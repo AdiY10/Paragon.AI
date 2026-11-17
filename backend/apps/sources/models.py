@@ -46,6 +46,7 @@ class SourceSnapshot(models.Model):
     published_at = models.DateTimeField(auto_now_add=True)
     adapter_version = models.CharField(max_length=64)
     source_schema = models.JSONField()
+    context = models.JSONField(default=dict)
     record_count = models.PositiveIntegerField()
     artifact_key = models.CharField(max_length=80)
     sha256 = models.CharField(max_length=64)
