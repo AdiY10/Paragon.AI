@@ -4,12 +4,15 @@ No production deployment exists yet; this is not Release 1 acceptance.
 
 | Verification | Result |
 |---|---|
-| Offline suite, Python 3.13, SQLite | 34 passed, 1 spatial test explicitly skipped |
-| Same suite, PostgreSQL 17 and PostGIS 3.6 | 35 passed, no skips |
+| Offline suite, Python 3.13, SQLite | 35 passed, 1 spatial test explicitly skipped |
+| Same suite, PostgreSQL 17 and PostGIS 3.6 | 36 passed, no skips |
 | Django configuration / migration consistency | Passed |
 | Overture monthly captures | 70 extracts / 35 seed pins; all SHA-256 hashes verified |
 | Historical Regal closure | Real Sep→Oct record pair preserved in tests |
 | GitHub Actions | Not run: workflow push rejected for missing OAuth workflow scope |
+| Production Gunicorn on private local socket | Health 200; app 302; anonymous API 403; sign-in 200; HSTS verified |
+| Render manifest | Official JSON-schema validation passed |
+| Docker image / Compose | Prepared; cannot run without daemon access |
 | Live OIDC / HTTPS / production ACs | Pending owner credentials and deployment |
 
 The real database suite creates a separate test database, applies all migrations,

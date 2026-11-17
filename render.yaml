@@ -1,0 +1,28 @@
+# Prepared infrastructure only. Provisioning paid resources requires owner approval.
+services:
+  - type: web
+    name: paragon-radar
+    runtime: docker
+    plan: starter
+    region: virginia
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health/
+    preDeployCommand: python backend/manage.py migrate --noinput
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: OIDC_SERVER_URL
+        sync: false
+      - key: OIDC_CLIENT_ID
+        sync: false
+      - key: OIDC_CLIENT_SECRET
+        sync: false
+      - key: TRUST_PROXY_SSL_HEADER
+        value: 'true'

@@ -14,7 +14,7 @@ if url.scheme not in ('postgres', 'postgresql') or not url.hostname or not url.p
 DATABASES = {'default': {
     'ENGINE': 'django.contrib.gis.db.backends.postgis',
     'NAME': unquote(url.path.lstrip('/')), 'USER': unquote(url.username or ''),
-    'PASSWORD': unquote(url.password or ''), 'HOST': url.hostname,
+    'PASSWORD': unquote(url.password or ''), 'HOST': unquote(url.hostname),
     'PORT': url.port or 5432, 'CONN_MAX_AGE': 60,
     'OPTIONS': dict(parse_qsl(url.query)),
 }}
