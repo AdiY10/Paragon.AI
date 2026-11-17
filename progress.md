@@ -3,12 +3,12 @@
 ## M0 — in progress
 - Implementation plan adopted from reviewed commit 1fee667.
 - Added resumable bounded Overture preservation CLI with per-extract hashes and source attribution.
-- PRs #1–#8 merged; GitHub push and API permissions verified.
+- PRs #1–#9 merged; GitHub push and API permissions verified.
 - Invite-only OIDC and membership APIs implemented and locally tested. Live deployment/provider callback and the product workflows remain incomplete.
 
 Validation: 40 tests pass against real PostgreSQL 17/PostGIS 3.6 including the backend foundation. Kingston snapshots contain 2,863 September and 2,916 October records within 3 miles; hashes verified. October has 584 qualifying present businesses within 1 mile. The real Regal record changes from open to permanently_closed. Full portfolio capture completed with 70 successful extracts; P21 has no reference pin, and malformed seed rows P02/P26 were corrected with CSV quoting. Strict seed validation now runs before external lookups.
 
-Backend scaffold now enforces private application/API access and rejects missing production secrets. The real PostGIS integration suite passes all 40 tests; SQLite passes 39 with one explicit spatial-test skip. Production Gunicorn smoke passes with real migrations and strict settings; Render manifest passes official schema validation. Docker/Compose build is unverified because the daemon is inaccessible. Versioned source catalog and private source-metadata API are implemented. Next: immutable snapshot storage and durable jobs. Admin role reassignment and access audit records are implemented. CI workflow is preserved on local branch ci/backend-verification; GitHub rejected its push because the current OAuth credential lacks workflow scope.
+Backend scaffold now enforces private application/API access and rejects missing production secrets. The real PostGIS integration suite passes all 40 tests; SQLite passes 39 with one explicit spatial-test skip. Production Gunicorn smoke passes with real migrations and strict settings; Render manifest passes official schema validation. Docker/Compose build is unverified because the daemon is inaccessible. Versioned source catalog and private source-metadata API are implemented. Private content-addressed artifact storage now passes interruption, corruption, limit, deduplication, and concurrent-publication checks. Next: snapshot publication and durable jobs. Admin role reassignment and access audit records are implemented. CI workflow is preserved on local branch ci/backend-verification; GitHub rejected its push because the current OAuth credential lacks workflow scope.
 
 BLOCKER: Hosting credentials and approved resource budget are not available.
 Impact: Live M0 deployment and production verification cannot run yet.
