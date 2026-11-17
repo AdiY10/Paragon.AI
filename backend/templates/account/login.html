@@ -1,0 +1,8 @@
+{% load socialaccount %}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sign in · Paragon Radar</title></head>
+<body><main><h1>Paragon Radar</h1><p>Private market intelligence. Access is by invitation only.</p>
+{% get_providers as providers %}
+{% for provider in providers %}<form method="post" action="{% provider_login_url provider.id %}">{% csrf_token %}<button type="submit">Continue with {{ provider.name }}</button></form>
+{% empty %}<p>Organization sign-in is not configured yet. Contact your administrator.</p>{% endfor %}
+</main></body></html>
