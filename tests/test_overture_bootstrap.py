@@ -27,3 +27,11 @@ def test_corrupt_resume_is_rejected(tmp_path):
     assert m.valid_capture(path)
     path.write_bytes(b'corrupt')
     assert not m.valid_capture(path)
+
+def test_real_regal_closure_capture():
+    fixture_path = Path(__file__).parent/'fixtures/real/overture/regal-status-change.json'
+    fixture = json.loads(fixture_path.read_text())
+    assert fixture['before']['id'] == fixture['after']['id']
+    assert fixture['before']['operating_status'] == 'open'
+    assert fixture['after']['operating_status'] == 'permanently_closed'
+    assert fixture['releases'] == ['2026-09-23.1', '2026-10-21.0']
