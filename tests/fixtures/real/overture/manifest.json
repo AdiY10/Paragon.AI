@@ -1,0 +1,61 @@
+{
+  "description": "Actual public Overture record pair extracted during bootstrap; not application seed data.",
+  "extracts": [
+    {
+      "release": "2026-09-23.1",
+      "seed_id": "P20",
+      "coordinates": {
+        "lat": 41.965186,
+        "lon": -73.988947
+      },
+      "radius_miles": 3,
+      "pin_provenance": "https://paragonct.com/properties/kingston-marketplace/",
+      "pin_status": "unconfirmed_seed_reference",
+      "source": "s3://overturemaps-us-west-2/release/2026-09-23.1/theme=places/type=place/*",
+      "retrieved_at": "2026-11-17T22:41:24.361918+00:00",
+      "record_count": 2863,
+      "sha256": "864dc1e05f724c2e1b03ebead5b3f74bd7632ef286f908a5466dc61f2c35acfa",
+      "attribution_url": "https://docs.overturemaps.org/attribution/",
+      "schema": [
+        "id",
+        "name",
+        "basic_category",
+        "brand",
+        "operating_status",
+        "confidence",
+        "sources",
+        "lat",
+        "lon"
+      ],
+      "status": "complete"
+    },
+    {
+      "release": "2026-10-21.0",
+      "seed_id": "P20",
+      "coordinates": {
+        "lat": 41.965186,
+        "lon": -73.988947
+      },
+      "radius_miles": 3,
+      "pin_provenance": "https://paragonct.com/properties/kingston-marketplace/",
+      "pin_status": "unconfirmed_seed_reference",
+      "source": "s3://overturemaps-us-west-2/release/2026-10-21.0/theme=places/type=place/*",
+      "retrieved_at": "2026-11-17T22:41:27.269285+00:00",
+      "record_count": 2916,
+      "sha256": "b688b8445b59c3e1a8b447db8d117ffcf2df604531d7a942e3b86af95c4cc8fe",
+      "attribution_url": "https://docs.overturemaps.org/attribution/",
+      "schema": [
+        "id",
+        "name",
+        "basic_category",
+        "brand",
+        "operating_status",
+        "confidence",
+        "sources",
+        "lat",
+        "lon"
+      ],
+      "status": "complete"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "before": {
+    "basic_category": "movie_theater",
+    "brand": null,
+    "confidence": 0.9199122190475464,
+    "id": "43ab62df-2092-4468-80b8-ff1a0dc6af3d",
+    "lat": 41.9671268,
+    "lon": -73.98483949999999,
+    "name": "Regal Cinemas Hudson Valley Mall 12",
+    "operating_status": "open",
+    "sources": [
+      {
+        "between": null,
+        "confidence": 0.77,
+        "dataset": "Foursquare",
+        "license": "Apache-2.0",
+        "property": "",
+        "provider": "foursquare",
+        "record_id": "4bc9f1ae511f9521fa96aec7",
+        "resource": "foursquare",
+        "update_time": "2025-08-19T00:00:00.000",
+        "version": "2026-04-14"
+      },
+      {
+        "between": null,
+        "confidence": null,
+        "dataset": "Overture",
+        "license": "CDLA-Permissive-2.0",
+        "property": "/properties/confidence",
+        "provider": "overture",
+        "record_id": null,
+        "resource": "confidence_calculation",
+        "update_time": "2026-09-17T22:52:12Z",
+        "version": "2026-09-17"
+      },
+      {
+        "between": null,
+        "confidence": 1.0,
+        "dataset": "Overture-signals",
+        "license": "CDLA-Permissive-2.0",
+        "property": "/properties/operating_status",
+        "provider": "overture",
+        "record_id": "bdb67feb-4c4d-47af-97aa-b1c46ca03e45",
+        "resource": "operating_status_signal",
+        "update_time": "2026-09-14T15:43:16Z",
+        "version": "2026-09-14"
+      }
+    ]
+  },
+  "after": {
+    "basic_category": "movie_theater",
+    "brand": null,
+    "confidence": 0.9199122190475464,
+    "id": "43ab62df-2092-4468-80b8-ff1a0dc6af3d",
+    "lat": 41.9671268,
+    "lon": -73.98483949999999,
+    "name": "Regal Cinemas Hudson Valley Mall 12",
+    "operating_status": "permanently_closed",
+    "sources": [
+      {
+        "between": null,
+        "confidence": 0.77,
+        "dataset": "Foursquare",
+        "license": "Apache-2.0",
+        "property": "",
+        "provider": "foursquare",
+        "record_id": "4bc9f1ae511f9521fa96aec7",
+        "resource": "foursquare",
+        "update_time": "2025-08-19T00:00:00.000",
+        "version": "2026-04-14"
+      },
+      {
+        "between": null,
+        "confidence": null,
+        "dataset": "Overture",
+        "license": "CDLA-Permissive-2.0",
+        "property": "/properties/confidence",
+        "provider": "overture",
+        "record_id": null,
+        "resource": "confidence_calculation",
+        "update_time": "2026-10-15T18:00:21Z",
+        "version": "2026-10-15"
+      },
+      {
+        "between": null,
+        "confidence": 1.0,
+        "dataset": "Overture-signals",
+        "license": "CDLA-Permissive-2.0",
+        "property": "/properties/operating_status",
+        "provider": "overture",
+        "record_id": "48a9f61f-adbe-459b-98ba-93c97206feeb",
+        "resource": "operating_status_signal",
+        "update_time": "2026-10-13T21:05:00Z",
+        "version": "2026-10-12"
+      }
+    ]
+  },
+  "releases": [
+    "2026-09-23.1",
+    "2026-10-21.0"
+  ]
+}
