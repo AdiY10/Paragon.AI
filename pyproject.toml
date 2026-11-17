@@ -20,7 +20,7 @@ dev = ["pytest>=8,<10", "pytest-django>=4.11,<5"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "backend/tests"]
-pythonpath = ["backend"]
+pythonpath = ["backend", "scripts/ingestion"]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
 
 [tool.uv]
