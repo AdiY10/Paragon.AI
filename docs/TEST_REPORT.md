@@ -5,7 +5,7 @@ No production deployment exists yet; this is not Release 1 acceptance.
 | Verification | Result |
 |---|---|
 | Offline suite, Python 3.13, SQLite | 35 passed, 1 spatial test explicitly skipped |
-| Same suite, PostgreSQL 17 and PostGIS 3.6 | 35 passed, no skips |
+| Same suite, PostgreSQL 17 and PostGIS 3.6 | 36 passed, no skips |
 | Django configuration / migration consistency | Passed |
 | Overture monthly captures | 70 extracts / 35 seed pins; all SHA-256 hashes verified |
 | Historical Regal closure | Real Sep→Oct record pair preserved in tests |
