@@ -9,7 +9,7 @@ ALLOWED_HOSTS = [v.strip() for v in os.environ.get('DJANGO_ALLOWED_HOSTS', '').s
 INSTALLED_APPS = [
     'django.contrib.auth', 'django.contrib.contenttypes', 'django.contrib.sessions',
     'django.contrib.messages', 'django.contrib.staticfiles',
-    'rest_framework', 'drf_spectacular', 'apps.accounts', 'apps.sources',
+    'rest_framework', 'drf_spectacular', 'apps.accounts', 'apps.sources', 'apps.operations', 'django_q',
     'allauth', 'allauth.account', 'allauth.socialaccount',
     'allauth.socialaccount.providers.openid_connect',
 ]
@@ -82,3 +82,13 @@ if os.environ.get('GEOS_LIBRARY_PATH'):
     GEOS_LIBRARY_PATH = os.environ['GEOS_LIBRARY_PATH']
 if os.environ.get('GDAL_LIBRARY_PATH'):
     GDAL_LIBRARY_PATH = os.environ['GDAL_LIBRARY_PATH']
+
+Q_CLUSTER = {
+    'name': 'paragon-maintenance', 'orm': 'default', 'workers': 1,
+    'timeout': 1800, 'retry': 2100, 'max_attempts': 3,
+    'queue_limit': 1, 'bulk': 1, 'poll': 1, 'save_limit': 250,
+    'scheduler': False, 'catch_up': False,
+    'ALT_CLUSTERS': {'paragon-foreground': {
+        'workers': 2, 'timeout': 90, 'retry': 150, 'queue_limit': 2,
+    }},
+}
