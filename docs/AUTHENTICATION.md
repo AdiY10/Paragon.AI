@@ -22,7 +22,10 @@ existing private channel; the invitation endpoint does not send email.
 Membership is checked against the database on every authenticated request. Removal
 invalidates access on the next request and clears that browser session. Role guards
 are server-side. Reposting an invitation does not reactivate a removed member.
-The last admin cannot be removed. POST/DELETE use Django/DRF CSRF protection.
+Admins can reassign roles with `PATCH /api/admin/users/<id>/`.
+The last administrator who has signed in cannot be removed or demoted; a pending
+admin invitation cannot substitute for them. Invitation, removal, role changes,
+and initial-admin bootstrap create access audit records. POST/DELETE use Django/DRF CSRF protection.
 
 Local tests verify adapter email checks, persistence, roles, revocation, and CSRF.
 A live provider callback is still unverified until owner-provided OIDC credentials
