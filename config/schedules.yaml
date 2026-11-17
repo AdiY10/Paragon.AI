@@ -1,0 +1,11 @@
+schema_version: 1
+# Definitions only. Missing handlers must remain disabled, never replaced by no-ops.
+schedules:
+  - {name: sec_daily, kind: sec_daily, cadence: daily, hour: 6, minute: 0}
+  - {name: brief_weekly, kind: brief_weekly, cadence: weekly, weekday: 0, hour: 7, minute: 0}
+  - {name: overture_check, kind: overture_check, cadence: weekly, weekday: 3, hour: 3, minute: 0}
+  - {name: bls_bps_check, kind: bls_bps_check, cadence: weekly, weekday: 1, hour: 5, minute: 0}
+  - {name: annual_sources_check, kind: annual_sources_check, cadence: monthly, day: 1, hour: 4, minute: 0}
+  - {name: flood_recheck, kind: flood_recheck, cadence: monthly, day: 15, hour: 4, minute: 0}
+  - {name: maintenance_daily, kind: maintenance_daily, cadence: daily, hour: 5, minute: 30}
+  - {name: backup_daily, kind: backup_daily, cadence: daily, hour: 2, minute: 0}
