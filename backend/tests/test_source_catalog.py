@@ -32,7 +32,7 @@ def test_source_catalog_api_is_private_and_does_not_fabricate_health(client):
     client.force_login(user)
     data=client.get('/api/sources/').json()
     assert len(data)==16
-    assert all('last_checked' not in source and 'status' not in source for source in data)
+    assert all(source['status']=='Not checked' and source['health_scopes']==[] for source in data)
 
 
 def test_invalid_catalog_is_rejected_before_writes(tmp_path):

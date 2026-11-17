@@ -65,3 +65,44 @@ class SourceSnapshot(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValueError('Published source records cannot be deleted')
+
+
+class SourceCheck(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source = models.ForeignKey(SourceDefinition, on_delete=models.PROTECT, related_name='checks')
+    scope = models.CharField(max_length=160)
+    run_key = models.CharField(max_length=160)
+    completed_at = models.DateTimeField()
+    succeeded = models.BooleanField()
+    error_code = models.CharField(max_length=32, blank=True)
+    snapshot = models.ForeignKey(SourceSnapshot, null=True, blank=True, on_delete=models.PROTECT)
+    objects = ImmutableQuerySet.as_manager()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['source','scope','run_key'], name='source_check_run_unique')]
+        ordering = ['-completed_at', 'id']
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError('Source check history is immutable')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError('Source check history cannot be deleted')
+
+
+class SourceHealth(models.Model):
+    source = models.ForeignKey(SourceDefinition, on_delete=models.PROTECT, related_name='health_scopes')
+    scope = models.CharField(max_length=160)
+    last_checked_at = models.DateTimeField(null=True)
+    last_success_at = models.DateTimeField(null=True)
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    error_code = models.CharField(max_length=32, blank=True)
+    latest_snapshot = models.ForeignKey(SourceSnapshot, null=True, on_delete=models.PROTECT)
+    available_release = models.CharField(max_length=96, blank=True)
+    available_since = models.DateTimeField(null=True)
+    processed_release = models.CharField(max_length=96, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['source','scope'], name='source_health_scope_unique')]
+        ordering = ['scope']
