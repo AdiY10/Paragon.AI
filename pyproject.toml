@@ -1,0 +1,27 @@
+[project]
+name = "paragon-radar"
+version = "0.1.0"
+description = "Private, evidence-backed trade-area intelligence for Paragon Realty Group"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "Django>=5.2,<5.3",
+  "djangorestframework>=3.16,<4",
+  "django-allauth>=65.22,<66",
+  "django-q2>=1.11,<2",
+  "drf-spectacular>=0.28,<1",
+  "psycopg[binary]>=3.2,<4",
+  "duckdb>=1.4,<3",
+  "pyarrow>=20,<24",
+  "gunicorn>=23,<24",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-django>=4.11,<5"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "backend/tests"]
+pythonpath = ["backend"]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+
+[tool.uv]
+package = false
