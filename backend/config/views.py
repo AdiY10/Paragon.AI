@@ -7,14 +7,9 @@ from rest_framework.response import Response
 def health(request):
     return JsonResponse({'status': 'ok'})
 
-@login_not_required
-def sign_in(request):
-    # Replaced by the mature OIDC integration in the access-control milestone.
-    return HttpResponse('Paragon Radar · Invite-only access. Sign-in configuration is pending.', status=503)
-
 def application(request):
     return HttpResponse('Paragon Radar · Application foundation')
 
 @api_view(['GET'])
 def session(request):
-    return Response({'email': request.user.email})
+    return Response({'email': request.user.email, 'role': request.membership.role})

@@ -9,7 +9,9 @@ ALLOWED_HOSTS = [v.strip() for v in os.environ.get('DJANGO_ALLOWED_HOSTS', '').s
 INSTALLED_APPS = [
     'django.contrib.auth', 'django.contrib.contenttypes', 'django.contrib.sessions',
     'django.contrib.messages', 'django.contrib.staticfiles',
-    'rest_framework', 'drf_spectacular',
+    'rest_framework', 'drf_spectacular', 'apps.accounts',
+    'allauth', 'allauth.account', 'allauth.socialaccount',
+    'allauth.socialaccount.providers.openid_connect',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -17,6 +19,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.ActiveMembershipMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -54,3 +58,22 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 50,
 }
 SPECTACULAR_SETTINGS = {'TITLE': 'Paragon Radar API', 'VERSION': '0.1.0', 'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAdminUser']}
+
+AUTHENTICATION_BACKENDS = ['django.contrib.auth.backends.ModelBackend', 'allauth.account.auth_backends.AuthenticationBackend']
+ACCOUNT_ADAPTER = 'apps.accounts.adapters.ClosedAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'apps.accounts.adapters.InviteOnlySocialAdapter'
+SOCIALACCOUNT_ONLY = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_LOGIN_ON_GET = False
+# The OIDC adapter requires the provider's verified email; local email flows are disabled.
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*']
+ACCOUNT_LOGOUT_ON_GET = False
+SOCIALACCOUNT_PROVIDERS = {}
+if os.environ.get('OIDC_CLIENT_ID') and os.environ.get('OIDC_CLIENT_SECRET') and os.environ.get('OIDC_SERVER_URL'):
+    SOCIALACCOUNT_PROVIDERS = {'openid_connect': {'APPS': [{
+        'provider_id': 'paragon', 'name': 'Organization sign-in',
+        'client_id': os.environ['OIDC_CLIENT_ID'], 'secret': os.environ['OIDC_CLIENT_SECRET'],
+        'settings': {'server_url': os.environ['OIDC_SERVER_URL']},
+    }]}}
