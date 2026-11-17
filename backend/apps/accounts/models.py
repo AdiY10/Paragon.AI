@@ -27,3 +27,15 @@ class Membership(models.Model):
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
+
+
+class AccessAuditEvent(models.Model):
+    """Append-only application records for changes to access and roles."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='access_audit_events')
+    membership = models.ForeignKey(Membership, on_delete=models.PROTECT, related_name='audit_events')
+    action = models.CharField(max_length=32)
+    before = models.JSONField(default=dict)
+    after = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)

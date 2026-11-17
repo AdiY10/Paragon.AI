@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from .models import Membership
+from .models import Membership, AccessAuditEvent
 from .permissions import IsAdministrator
 
 class InviteSerializer(serializers.Serializer):
@@ -24,20 +24,44 @@ def users(request):
             defaults={'role': serializer.validated_data['role'], 'invited_by': request.user})
         if not created:
             return Response({'detail': 'This email already has an invitation or membership.'}, status=409)
+        AccessAuditEvent.objects.create(actor=request.user, membership=member, action='invited',
+            after={'email': member.email, 'role': member.role, 'active': member.active})
     return Response({'id': str(member.id), 'email': member.email, 'role': member.role}, status=201)
 
 
-@api_view(['DELETE'])
+class RoleSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=Membership.Role.choices)
+
+
+@api_view(['PATCH', 'DELETE'])
 @permission_classes([IsAdministrator])
-def remove_user(request, member_id):
-    # Serialize administrator changes to prevent concurrent removals of the last admin.
+def member_detail(request, member_id):
+    serializer = None
+    if request.method == 'PATCH':
+        serializer = RoleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
     with transaction.atomic():
+        # All admin mutations acquire the same ordered locks. Pending invitations
+        # cannot substitute for the final admin who has actually signed in.
         list(Membership.objects.select_for_update().filter(role='admin').order_by('id'))
-        member = Membership.objects.filter(pk=member_id, active=True).first()
+        member = Membership.objects.select_for_update().filter(pk=member_id, active=True).first()
         if member is None:
             return Response({'detail': 'Membership not found.'}, status=404)
-        if member.role == 'admin' and Membership.objects.filter(role='admin', active=True).count() <= 1:
-            return Response({'detail': 'The last administrator cannot be removed.'}, status=409)
-        member.active = False
-        member.save(update_fields=['active', 'updated_at'])
-    return Response(status=204)
+        removing_admin = member.role == 'admin' and (
+            request.method == 'DELETE' or serializer.validated_data['role'] != 'admin')
+        if removing_admin and member.user_id and Membership.objects.filter(
+                role='admin', active=True, user__isnull=False).count() <= 1:
+            return Response({'detail': 'The last signed-in administrator cannot be removed or demoted.'}, status=409)
+        before = {'role': member.role, 'active': member.active}
+        if request.method == 'DELETE':
+            member.active = False
+            action = 'removed'
+        else:
+            member.role = serializer.validated_data['role']
+            action = 'role_changed'
+        member.save(update_fields=['role', 'active', 'updated_at'])
+        AccessAuditEvent.objects.create(actor=request.user, membership=member, action=action,
+            before=before, after={'role': member.role, 'active': member.active})
+    if request.method == 'DELETE':
+        return Response(status=204)
+    return Response({'id': str(member.id), 'role': member.role, 'active': member.active})

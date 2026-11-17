@@ -159,3 +159,41 @@ def test_invitation_mutations_require_csrf():
     client.force_login(admin)
     response = client.post('/api/admin/users/', {'email':'new@example.org'}, content_type='application/json')
     assert response.status_code == 403
+
+
+def test_role_promotion_takes_effect_on_next_request(client):
+    admin, _ = member('admin@example.org', 'admin')
+    target, membership = member()
+    client.force_login(admin)
+    response = client.patch(f'/api/admin/users/{membership.id}/', {'role':'admin'}, content_type='application/json')
+    assert response.status_code == 200
+    client.force_login(target)
+    assert client.get('/api/admin/users/').status_code == 200
+    event = membership.audit_events.get(action='role_changed')
+    assert event.before['role'] == 'member'
+    assert event.after['role'] == 'admin'
+    assert event.actor == admin
+
+
+def test_pending_admin_cannot_allow_last_signed_in_admin_to_be_demoted(client):
+    admin, membership = member('admin@example.org', 'admin')
+    Membership.objects.create(email='pending@example.org', role='admin')
+    client.force_login(admin)
+    assert client.patch(f'/api/admin/users/{membership.id}/', {'role':'member'}, content_type='application/json').status_code == 409
+    assert client.delete(f'/api/admin/users/{membership.id}/').status_code == 409
+
+
+def test_member_cannot_promote_self(client):
+    user, membership = member()
+    client.force_login(user)
+    assert client.patch(f'/api/admin/users/{membership.id}/', {'role':'admin'}, content_type='application/json').status_code == 403
+
+
+def test_invitation_and_removal_are_audited(client):
+    admin, _ = member('admin@example.org', 'admin')
+    client.force_login(admin)
+    assert client.post('/api/admin/users/', {'email':'new@example.org'}, content_type='application/json').status_code == 201
+    invitation = Membership.objects.get(email='new@example.org')
+    assert invitation.audit_events.get().action == 'invited'
+    assert client.delete(f'/api/admin/users/{invitation.id}/').status_code == 204
+    assert list(invitation.audit_events.order_by('created_at').values_list('action',flat=True)) == ['invited','removed']
