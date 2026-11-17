@@ -1,0 +1,195 @@
+schema_version: 1
+sources:
+- id: SRC-01
+  name: Census Geocoder
+  provider: U.S. Census Bureau
+  purpose: Resolve address pins and census geographies
+  coverage: US addresses
+  documentation_url: https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Census Bureau
+  cadence: on_demand
+  stale_after_days: null
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-02
+  name: Nominatim fallback
+  provider: OpenStreetMap Foundation
+  purpose: Fallback for nonconfidential public-address lookups
+  coverage: Global addresses; policy-limited fallback
+  documentation_url: https://operations.osmfoundation.org/policies/nominatim/
+  licence: ODbL; comply with Nominatim usage policy.
+  attribution: © OpenStreetMap contributors
+  cadence: on_demand
+  stale_after_days: null
+  privacy_note: Disabled by default for confidential candidates; no autocomplete or
+    bulk queries; application-wide maximum one request per second with caching and
+    identifying User-Agent.
+- id: SRC-03
+  name: ACS five-year estimates
+  provider: U.S. Census Bureau
+  purpose: Trade-area demographics and statistically qualified trends
+  coverage: US block groups; geography and period dependent
+  documentation_url: https://www.census.gov/programs-surveys/acs/data/summary-file.html
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Census Bureau
+  cadence: monthly_check
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-04
+  name: TIGER geography
+  provider: U.S. Census Bureau
+  purpose: Versioned blocks, block groups, population weights, and boundaries
+  coverage: US census geography; vintage dependent
+  documentation_url: https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Census Bureau
+  cadence: monthly_check
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-05
+  name: LODES workplace jobs
+  provider: U.S. Census Bureau
+  purpose: Jobs located in rings and year-over-year change
+  coverage: US states; available state-years vary
+  documentation_url: https://lehd.ces.census.gov/data/
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Census Bureau
+  cadence: monthly_check
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-06
+  name: QCEW employment
+  provider: U.S. Bureau of Labor Statistics
+  purpose: County private and retail employment
+  coverage: US counties and Connecticut planning regions
+  documentation_url: https://www.bls.gov/cew/additional-resources/open-data/
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Bureau of Labor Statistics
+  cadence: weekly_check
+  stale_after_days: 21
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-07
+  name: LAUS unemployment
+  provider: U.S. Bureau of Labor Statistics
+  purpose: County unemployment and year-over-year percentage-point change
+  coverage: US counties and Connecticut planning regions
+  documentation_url: https://www.bls.gov/lau/
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Bureau of Labor Statistics
+  cadence: weekly_check
+  stale_after_days: 21
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-08
+  name: CPI inflation index
+  provider: U.S. Bureau of Labor Statistics
+  purpose: Inflation adjustment for comparable household income periods
+  coverage: US annual inflation index
+  documentation_url: https://www.bls.gov/cpi/research-series/r-cpi-u-rs-home.htm
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Bureau of Labor Statistics
+  cadence: monthly_check
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-09
+  name: Building Permits Survey
+  provider: U.S. Census Bureau
+  purpose: Residential units authorized over comparable trailing periods
+  coverage: Covered counties and permit-issuing jurisdictions
+  documentation_url: https://www.census.gov/construction/bps/
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Census Bureau
+  cadence: weekly_check
+  stale_after_days: 21
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-10
+  name: HPMS road traffic
+  provider: Federal Highway Administration / USDOT
+  purpose: AADT for up to two selected nearby named routes
+  coverage: US federal traffic segments; local coverage varies
+  documentation_url: https://www.fhwa.dot.gov/policyinformation/hpms.cfm
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: Federal Highway Administration / USDOT
+  cadence: monthly_check
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-11
+  name: National Flood Hazard Layer
+  provider: FEMA
+  purpose: Conservative flood screening at and near the pin
+  coverage: Digitally mapped areas; not an official property determination
+  documentation_url: https://www.fema.gov/flood-maps/national-flood-hazard-layer
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: FEMA
+  cadence: on_demand_and_monthly
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-12
+  name: National Risk Index
+  provider: FEMA
+  purpose: Modelled tract-level natural hazard context
+  coverage: US census tracts; published model vintage
+  documentation_url: https://hazards.fema.gov/nri/
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: FEMA
+  cadence: monthly_check
+  stale_after_days: 45
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-13
+  name: Overture Places
+  provider: Overture Maps Foundation
+  purpose: Nearby business landscape and qualified snapshot changes
+  coverage: Global map places; completeness varies
+  documentation_url: https://docs.overturemaps.org/guides/places/
+  licence: Record-dependent CDLA-Permissive-2.0, Apache-2.0, or CC0; retain sources
+    and notices.
+  attribution: Overture Maps Foundation and applicable record-level source contributors.
+  cadence: weekly_check
+  stale_after_days: 21
+  privacy_note: Only required data lookups are sent to this provider; no analytics
+    or session replay.
+- id: SRC-14
+  name: SEC EDGAR filings
+  provider: U.S. Securities and Exchange Commission
+  purpose: Company-level tenant bankruptcy and restructuring events
+  coverage: SEC registrants with confirmed tenant-to-filer mapping
+  documentation_url: https://www.sec.gov/search-filings/edgar-application-programming-interfaces
+  licence: U.S. government public data; retain source citation and published caveats.
+  attribution: U.S. Securities and Exchange Commission
+  cadence: daily_check
+  stale_after_days: 3
+  privacy_note: Company identifiers only; identifying User-Agent with supplied contact
+    required; use at most five requests per second application-wide.
+- id: SRC-15
+  name: User-provided facts
+  provider: Paragon team
+  purpose: Portfolio confirmation, tenant roster, pin corrections, and labelled facts
+  coverage: User-entered property facts only
+  documentation_url: https://github.com/AdiY10/Paragon.AI/blob/main/docs/03_DATA_SOURCES.md
+  licence: Private user-provided business facts.
+  attribution: Paragon team
+  cadence: on_demand
+  stale_after_days: null
+  privacy_note: Private to authorized Paragon users; preserve actor and entry time.
+- id: SRC-16
+  name: Paragon public property listings
+  provider: Paragon Realty Group
+  purpose: One-time unconfirmed portfolio and tenant seed
+  coverage: 36 publicly listed properties; ownership unconfirmed
+  documentation_url: https://paragonct.com/properties/
+  licence: Public listing used as an attributed unconfirmed seed; no market-data scraping.
+  attribution: Paragon Realty Group
+  cadence: one_time
+  stale_after_days: null
+  privacy_note: Public source only; demographic, traffic, and occupancy listing values
+    are not imported as measurements.
