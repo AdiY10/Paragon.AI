@@ -1,0 +1,23 @@
+# Verification report — implementation in progress
+
+No production deployment exists yet; this is not Release 1 acceptance.
+
+| Verification | Result |
+|---|---|
+| Offline suite, Python 3.13, SQLite | 34 passed, 1 spatial test explicitly skipped |
+| Same suite, PostgreSQL 17 and PostGIS 3.6 | 35 passed, no skips |
+| Django configuration / migration consistency | Passed |
+| Overture monthly captures | 70 extracts / 35 seed pins; all SHA-256 hashes verified |
+| Historical Regal closure | Real Sep→Oct record pair preserved in tests |
+| GitHub Actions | Not run: workflow push rejected for missing OAuth workflow scope |
+| Live OIDC / HTTPS / production ACs | Pending owner credentials and deployment |
+
+The real database suite creates a separate test database, applies all migrations,
+and tests membership, role changes, revocation, CSRF, access audit records,
+case-insensitive SQL uniqueness, and spherical spatial distance. It does not yet
+verify concurrent role mutation, source pipeline computations, product workflows,
+performance, or production reliability. Test fixtures never populate production.
+
+P21 (Mt. Kisco) has no resolved seed pin and has no Overture capture. The 70 archived
+extracts are currently in ignored local runtime storage; durable off-machine storage
+is still required before claiming retention/recovery readiness.
