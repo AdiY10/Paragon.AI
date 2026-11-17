@@ -62,3 +62,16 @@ transport completion, then asks the worker parent to drain its children. Forced 
 fails the check rather than being reported as graceful shutdown. The verified local run
 processed 16 source definitions in one attempt, acknowledged the message, and shut down
 cleanly. This does not verify deployment schedules or production source freshness.
+
+## Administrator controls
+
+`GET /api/admin/jobs/` returns paginated run metadata, timing, record counts, retry
+state, and sanitized error codes. It omits handler parameters and transport payloads.
+`POST /api/admin/jobs/` submits a registered kind with a UUID `Idempotency-Key` header;
+repeating the request returns the same run. The initial catalog job uses global scope.
+
+`POST /api/admin/jobs/<id>/rerun/` requires a new UUID idempotency key and a terminal
+original run. It creates a linked run with the requesting administrator recorded,
+leaving the original result intact. Active runs return 409 and remain under lease/
+recovery control. Removed or Member users cannot access these endpoints. Browser
+mutations remain protected by the session authentication and CSRF stack.
