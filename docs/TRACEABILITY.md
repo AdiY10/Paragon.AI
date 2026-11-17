@@ -4,8 +4,8 @@ Production status remains pending until deployed verification.
 
 | Acceptance | Requirements | Status | Evidence |
 |---|---|---|---|
-| AC-01 | FR-01 | Pending | Not implemented |
-| AC-02 | FR-02 | Pending | Not implemented |
+| AC-01 | FR-01 | Implemented; production verification pending | Anonymous route tests and membership middleware |
+| AC-02 | FR-02 | Implemented; live OIDC verification pending | Invitation, role, revocation, and audit tests |
 | AC-03 | FR-04 | Pending | Not implemented |
 | AC-04 | FR-05 | Pending | Not implemented |
 | AC-05 | FR-05 | Pending | Not implemented |
