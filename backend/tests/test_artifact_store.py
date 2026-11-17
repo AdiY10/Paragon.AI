@@ -50,7 +50,7 @@ def test_concurrent_identical_publications_are_complete(tmp_path):
     with ThreadPoolExecutor(max_workers=4) as pool:
         artifacts=list(pool.map(lambda _:store.put(BytesIO(b'complete'*10000)),range(8)))
     assert len(set(artifacts))==1
-    with store.open_verified(artifacts[0].key) as f:assert len(f.read())==70000
+    with store.open_verified(artifacts[0].key) as f:assert f.read()==b'complete'*10000
 
 
 def test_size_limit_cleans_staging_and_does_not_publish(tmp_path):
