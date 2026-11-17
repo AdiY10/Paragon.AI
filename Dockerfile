@@ -12,6 +12,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --chown=paragon:paragon backend ./backend
 COPY --chown=paragon:paragon infra ./infra
+COPY --chown=paragon:paragon config ./config
 COPY --chown=paragon:paragon data/seed ./data/seed
 ENV PATH="/app/.venv/bin:$PATH" PYTHONPATH=/app/backend PYTHONUNBUFFERED=1 DJANGO_SETTINGS_MODULE=config.settings.production
 USER paragon
