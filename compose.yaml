@@ -1,0 +1,18 @@
+services:
+  database:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: paragon
+      POSTGRES_USER: paragon
+      POSTGRES_PASSWORD: ${PARAGON_LOCAL_DB_PASSWORD:?Set a disposable local database password}
+    ports:
+      - '127.0.0.1:55432:5432'
+    volumes:
+      - paragon-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U paragon -d paragon']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  paragon-db:

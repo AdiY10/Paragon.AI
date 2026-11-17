@@ -77,3 +77,8 @@ if os.environ.get('OIDC_CLIENT_ID') and os.environ.get('OIDC_CLIENT_SECRET') and
         'client_id': os.environ['OIDC_CLIENT_ID'], 'secret': os.environ['OIDC_CLIENT_SECRET'],
         'settings': {'server_url': os.environ['OIDC_SERVER_URL']},
     }]}}
+
+if os.environ.get('GEOS_LIBRARY_PATH'):
+    GEOS_LIBRARY_PATH = os.environ['GEOS_LIBRARY_PATH']
+if os.environ.get('GDAL_LIBRARY_PATH'):
+    GDAL_LIBRARY_PATH = os.environ['GDAL_LIBRARY_PATH']
