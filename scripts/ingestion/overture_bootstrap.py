@@ -1,7 +1,7 @@
 """Preserve bounded real Places extracts before Overture release retention expires."""
 from __future__ import annotations
 import argparse
-import csv
+from seed import read_seed
 import hashlib
 import json
 import math
@@ -94,6 +94,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--location', action='append', help='Optional seed ID; repeatable')
     args = parser.parse_args()
+    sites = read_seed(args.seed)
+    if args.location and set(args.location) - {s["seed_id"] for s in sites}:
+        parser.error("Unknown seed location ID")
     args.output.mkdir(parents=True, exist_ok=True)
     request = urllib.request.Request(BUCKET+'?list-type=2&prefix=release/&delimiter=/',
         headers={'User-Agent': 'ParagonRadarBootstrap/0.1'})
@@ -108,22 +111,21 @@ def main():
     con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
     con.execute("SET s3_region='us-west-2'; SET memory_limit='1GB'; SET threads=2;")
     results = []
-    with args.seed.open() as handle:
-        for site in csv.DictReader(handle):
-            if args.location and site['seed_id'] not in args.location:
-                continue
-            if not site['reference_lat'] or not site['reference_lon']:
-                results.append({'seed_id': site['seed_id'], 'status': 'unresolved_pin'})
-                continue
-            for release in releases:
-                try:
-                    outcome = capture(con, release, site, args.output)
-                except Exception as exc:
-                    outcome = {'status': 'failed', 'error_type': type(exc).__name__, 'error': str(exc)}
-                outcome.update(seed_id=site['seed_id'], release=release)
-                results.append(outcome)
-                print(json.dumps(outcome), flush=True)
-                (args.output/'bootstrap-report.json').write_text(json.dumps(results, indent=2)+'\n')
+    for site in sites:
+        if args.location and site['seed_id'] not in args.location:
+            continue
+        if not site['reference_lat'] or not site['reference_lon']:
+            results.append({'seed_id': site['seed_id'], 'status': 'unresolved_pin'})
+            continue
+        for release in releases:
+            try:
+                outcome = capture(con, release, site, args.output)
+            except Exception as exc:
+                outcome = {'status': 'failed', 'error_type': type(exc).__name__, 'error': str(exc)}
+            outcome.update(seed_id=site['seed_id'], release=release)
+            results.append(outcome)
+            print(json.dumps(outcome), flush=True)
+            (args.output/'bootstrap-report.json').write_text(json.dumps(results, indent=2)+'\n')
     (args.output/'bootstrap-report.json').write_text(json.dumps(results, indent=2)+'\n')
     return 1 if any(r['status'] in ('failed', 'unresolved_pin') for r in results) else 0
 
