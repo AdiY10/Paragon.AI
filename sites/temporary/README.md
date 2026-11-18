@@ -59,3 +59,20 @@ of account ownership. Keep this Site available until the destination is verified
 
 This temporary Site is not full Release 1 acceptance. It is private to its owner;
 sharing with more users requires an explicit access-policy change.
+
+## Census address review update
+
+Find address pin now performs on-demand Census lookup with explicit review and
+acceptance, no automatic building/ownership confirmation, 30-day cached evidence,
+and real per-location source-check history. Ambiguous results require selection;
+no match leaves the saved pin intact. Nominatim remains disabled. The UI comes from
+canonical commit 8eb9412c3dc2e573408b7bb26d397385b3a7393f.
+
+Additive migration 0001 creates only geocode_lookups and source_checks; existing
+record, audit, and pin tables remain unchanged. Export schema version 2 additionally
+includes the private raw Census responses/hashes, lookup history, and source checks.
+The destination importer must handle both earlier version 1 and version 2 exports.
+Fifteen frontend/adapter tests and the actual local Workers/D1 browser workflow
+verify real Census match, ambiguity, no match, cache age, acceptance replay,
+provenance-field rejection, and cross-user denial. Production owner interaction is
+not impersonated by those local tests.

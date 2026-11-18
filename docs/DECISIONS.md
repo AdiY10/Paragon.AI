@@ -83,3 +83,13 @@ building/ownership verification separate. Show a true unsaved map and source che
 capture dates, with exactness and geography-vintage details available for audit.
 Preview markers do not link to nonexistent records. Extend browser verification
 with live public-reference requests and phone-width accessibility checks.
+
+## D-029 — Publish on-demand Census on the existing private Site
+
+Adapt the same reviewed geocoding contract to HTTP-only Workers and D1, keeping
+owner namespaces, explicit acceptance, immutable source response hashes, actual
+check history, cache age, source-field rejection, and idempotent acceptance replay.
+Append schema-only lookup/check tables; do not change existing record/pin tables or
+reseed user edits. Export schema 2 adds raw response and check evidence for later
+migration. Keep ChatGPT authentication/audience unchanged. Only on-demand Census
+checks are live; other background sources remain explicitly unimplemented.

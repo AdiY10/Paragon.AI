@@ -126,3 +126,17 @@ and no auto-confirmed ownership/building. A 375-pixel dialog screenshot was insp
 mobile overflow and automated A/AA rules pass. Property/search secondary-text contrast
 was corrected after this broader dialog scan exposed it. Previous record/pin edits,
 concurrent conflict, focus, maps, source cards, and failed-tile retention still pass.
+
+## Private Site Census publication (2026-11-18)
+
+Sites confirmed terminal `succeeded` publication at the existing owner-private URL
+for source 15f361441b7d5b6b164229c52253baa89cb45d9d. Live database inspection confirms
+additive geocode_lookups/source_checks alongside existing records/revisions/audits.
+The original migration/snapshot files were unchanged. Fifteen Site frontend/adapter
+tests and the production Worker build pass. Local actual Workers/D1 plus Chromium
+verify live Census matched/ambiguous/no-match results, explicit choice and acceptance,
+unchanged pins on no match, source hash/context and unverified status, no fake cache
+re-checks, idempotent replay, rejected source spoofing and other-user acceptance,
+real source health, and schema-2 export of raw lookup evidence. Existing persistence,
+private APIs, responsive A/AA checks, and map loading pass. Real production owner
+interaction is not impersonated or claimed; full Release 1 analysis remains pending.

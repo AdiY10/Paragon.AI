@@ -21,3 +21,11 @@ the destination. Keep the temporary Site until those checks pass.
 There is no automatic Django importer yet. Changing the URL alone will not transfer
 D1 edits. The export action and source are available now so migration can be done
 without redesigning the UI or losing the collected records.
+
+Export version 2 adds geocode_lookups and source_checks. Verify each raw_response's
+SHA-256 against its source.sha256 before publishing it into destination private
+artifact storage. Map Site content-addressed source IDs and owner IDs to destination
+snapshot/user IDs. Preserve original retrieval/check dates and geography vintages,
+including Connecticut planning-region versus old-county decennial block IDs. An
+interpolated Census suggestion must remain unconfirmed after import. Existing
+version 1 exports have no geocoding arrays; do not synthesize missing evidence.

@@ -90,5 +90,5 @@ requests are made. No invented metrics, photographs, or “live” activity are 
 
 Census lookup/review is now implemented in the canonical Django UI. The browser
 smoke contacts Census for three real public addresses and verifies match, ambiguity,
-and no-match behavior. The temporary Site needs its separate adapter update before
-this control is available there. See GEOCODING.md for privacy and provenance.
+and no-match behavior. The same review control is now published on the temporary Site with its separate
+Worker adapter and persistent source evidence. See GEOCODING.md for privacy and provenance.
