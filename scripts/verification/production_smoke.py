@@ -44,7 +44,7 @@ def main():
                 else:
                     raise TimeoutError('Production WSGI socket did not appear')
                 results = {}
-                for route, expected in [('/health/',200),('/',302),('/api/session/',403),('/accounts/login/',200)]:
+                for route, expected in [('/health/',200),('/',302),('/api/session/',403),('/api/locations/',403),('/api/sources/',403),('/api/admin/jobs/',403),('/api/admin/schedules/',403),('/accounts/login/',200)]:
                     connection = SocketHTTPConnection(path)
                     connection.request('GET', route, headers={'Host':'localhost','X-Forwarded-Proto':'https'})
                     response = connection.getresponse()
