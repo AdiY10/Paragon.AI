@@ -1,5 +1,9 @@
 # Invite-only authentication
 
+The temporary OpenAI Site uses built-in ChatGPT sign-in and owner-private platform
+access; it does not require these OIDC settings. See TEMPORARY_SITE.md. The following
+configuration applies to the canonical Django application.
+
 The application uses django-allauth's OpenID Connect authorization-code flow and
 server sessions. There is no local password signup. A provider identity must supply
 an explicitly verified email matching an active invitation. An email string alone

@@ -43,3 +43,14 @@ revision through the existing API. Pin verification resets on movement and stays
 independent of ownership. Native coordinate inputs provide a keyboard alternative
 to drag. Use Radix modal navigation on phones so hidden desktop links cannot take
 focus and the menu traps/restores focus correctly.
+
+## D-025 — User-authorized temporary private OpenAI Sites deployment
+
+Publish a separate portable Worker/D1 adapter for the working portfolio UI using
+Sites-owned ChatGPT authentication and owner-private access. Preserve canonical
+Django/PostGIS and its full data pipeline. Keep actual seed/source evidence, user
+namespacing, atomic version/audit writes, and durable edits. Explicitly disable
+unimplemented refresh/analysis and provide a versioned export. Mirror adapter source
+and document the future importer/identity mapping instead of claiming URL changes
+alone migrate data. No external paid provisioning or separate OIDC client is needed
+for this temporary workspace.

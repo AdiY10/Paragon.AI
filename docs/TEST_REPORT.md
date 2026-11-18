@@ -80,3 +80,16 @@ risk when the live location prop's version changes during editing. Backend code 
 unchanged from the 153-test PostGIS baseline. Full production acceptance remains open.
 The final browser run also verifies phone-width pin-dialog overflow and retains an
 inspected 375-pixel screenshot. Coordinate inputs and Save pin remain usable.
+
+## Temporary private OpenAI Site (2026-11-18)
+
+Published through the Sites plugin with terminal `succeeded` status and live URL
+https://paragon-radar-workspace.amitsch5.chatgpt.site. Owner-private access was read
+and preserved. Eight frontend tests and the production Worker build pass. Actual
+local D1 SQL/Workers tests verify identity rejection, same-origin mutations, atomic
+competing updates, audit consistency, and separate user namespaces. Chromium verifies
+three responsive widths, A/AA rules, real map loading, persisted notes after reload,
+manual pin revisions, and schema-versioned export. The test identity gateway is local
+only and absent from the deployed artifact. Real owner interaction with the private
+published URL is not impersonated or claimed. Full data-source/Release 1 acceptance
+remains open; see TEMPORARY_SITE.md.

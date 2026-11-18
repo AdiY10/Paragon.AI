@@ -2,7 +2,11 @@
 
 A private market-intelligence application in development for **John Nelson, Founder and CEO of [Paragon Realty Group](https://paragonct.com/)**.
 
-**Status (2026-11-18):** implementation is underway. Invite-only access, source archives and health, durable jobs, schedules, private property management, and a responsive React UI are implemented and locally verified. The 36 public portfolio records remain unconfirmed until reviewed. **Release 1 is not deployed or ready for acceptance:** geocoding, trade-area calculations, signals, screening, and metric comparisons are still being implemented. See [progress.md](progress.md) for current evidence and blockers.
+**Status (2026-11-18):** implementation is underway. Invite-only access, source archives and health, durable jobs, schedules, private property management, and a responsive React UI are implemented and locally verified. The 36 public portfolio records remain unconfirmed until reviewed. **The full Django/PostGIS Release 1 is not deployed or ready for acceptance:** geocoding, trade-area calculations, signals, screening, and metric comparisons are still being implemented. See [progress.md](progress.md) for current evidence and blockers.
+
+## Temporary private workspace
+
+[Open Paragon Radar on OpenAI Sites](https://paragon-radar-workspace.amitsch5.chatgpt.site) using the owning ChatGPT account. The working temporary version supports real portfolio management, maps, persistent notes/pins, and workspace export. Source refresh and full trade-area analysis remain unavailable. See [temporary deployment and migration](docs/TEMPORARY_SITE.md).
 
 ## Target Release 1 behavior
 - **This Week:** a Monday brief of meaningful changes around Paragon's properties (tenant SEC bankruptcy or closure filings, possible nearby closures, flood exposure, local jobs, population and income trends, traffic, housing pipeline), each with evidence.
