@@ -56,7 +56,7 @@ class LocationRevision(models.Model):
     number=models.PositiveIntegerField()
     lat=models.FloatField(null=True,blank=True)
     lon=models.FloatField(null=True,blank=True)
-    method=models.CharField(max_length=32,choices=[(v,v) for v in ['unplaced','seed_reference','census_exact','census_non_exact','nominatim','manual']])
+    method=models.CharField(max_length=32,choices=[(v,v) for v in ['unplaced','seed_reference','census_exact','census_non_exact','census_interpolated','nominatim','manual']])
     matched_address=models.CharField(max_length=500,blank=True)
     confirmed=models.BooleanField(default=False)
     context=models.JSONField(default=dict)
@@ -97,3 +97,29 @@ class SeedImportBatch(models.Model):
         if not self._state.adding:raise ValueError('Seed import history is immutable')
         super().save(*args,**kwargs)
     def delete(self,*args,**kwargs):raise ValueError('Seed import history cannot be deleted')
+
+
+class GeocodeLookup(models.Model):
+    """Immutable private preview; accepting it is a separate pin revision."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    location=models.ForeignKey(Location,on_delete=models.PROTECT,related_name='geocode_lookups')
+    requested_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,on_delete=models.SET_NULL)
+    requested_version=models.PositiveIntegerField()
+    address_hash=models.CharField(max_length=64)
+    snapshot=models.ForeignKey('sources.SourceSnapshot',on_delete=models.PROTECT)
+    status=models.CharField(max_length=16,choices=[('matched','Matched'),('ambiguous','Ambiguous'),('no_match','No match')])
+    candidates=models.JSONField()
+    benchmark=models.JSONField()
+    vintage=models.JSONField()
+    created_at=models.DateTimeField(auto_now_add=True)
+    expires_at=models.DateTimeField()
+    checked_at=models.DateTimeField()
+    objects=ImmutableQuerySet.as_manager()
+    class Meta:
+        ordering=['-created_at','id']
+        constraints=[models.UniqueConstraint(fields=['location','requested_by','requested_version','snapshot','checked_at'],name='location_geocode_preview_unique')]
+        indexes=[models.Index(fields=['location','address_hash','expires_at'])]
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValueError('Geocode lookup evidence is immutable')
+        super().save(*args,**kwargs)
+    def delete(self,*args,**kwargs):raise ValueError('Geocode lookup evidence cannot be deleted')

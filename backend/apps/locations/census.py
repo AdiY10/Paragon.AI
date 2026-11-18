@@ -24,7 +24,7 @@ GEOGRAPHIES = {
 
 class GeocoderError(Exception):
     def __init__(self, code):
-        if code not in {'TIMEOUT','HTTP_ERROR','SCHEMA_ERROR','SOURCE_ERROR'}:
+        if code not in {'TIMEOUT','HTTP_ERROR','SCHEMA_ERROR','SOURCE_ERROR','NOT_CONFIGURED','STORAGE_ERROR'}:
             raise ValueError('Invalid geocoder error code')
         self.code = code
         super().__init__(code)

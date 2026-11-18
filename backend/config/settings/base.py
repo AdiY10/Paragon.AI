@@ -103,3 +103,6 @@ Q_CLUSTER = {
 MAP_TILE_URL = os.environ.get('MAP_TILE_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
 # Raster provider policy requires a Referer; send only our origin cross-origin.
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Requires private durable storage for the full backend deployment.
+SOURCE_ARTIFACT_ROOT = Path(os.environ.get('SOURCE_ARTIFACT_ROOT') or BASE_DIR / 'var' / 'artifacts')

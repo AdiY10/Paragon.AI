@@ -62,3 +62,6 @@ class SearchSerializer(StrictInputMixin,serializers.Serializer):
     status=serializers.ChoiceField(choices=[*Location.Status.values,'all'],required=False)
     state=serializers.CharField(max_length=2,required=False)
     asset_type=serializers.ChoiceField(choices=Location.AssetType.choices,required=False)
+
+class GeocodeAcceptSerializer(ConfirmationSerializer):
+    candidate_index=serializers.IntegerField(min_value=0,max_value=19)
