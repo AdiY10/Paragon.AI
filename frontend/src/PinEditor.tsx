@@ -90,6 +90,7 @@ export default function PinEditor({ location }: { location: Location }) {
               <LocationMap
                 locations={[preview]}
                 editPin
+                previewOnly
                 onPinChange={(nextLat, nextLon) => {
                   setLatitude(nextLat.toFixed(6));
                   setLongitude(nextLon.toFixed(6));

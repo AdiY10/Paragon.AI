@@ -21,7 +21,8 @@ def main():
         (testdir/'ui_test_settings.py').write_text(
             'from config.settings.test import *\n'
             'DATABASES=' + repr({"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": str(testdir/"test.sqlite3")}}) + '\n'
-            'ALLOWED_HOSTS=["127.0.0.1", "localhost"]\n')
+            'ALLOWED_HOSTS=["127.0.0.1", "localhost"]\n'
+            + 'SOURCE_ARTIFACT_ROOT=' + repr(str(testdir/"private-artifacts")) + '\n')
         env = dict(os.environ, DJANGO_SETTINGS_MODULE='ui_test_settings',
                    PYTHONPATH=os.pathsep.join([str(ROOT/'backend'), directory]))
         setup = '''import django; django.setup()

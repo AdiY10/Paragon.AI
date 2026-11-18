@@ -1,7 +1,7 @@
 # Address geocoding and pin evidence
 
 The Census single-address adapter is implemented in `apps.locations.census`.
-Persisted private preview/acceptance APIs are implemented; the UI is the next increment. No
+Persisted private preview/acceptance APIs are implemented; the review UI is implemented. No
 geocoding result replaces a saved pin automatically.
 
 ## Provider contract
@@ -84,3 +84,23 @@ filesystem. Geocode evidence is not exposed through public static assets.
 Run `uv run python scripts/verification/geocode_smoke.py` for the live public Staples
 Plaza lookup-to-preview-to-acceptance check in a disposable database. It creates only
 a test identity in that temporary database and removes it after verification.
+
+## Review interface
+
+Property records expose **Find address pin**. The dialog discloses that Census
+receives the saved address, then waits for **Find suggestions**. It shows the returned
+matched address/coordinates, an unsaved map, actual check/capture dates, and expandable
+benchmark, exactness, geography-vintage, and response-hash evidence. Two or more
+matches start with no selected radio and acceptance disabled. A no-match result
+explains that the saved pin is unchanged and points back to manual placement.
+
+**Use selected Census pin** performs the explicit acceptance API call. It does not
+confirm ownership/building position. The property evidence drawer retains matched
+address and source check/capture dates after the dialog closes. Preview-map popups
+do not link to nonexistent preview records. All controls work at phone width;
+provider errors and record conflicts leave saved pins intact.
+
+The isolated browser smoke now performs live Census requests for the three actual
+public reference properties. It checks explicit ambiguous selection, no-match pin
+retention, source-backed acceptance without manufactured confirmation, mobile overflow,
+and automated A/AA rules. Test artifacts stay inside the disposable test directory.

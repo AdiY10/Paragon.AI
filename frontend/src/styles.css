@@ -1622,3 +1622,98 @@ th {
 .modal textarea {
   resize: vertical;
 }
+.pin-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+.geocode-dialog {
+  width: min(700px, calc(100% - 32px));
+}
+.lookup-address {
+  padding: 15px;
+  background: #edf0e6;
+  border-radius: 5px;
+  font-size: 13px;
+  margin: 22px 0;
+  color: #304e34;
+}
+.geocode-dialog > .button {
+  margin-bottom: 18px;
+}
+.geocode-dialog .location-map {
+  height: 280px;
+}
+.geocode-dialog .map-caption {
+  display: none;
+}
+.geocode-dialog .map-privacy {
+  padding: 0;
+  margin: 10px 0;
+}
+.geocode-dialog .preview-label {
+  display: block;
+}
+.census-choices {
+  border: 0;
+  padding: 0;
+  margin: 22px 0;
+}
+.census-choices legend {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.census-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid #d7dfcf;
+  background: #fafbf6;
+  border-radius: 6px;
+  margin: 10px 0;
+}
+.census-choice:has(input:checked) {
+  border-color: #456c43;
+  background: #edf2e7;
+}
+.census-choice input {
+  width: 16px;
+  flex-shrink: 0;
+  margin: 3px 0;
+}
+.census-choice strong {
+  font-size: 12px;
+  line-height: 1.5;
+  display: block;
+  font-weight: 500;
+}
+.census-choice small {
+  display: block;
+  font-size: 10px;
+  color: #53634f;
+  margin-top: 7px;
+  line-height: 1.7;
+}
+.geocode-evidence {
+  font-size: 11px;
+  margin: 22px 0;
+}
+.geocode-evidence summary {
+  cursor: pointer;
+  color: #34563a;
+}
+.geography-evidence {
+  display: contents;
+}
+.geocode-dialog > p:last-child {
+  margin-top: 20px;
+}
+.geocode-dialog .facts {
+  font-size: 10px;
+  grid-template-columns: 115px minmax(0, 1fr);
+}
+.confirm-box p,.search-results small{color:#53634f}
