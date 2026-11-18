@@ -58,3 +58,17 @@ def rerun(request,job_id):
     except ValueError:
         return Response({'detail':'This job is no longer compatible with a registered handler.'},status=400)
     return Response(payload(job),status=202 if created else 200)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdministrator])
+def schedules(request):
+    from .models import JobSchedule,SchedulerState
+    items=[]
+    for schedule in JobSchedule.objects.all():
+        items.append({'name':schedule.name,'kind':schedule.kind,'enabled':schedule.enabled,
+            'calendar':schedule.calendar,'next_due_at':schedule.next_due_at,
+            'last_dispatched_at':schedule.last_dispatched_at,
+            'blocked_reason':None if schedule.kind in REGISTRY else 'HANDLER_NOT_IMPLEMENTED'})
+    state=SchedulerState.objects.filter(name='primary').first()
+    return Response({'schedules':items,'last_tick_at':state.last_tick_at if state else None})

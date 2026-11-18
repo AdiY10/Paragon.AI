@@ -33,3 +33,38 @@ class JobRun(models.Model):
     class Meta:
         ordering=['-created_at','id']
         constraints=[models.UniqueConstraint(fields=['kind','scope','dedup_key'],name='job_run_dedup_unique')]
+
+
+class JobSchedule(models.Model):
+    name=models.CharField(primary_key=True,max_length=64)
+    kind=models.CharField(max_length=64)
+    scope=models.CharField(max_length=160,default='global')
+    calendar=models.JSONField()
+    enabled=models.BooleanField(default=False)
+    next_due_at=models.DateTimeField()
+    last_dispatched_at=models.DateTimeField(null=True)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering=['name']
+
+
+class ScheduleOccurrence(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    schedule=models.ForeignKey(JobSchedule,on_delete=models.PROTECT,related_name='occurrences')
+    local_date=models.DateField()
+    scheduled_for=models.DateTimeField()
+    dispatched_at=models.DateTimeField()
+    missed_count=models.PositiveIntegerField(default=0)
+    delay_seconds=models.PositiveIntegerField()
+    calendar_at_dispatch=models.JSONField()
+    job=models.OneToOneField(JobRun,on_delete=models.PROTECT,related_name='scheduled_occurrence')
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['schedule','local_date'],name='schedule_local_date_unique')]
+        ordering=['-scheduled_for']
+
+
+class SchedulerState(models.Model):
+    name=models.CharField(primary_key=True,max_length=32,default='primary')
+    owner=models.UUIDField(null=True)
+    lease_until=models.DateTimeField()
+    last_tick_at=models.DateTimeField(null=True)
