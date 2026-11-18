@@ -24,8 +24,10 @@ that Release 1's data calculations or production deployment are complete.
   remain unavailable. Candidate record creation works; screening scores do not
   exist yet.
 
-The location-ring illustration in this first UI milestone is explicitly labelled
-**schematic, not a map**. A real interactive basemap is the next UI increment.
+Portfolio and property screens now include interactive MapLibre maps with OSM
+raster tiles, linked reference pins, and geodesic distance rings. The list remains
+available when tiles or WebGL fail. See [MAPS.md](MAPS.md) for attribution, privacy,
+and display-geometry limits.
 Geocoding, pin correction controls, tenant management, signal evidence, comparison,
 and complete administrator controls remain in the implementation plan.
 
@@ -70,7 +72,8 @@ the configured production/local portfolio database or creates a production user.
 
 The browser check covers 375/768/1280 widths, horizontal overflow, automated WCAG
 A/AA rules, filters, provenance, editing, confirmation, source cards, body-based
-search, and anonymous API denial. Screenshots are optional local review artifacts
+search, anonymous API denial, actual map-worker loading, three displayed rings, and
+retention of saved pins when tile requests fail. Screenshots are optional local review artifacts
 and are not deployed. Automated accessibility checks supplement manual keyboard,
 focus, screen-reader, and production acceptance checks; they do not certify full
 WCAG 2.2 conformance.

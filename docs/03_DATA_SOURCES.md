@@ -254,3 +254,10 @@ Reproduce with [`scripts/feasibility/probe_public_sources.sh`](../scripts/feasib
 | V18 | EDGAR full-text "store closures", 8-K, 2026-09-01→2026-11-16 | 37 hits; Leslie's 8-K 2026-09-30 includes item 1.03 | No (search index changes) |
 | V19 | data.ct.gov `5mzw-sjtu` latest commercial sale | Max recorded date 2025-09-30; 9,664 commercial rows | Release 1.1 |
 | V20 | `www.sec.gov/files/company_tickers.json` with a generic User-Agent | HTTP 403 | Access fact: a contact email is required |
+
+## Basemap delivery (implementation choice, 2026-11-18)
+
+OpenStreetMap standard raster tiles supply visual context only; they do not produce
+property or trade-area metrics. Provider policy, attribution, coverage, privacy,
+caching, configuration, failures, and verification are documented in [MAPS.md](MAPS.md).
+This does not add a metric source or change the 16-source ingestion catalog.

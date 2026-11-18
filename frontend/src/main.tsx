@@ -1,5 +1,7 @@
 import "vite/modulepreload-polyfill";
 import React, {
+  lazy,
+  Suspense,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -39,6 +41,7 @@ import { api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
 
+const LocationMap = lazy(() => import("./LocationMap"));
 const client = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, refetchOnWindowFocus: true, staleTime: 30000 },
@@ -731,7 +734,8 @@ function Portfolio({
 }) {
   const [state, setState] = useState(""),
     [status, setStatus] = useState(candidates ? "candidate" : "owned"),
-    [type, setType] = useState("");
+    [type, setType] = useState(""),
+    [showMap, setShowMap] = useState(!candidates);
   const filtered = locations.filter(
     (item) =>
       (!state || item.state === state) &&
@@ -801,6 +805,26 @@ function Portfolio({
           </select>
         </label>
       </div>
+      <div className="map-toolbar">
+        <span>Explore saved locations</span>
+        <button
+          className="button secondary small-button"
+          aria-pressed={showMap}
+          onClick={() => setShowMap(!showMap)}
+        >
+          {showMap ? "List only" : "Map + list"}
+          <MapPin size={15} />
+        </button>
+      </div>
+      {showMap && (
+        <section className="portfolio-map panel">
+          <Suspense
+            fallback={<p className="notice">Loading interactive map…</p>}
+          >
+            <LocationMap locations={filtered} />
+          </Suspense>
+        </section>
+      )}
       <div className="property-grid portfolio-grid">
         {filtered.map((item) => (
           <PropertyCard key={item.id} location={item} />
@@ -917,13 +941,11 @@ function LocationPage({ id }: { id: string }) {
             <h2>Location reference</h2>
             <MapPin size={21} />
           </div>
-          <div className="pin-visual">
-            <div className="ring r3" />
-            <div className="ring r2" />
-            <div className="ring r1" />
-            <MapPin size={34} />
-            <span>SCHEMATIC · NOT A MAP</span>
-          </div>
+          <Suspense
+            fallback={<p className="notice">Loading interactive map…</p>}
+          >
+            <LocationMap locations={[item]} rings />
+          </Suspense>
           <Badge>{titleCase(pin.method)}</Badge>
           <p>
             {pin.lat === null
@@ -980,6 +1002,11 @@ function Sources({
         title="The evidence, explained."
         description="See what each source covers, when it was checked, and where uncertainty remains."
       />
+      <p className="notice">
+        Map privacy: OpenStreetMap receives your IP and viewed map area when a
+        map is open. Property names, notes, and account details stay in this
+        workspace.
+      </p>
       {error ? (
         <ErrorNotice error={error} />
       ) : !sources ? (

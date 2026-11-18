@@ -23,3 +23,12 @@ ephemeral database containing the real public seed, with a test-only account.
 Visual review and automated WCAG checks cover 375, 768, and 1280 pixels. The hosting
 runtime suggested by the Sites skill does not support this Python/PostGIS worker
 architecture, so deployment stays with the repository's documented topology.
+
+## D-023 — Local map worker and policy-compliant OSM raster basemap
+
+Use lazy MapLibre GL JS with a self-contained Vite worker on our static origin and
+OSM raster tiles for initial private-app usage. Keep attribution visible, normal
+browser caching, and origin-only cross-origin Referer. Document IP/viewed-area
+privacy and permit disabling external tiles through runtime configuration. Retain
+an accessible list, explicit tile/WebGL failures, and unplaced records. Browser
+rings are geodesic display geometry, not server metric aggregation boundaries.

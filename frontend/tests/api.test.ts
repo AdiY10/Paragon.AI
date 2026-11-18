@@ -27,16 +27,14 @@ describe("private API transport", () => {
   });
   it("rejects cross-origin pagination without requesting the remote page", async () => {
     browser();
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            results: [],
-            next: "https://remote.example/api/locations/",
-          }),
-        ),
-      );
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [],
+          next: "https://remote.example/api/locations/",
+        }),
+      ),
+    );
     vi.stubGlobal("fetch", fetcher);
     await expect(allLocations()).rejects.toThrow("Invalid pagination origin");
     expect(fetcher).toHaveBeenCalledTimes(1);
