@@ -6,6 +6,24 @@
 
 ---
 
+## 0. PRIORITY TASK FROM ADI (added 2026-11-18): move off OpenAI Sites, with password access
+
+Adi cannot use the temporary workspace on OpenAI Sites (`*.chatgpt.site`), because it is tied to Amit's ChatGPT account. Do this **next**, before further feature work:
+
+1. **Host the app on a regular public web host** that Adi can open from any browser: e.g. the Render setup already in `render.yaml`, or Fly.io, Railway or similar. Pick the simplest option that runs the real backend and database. Prefer a free or low-cost tier, and get Amit's or Adi's approval before any paid plan (§4.8).
+2. **Simple access control for now: a password.** Until the full sign-in provider (OIDC) is configured, gate the **entire** app (every page and API route) behind a login with:
+   - a shared password, or a few named username/password accounts, stored only as a hashed value or a secret in the host's secret store, **never in the repo**;
+   - HTTPS only, secure session cookies, rate-limited login attempts, and a logout;
+   - a way for Amit or Adi to change the password or revoke access without a code change (an environment variable or admin setting).
+   This satisfies FR-01 and AC-01 for now. Keep the OIDC path so it can replace or sit alongside the password later.
+3. **Carry over the data** from the temporary workspace (portfolio edits, pins, notes) using its existing export, so nothing Adi or Amit entered is lost.
+4. **Deliver to Adi privately (not in git):** the URL and the password. Put the steps in `docs/TESTING_GUIDE.md` and record the host and monthly cost in `progress.md`.
+5. After this, the temporary OpenAI Sites version may be retired. Note that in `docs/TEMPORARY_SITE.md`.
+
+**Done when:** Adi, from a browser not signed in to ChatGPT, opens the URL, sees only a password prompt, enters the password, and reaches the working portfolio workspace with the migrated data. A wrong password or an unauthenticated API request gets no data.
+
+---
+
 ## 1. What you are building (30-second version)
 
 A private web app for **John Nelson, Founder and CEO of Paragon Realty Group** (Westport, CT; about 2M SF, mostly neighborhood and community shopping centers in 12 states). It:
