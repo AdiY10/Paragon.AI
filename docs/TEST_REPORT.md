@@ -115,3 +115,14 @@ caught and corrected nullable-join locking and concurrent revision snapshot issu
 The live isolated smoke retrieved the actual Staples Plaza address, persisted its
 artifact, reused the cache without a second source check, and created one unconfirmed
 Census pin revision. No configured portfolio database or real account was modified.
+
+## Census review UI (2026-11-18)
+
+TypeScript/Vite build and eight frontend transport/geography tests pass. Chromium
+uses actual Census responses for public P03/P21/P20 in the disposable database.
+Checks verify the one-match review, two unselected ambiguous choices with disabled
+acceptance, unchanged saved pin on no match, persisted accepted source references,
+and no auto-confirmed ownership/building. A 375-pixel dialog screenshot was inspected;
+mobile overflow and automated A/AA rules pass. Property/search secondary-text contrast
+was corrected after this broader dialog scan exposed it. Previous record/pin edits,
+concurrent conflict, focus, maps, source cards, and failed-tile retention still pass.

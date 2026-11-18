@@ -15,7 +15,7 @@ that Release 1's data calculations or production deployment are complete.
   when the corresponding filter is selected.
 - **Property record:** source period, pin method/coordinates, confirmation status,
   ring preset, user-provided GLA/notes, record confirmation, version-checked
-  editing, and previewed manual pin correction/confirmation. The provenance drawer includes the original listing and change history.
+  editing, and previewed manual pin correction/confirmation, and source-backed Census suggestion review. The provenance drawer includes the original listing and change history.
 - **Data Sources:** the real 16-entry registry, recorded scoped health, periods,
   last successful check, licensing, attribution, and privacy notes. No check is
   displayed as “Not checked,” never as healthy.
@@ -28,7 +28,7 @@ Portfolio and property screens now include interactive MapLibre maps with OSM
 raster tiles, linked reference pins, and geodesic distance rings. The list remains
 available when tiles or WebGL fail. See [MAPS.md](MAPS.md) for attribution, privacy,
 and display-geometry limits.
-Geocoding, tenant management, signal evidence, comparison,
+Tenant management, signal evidence, comparison,
 and complete administrator controls remain in the implementation plan.
 
 ## Build and serve
@@ -87,3 +87,8 @@ Visual choices: pine navigation, warm neutral surfaces, restrained green/brass,
 visible source labels, text-labelled status, native form controls, Radix accessible
 dialogs, reduced-motion support, and system fonts. No analytics or third-party font
 requests are made. No invented metrics, photographs, or “live” activity are shown.
+
+Census lookup/review is now implemented in the canonical Django UI. The browser
+smoke contacts Census for three real public addresses and verifies match, ambiguity,
+and no-match behavior. The temporary Site needs its separate adapter update before
+this control is available there. See GEOCODING.md for privacy and provenance.

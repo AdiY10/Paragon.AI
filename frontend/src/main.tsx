@@ -38,6 +38,7 @@ import {
   X,
 } from "lucide-react";
 import PinEditor from "./PinEditor";
+import GeocodeDialog from "./GeocodeDialog";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -168,6 +169,28 @@ function RecordEvidence({ location }: { location: Location }) {
         </dd>
         <dt>Pin method</dt>
         <dd>{titleCase(location.current_revision.method)}</dd>
+        {location.current_revision.matched_address && (
+          <>
+            <dt>Matched address</dt>
+            <dd>{location.current_revision.matched_address}</dd>
+          </>
+        )}
+        {Boolean(location.current_revision.context.last_checked_at) && (
+          <>
+            <dt>Pin source checked</dt>
+            <dd>
+              {dateLabel(
+                String(location.current_revision.context.last_checked_at),
+              )}
+            </dd>
+            <dt>Original capture</dt>
+            <dd>
+              {dateLabel(
+                String(location.current_revision.context.retrieved_at),
+              )}
+            </dd>
+          </>
+        )}
         <dt>Coordinate attribution</dt>
         <dd>
           {String(
@@ -973,7 +996,10 @@ function LocationPage({ id }: { id: string }) {
           >
             <LocationMap locations={[item]} rings />
           </Suspense>
-          <PinEditor location={item} />
+          <div className="pin-actions">
+            <GeocodeDialog location={item} />
+            <PinEditor location={item} />
+          </div>
           <Badge>{titleCase(pin.method)}</Badge>
           <p>
             {pin.lat === null

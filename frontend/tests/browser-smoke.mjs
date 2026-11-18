@@ -290,6 +290,113 @@ try {
   await search.fill(name);
   await search.press("Enter");
   await page.locator(".search-results").getByRole("link").first().waitFor();
+  const records = (
+    await (
+      await context.request.get(base + "/api/locations/?status=all")
+    ).json()
+  ).results;
+  for (const [seedId, expected] of [
+    ["P03", "matched"],
+    ["P21", "ambiguous"],
+    ["P20", "no_match"],
+  ]) {
+    const record = records.find((item) => item.seed_id === seedId);
+    const before = await (
+      await context.request.get(`${base}/api/locations/${record.id}/`)
+    ).json();
+    await page.goto(`${base}/#/locations/${record.id}`);
+    await page
+      .getByRole("button", { name: "Find address pin", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: "Find a Census address pin",
+    });
+    await dialog
+      .getByRole("button", { name: "Find suggestions", exact: true })
+      .click();
+    if (expected === "no_match") {
+      await dialog
+        .getByRole("status")
+        .filter({ hasText: "No Census match." })
+        .waitFor();
+      const after = await (
+        await context.request.get(`${base}/api/locations/${record.id}/`)
+      ).json();
+      if (
+        after.version !== before.version ||
+        after.current_revision.id !== before.current_revision.id
+      )
+        throw new Error("No-match changed the saved pin");
+      await page.keyboard.press("Escape");
+      continue;
+    }
+    await dialog.getByRole("radio").first().waitFor();
+    if (expected === "ambiguous") {
+      if ((await dialog.getByRole("radio").count()) !== 2)
+        throw new Error("Expected actual ambiguous Mount Kisco alternatives");
+      if (
+        await dialog
+          .getByRole("radio")
+          .evaluateAll((inputs) => inputs.some((input) => input.checked))
+      )
+        throw new Error("Ambiguity was preselected");
+      if (
+        !(await dialog
+          .getByRole("button", { name: "Use selected Census pin" })
+          .isDisabled())
+      )
+        throw new Error("Ambiguous accept was enabled before selection");
+      await dialog.getByRole("radio").nth(1).check();
+    }
+    await dialog.locator(".location-map[data-ready=true]").waitFor();
+    if (seedId === "P03") {
+      await page.setViewportSize({ width: 375, height: 1000 });
+      if (
+        await dialog.evaluate(
+          (element) => element.scrollWidth > element.clientWidth,
+        )
+      )
+        throw new Error("Census dialog overflows on phone");
+      if(output)await page.screenshot({path:`${output}/census-review-375.png`,fullPage:false});
+      const scan = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze();
+      if (scan.violations.length)
+        throw new Error(
+          JSON.stringify(
+            scan.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+          ),
+        );
+      if (output)
+        await page.screenshot({
+          path: `${output}/census-review-375.png`,
+          fullPage: false,
+        });
+      await page.setViewportSize({ width: 1280, height: 1000 });
+    }
+    await dialog
+      .getByRole("button", { name: "Use selected Census pin", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    await page.getByText("Census Interpolated", { exact: true }).waitFor();
+    const after = await (
+      await context.request.get(`${base}/api/locations/${record.id}/`)
+    ).json();
+    if (
+      after.current_revision.confirmed ||
+      after.confirmed ||
+      after.version !== before.version + 1 ||
+      !after.current_revision.context.snapshot_id
+    )
+      throw new Error(
+        "Census acceptance lost evidence or fabricated verification",
+      );
+  }
+  const finalRecords=await(await context.request.get(base+'/api/locations/?status=all')).json();
+  const expectedPinned=finalRecords.results.filter(item=>item.current_revision.lat!==null).length;
   await page.route("https://tile.openstreetmap.org/**", (route) =>
     route.abort(),
   );
@@ -297,7 +404,7 @@ try {
   await page
     .getByText("Basemap tiles unavailable.", { exact: false })
     .waitFor();
-  if ((await page.locator(".map-marker").count()) !== 35)
+  if ((await page.locator(".map-marker").count()) !== expectedPinned)
     throw new Error("Tile failure lost the saved pins");
   await page.unroute("https://tile.openstreetmap.org/**");
   const anonymous = await browser.newContext();
@@ -308,7 +415,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, and mobile keyboard focus.",
+    "UI browser smoke passed: 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
   );
 } finally {
   await browser.close();

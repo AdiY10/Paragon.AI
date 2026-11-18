@@ -74,3 +74,12 @@ address for 30 days, without fabricating re-checks. Identical re-fetched bytes m
 reuse a content snapshot but must preserve a later actual check time/expiry in a new
 preview. Lock the location before reading its current revision in a separate query;
 a nullable outer join can fail or expose a stale snapshot under competing accepts.
+
+## D-028 — Review address suggestions before source-backed pin changes
+
+Use a separate disclosed lookup action, explicit candidate selection, and explicit
+acceptance. Never preselect ambiguous alternatives or overwrite on lookup. Keep
+building/ownership verification separate. Show a true unsaved map and source check/
+capture dates, with exactness and geography-vintage details available for audit.
+Preview markers do not link to nonexistent records. Extend browser verification
+with live public-reference requests and phone-width accessibility checks.
