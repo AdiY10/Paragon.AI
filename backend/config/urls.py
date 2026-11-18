@@ -9,6 +9,7 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
     path('api/admin/users/', accounts.users),
     path('api/admin/users/<uuid:member_id>/', accounts.member_detail),
+    path('api/admin/schedules/', operations.schedules),
     path('api/admin/jobs/', operations.jobs),
     path('api/admin/jobs/<uuid:job_id>/rerun/', operations.rerun),
     path('api/sources/', source_list),

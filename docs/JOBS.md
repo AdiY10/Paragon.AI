@@ -39,10 +39,11 @@ Its hard timeout is 90 seconds and receipt retry is 150 seconds. No foreground p
 handler is registered yet. Bulk ingestion must be chunked; do not put unbounded national
 imports into a single job or execute them inside web requests.
 
-The built-in Q2 recurring scheduler is disabled. A timezone-aware application scheduler
-and recovery sweep are still pending; do not claim scheduled refreshes are running.
-The remaining recovery work must handle domain rows whose transport retries were exhausted
-or whose worker died without finalizing their lease.
+The built-in Q2 recurring scheduler is disabled. The application scheduler is documented
+in SCHEDULER.md and uses Eastern wall time, persisted occurrences, and leader leases.
+Source handlers remain disabled until implemented. The remaining recovery sweep must
+handle domain rows whose transport retries were exhausted or whose worker died without
+finalizing their lease. No production refresh schedule is claimed running.
 
 ## Verification
 
