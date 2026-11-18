@@ -24,10 +24,10 @@ def audit(location,actor,action,before,after):
 
 @transaction.atomic
 def create_location(*,name,address,actor=None,status='candidate',asset_type='other',lat=None,lon=None,
-        pin_method='unplaced',pin_context=None,seed_id=None,source_url='',city='',state='',origin='user'):
+        pin_method='unplaced',pin_context=None,seed_id=None,source_url='',city='',state='',origin='user',source_context=None):
     validate_pin(lat,lon,pin_method)
     location=Location(name=name,address=address,created_by=actor,status=status,asset_type=asset_type,
-        seed_id=seed_id,source_url=source_url,city=city,state=state,origin=origin)
+        seed_id=seed_id,source_url=source_url,city=city,state=state,origin=origin,source_context=dict(source_context or {}))
     location.full_clean();location.save()
     revision=LocationRevision.objects.create(location=location,number=1,lat=lat,lon=lon,
         method=pin_method,actor=actor,context=dict(pin_context or {}))

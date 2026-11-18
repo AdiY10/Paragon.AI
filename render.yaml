@@ -8,7 +8,7 @@ services:
     branch: main
     autoDeployTrigger: checksPass
     healthCheckPath: /health/
-    preDeployCommand: python backend/manage.py migrate --noinput && python backend/manage.py sync_sources && python backend/manage.py sync_schedules
+    preDeployCommand: python backend/manage.py migrate --noinput && python backend/manage.py sync_sources && python backend/manage.py sync_schedules && python backend/manage.py import_portfolio
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true

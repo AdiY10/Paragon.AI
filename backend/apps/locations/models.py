@@ -33,6 +33,8 @@ class Location(models.Model):
     confirmed_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name='+')
     origin=models.CharField(max_length=16,choices=[('public_seed','Public seed'),('user','User-provided')],default='user')
     source_url=models.URLField(max_length=2048,blank=True)
+    source_context=models.JSONField(default=dict,blank=True)
+    seed_batch=models.ForeignKey("SeedImportBatch",null=True,blank=True,on_delete=models.PROTECT,related_name="locations")
     version=models.PositiveIntegerField(default=1)
     analysis_version=models.PositiveIntegerField(default=1)
     current_revision=models.ForeignKey('LocationRevision',null=True,blank=True,on_delete=models.PROTECT,related_name='+')
@@ -81,3 +83,17 @@ class LocationAuditEvent(models.Model):
     created_at=models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering=['created_at','id']
+
+
+class SeedImportBatch(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    sha256=models.CharField(max_length=64,unique=True)
+    source_as_of=models.DateField()
+    imported_at=models.DateTimeField(auto_now_add=True)
+    rows=models.PositiveIntegerField()
+    created_locations=models.PositiveIntegerField()
+    objects=ImmutableQuerySet.as_manager()
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValueError('Seed import history is immutable')
+        super().save(*args,**kwargs)
+    def delete(self,*args,**kwargs):raise ValueError('Seed import history cannot be deleted')

@@ -4,12 +4,13 @@ No production deployment exists yet; this is not Release 1 acceptance.
 
 | Verification | Result |
 |---|---|
-| Offline suite, Python 3.13, SQLite | 126 passed, 5 explicit spatial/concurrency skips |
-| Same suite, PostgreSQL 17 and PostGIS 3.6 | 131 passed, no skips |
+| Offline suite, Python 3.13, SQLite | 130 passed, 6 explicit spatial/concurrency skips |
+| Same suite, PostgreSQL 17 and PostGIS 3.6 | 136 passed, no skips |
 | Django configuration / migration consistency | Passed |
 | Overture monthly captures | 70 extracts / 35 seed pins; all SHA-256 hashes verified; all imported into local PostGIS/artifact store |
 | Real capture import rerun | Published zero; reused all 70; no duplicate snapshots |
 | Source health replay | 35 scopes and 70 original-time checks; dates not refreshed by replay |
+| Real portfolio seed | 36 unconfirmed properties / 35 reference pins; rerun created zero; one immutable batch retained |
 | Real lost-message recovery | One receipt deliberately removed; original job completed after actual grace period; one recovery event retained |
 | Real scheduler dispatch | One catalog-sync occurrence completed via worker; timing/lineage retained; verification schedule disabled afterward |
 | Real durable worker | 16 catalog definitions processed; one attempt; message acknowledged; graceful shutdown verified |
