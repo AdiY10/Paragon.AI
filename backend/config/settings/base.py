@@ -15,6 +15,7 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -42,6 +43,11 @@ TIME_ZONE = 'America/New_York'
 LANGUAGE_CODE = 'en-us'
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'var' / 'static'
+STATICFILES_DIRS = [BASE_DIR / 'backend' / 'static'] if (BASE_DIR / 'backend' / 'static').exists() else []
+FRONTEND_MANIFEST = BASE_DIR / 'backend' / 'static' / 'ui' / '.vite' / 'manifest.json'
+STORAGES = {'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+            'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'}}
+WHITENOISE_INDEX_FILE = False
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 SESSION_COOKIE_HTTPONLY = True

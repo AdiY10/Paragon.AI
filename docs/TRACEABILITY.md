@@ -29,3 +29,8 @@ Production status remains pending until deployed verification.
 | AC-23 | FR-33 | Pending | Not implemented |
 | AC-24 | FR-35, FR-36 | Pending | Not implemented |
 | AC-25 | all | Pending | Not implemented |
+
+UI increment: SCR-1/2/3/6/8 now have a real authenticated frontend for implemented
+record/source/job APIs. Automated browser checks cover responsive dashboard layouts
+and real record mutations; see USER_INTERFACE.md. SCR-4/5 remain explicit unavailable
+states until their data workflows exist. Full P0 acceptance remains open.
