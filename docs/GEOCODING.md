@@ -1,7 +1,7 @@
 # Address geocoding and pin evidence
 
 The Census single-address adapter is implemented in `apps.locations.census`.
-The persisted preview/acceptance workflow and UI are the next increment. No
+Persisted private preview/acceptance APIs are implemented; the UI is the next increment. No
 geocoding result replaces a saved pin automatically.
 
 ## Provider contract
@@ -53,3 +53,34 @@ https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
 Nominatim remains disabled until its policy-compliant application-wide throttling,
 cache, identifying User-Agent, and confidential-address protections are implemented.
 No candidate address is sent to Nominatim as an implicit workaround.
+
+## Persisted private preview and acceptance
+
+`POST /api/locations/<id>/geocode/` takes only `expected_version`. It geocodes the
+saved address server-side and returns a private preview with source hash, published
+snapshot, original retrieval date, last actual check, expiry, benchmark/vintage,
+validated alternatives, and the interpolation caveat. No pin or confirmation changes.
+Only its requester can accept that preview through
+`POST /api/locations/<id>/geocode/<lookup-id>/accept/` with `expected_version` and
+`candidate_index`. Client-supplied coordinates/method/provenance are not accepted.
+
+Acceptance creates one unconfirmed `census_interpolated` pin revision and advances
+analysis generation. Even a single match needs explicit acceptance. A replay of the
+same accept returns the current accepted revision; competing accepts cannot create
+two revisions. Wrong owner, record, version, choice, or expired evidence is rejected.
+Changes during the HTTP call preserve valid source evidence but reject a stale preview.
+
+Census previews cache for 30 days from the last actual check. Cache hits do not
+create source checks or reset age. A real re-fetch with identical bytes can reuse
+an immutable content snapshot, while retaining its distinct later check time and
+new expiry. Network and storage failures retain saved pins and record sanitized
+source failures. Nominatim is not contacted. Manual placement remains available.
+
+Raw responses are published through the private content-addressed artifact store
+before snapshot/preview rows, with `SOURCE_ARTIFACT_ROOT` configurable for the full
+backend. Production requires durable private storage, not an ephemeral container
+filesystem. Geocode evidence is not exposed through public static assets.
+
+Run `uv run python scripts/verification/geocode_smoke.py` for the live public Staples
+Plaza lookup-to-preview-to-acceptance check in a disposable database. It creates only
+a test identity in that temporary database and removes it after verification.

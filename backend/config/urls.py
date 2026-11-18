@@ -16,6 +16,8 @@ urlpatterns = [
     path('api/locations/', locations.locations),
     path('api/locations/search/', locations.search),
     path('api/locations/<uuid:location_id>/', locations.location_detail),
+    path('api/locations/<uuid:location_id>/geocode/', locations.geocode),
+    path('api/locations/<uuid:location_id>/geocode/<uuid:lookup_id>/accept/', locations.geocode_accept),
     path('api/locations/<uuid:location_id>/pin/', locations.pin),
     path('api/locations/<uuid:location_id>/confirm/', locations.confirm),
     path('api/locations/<uuid:location_id>/history/', locations.history),

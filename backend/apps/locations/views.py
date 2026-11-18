@@ -85,3 +85,29 @@ def history(request,location_id):
     return paginator.get_paginated_response([{'id':entry.id,'action':entry.action,
         'actor':entry.actor.email if entry.actor else None,'created_at':entry.created_at,
         'before':entry.before,'after':entry.after} for entry in page])
+
+
+@api_view(['POST'])
+def geocode(request,location_id):
+    from .geocoding import request_lookup,lookup_payload
+    from .census import GeocoderError
+    serializer=ConfirmationSerializer(data=request.data);serializer.is_valid(raise_exception=True)
+    try:
+        lookup=request_lookup(location_id=location_id,actor=request.user,**serializer.validated_data)
+        return Response(lookup_payload(lookup))
+    except Location.DoesNotExist:return Response({'detail':'Location not found'},status=404)
+    except LocationConflict as exc:return Response({'detail':str(exc)},status=409)
+    except GeocoderError as exc:return Response({'detail':'Address lookup is temporarily unavailable','code':exc.code},status=503)
+    except ValueError:return Response({'detail':'Check the saved address before requesting a lookup'},status=400)
+
+
+@api_view(['POST'])
+def geocode_accept(request,location_id,lookup_id):
+    from .geocoding import accept_lookup
+    from .models import GeocodeLookup
+    from .serializers import GeocodeAcceptSerializer
+    serializer=GeocodeAcceptSerializer(data=request.data);serializer.is_valid(raise_exception=True)
+    try:
+        return mutation(lambda:accept_lookup(location_id=location_id,lookup_id=lookup_id,
+            actor=request.user,**serializer.validated_data))
+    except GeocodeLookup.DoesNotExist:return Response({'detail':'Lookup not found'},status=404)

@@ -64,3 +64,13 @@ accuracy. Preserve ambiguous alternatives and no-match outcomes. Current Connect
 county/BG and returned decennial blocks have different county prefixes: retain each
 vintage rather than forcing a false hierarchy. Captured the three real documented
 reference addresses before writing the parser.
+
+## D-027 — Explicit source-backed geocode acceptance and independent check time
+
+Publish a bounded response to private artifact storage, then create an immutable
+requester-scoped preview. Pin mutation is a separate explicit version-checked action
+using only the stored candidate index. Keep accepted pins unconfirmed. Cache by saved
+address for 30 days, without fabricating re-checks. Identical re-fetched bytes may
+reuse a content snapshot but must preserve a later actual check time/expiry in a new
+preview. Lock the location before reading its current revision in a separate query;
+a nullable outer join can fail or expose a stale snapshot under competing accepts.

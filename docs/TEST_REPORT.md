@@ -103,3 +103,15 @@ oversized payloads, HTML, malformed JSON, and address-bearing transport errors.
 Live retrievals reproduce Norwalk at 41.12661107292, -73.388299045728 and preserve
 current CT planning-region codes separately from 2020 block geography. This adapter
 milestone does not claim persisted lookup acceptance or a live Site geocoding UI.
+
+## Persisted geocoding (2026-11-18)
+
+199 tests pass on real PostgreSQL/PostGIS, including private lookup/accept APIs,
+immutable source evidence, no pin mutation during lookup, explicit ambiguity choice,
+no-match rejection, stale/expired/other-user/cross-record protection, unchanged cache
+age/check history, repeated identical-response checks, and competing idempotent accepts.
+SQLite passes 192 with seven explicit spatial/concurrency skips. PostgreSQL tests
+caught and corrected nullable-join locking and concurrent revision snapshot issues.
+The live isolated smoke retrieved the actual Staples Plaza address, persisted its
+artifact, reused the cache without a second source check, and created one unconfirmed
+Census pin revision. No configured portfolio database or real account was modified.
