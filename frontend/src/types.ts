@@ -2,6 +2,7 @@ export interface Session {
   email: string;
   role: "admin" | "member";
   csrfToken: string;
+  map: { tile_url: string | null };
 }
 export interface Pin {
   id: string;

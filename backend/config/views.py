@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.decorators import login_not_required
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpResponse, JsonResponse
@@ -22,4 +23,4 @@ def application(request):
 
 @api_view(['GET'])
 def session(request):
-    return Response({'email': request.user.email, 'role': request.membership.role, 'csrfToken': get_token(request)})
+    return Response({'email': request.user.email, 'role': request.membership.role, 'csrfToken': get_token(request), 'map': {'tile_url': settings.MAP_TILE_URL or None}})

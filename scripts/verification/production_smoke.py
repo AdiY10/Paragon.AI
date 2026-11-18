@@ -45,7 +45,9 @@ def main():
                     raise TimeoutError('Production WSGI socket did not appear')
                 results = {}
                 manifest = json.loads((ROOT/'backend/static/ui/.vite/manifest.json').read_text())['src/main.tsx']
-                static_routes = [('/static/ui/'+asset, 200) for asset in [manifest['file'], *manifest.get('css', [])]]
+                static_routes = [('/static/ui/assets/'+asset.name, 200)
+                    for asset in sorted((ROOT/'backend/static/ui/assets').iterdir())
+                    if asset.suffix in {'.js', '.css'}]
                 for route, expected in [('/health/',200),('/',302),('/api/session/',403),('/api/locations/',403),('/api/sources/',403),('/api/admin/jobs/',403),('/api/admin/schedules/',403),('/accounts/login/',200), *static_routes]:
                     connection = SocketHTTPConnection(path)
                     connection.request('GET', route, headers={'Host':'localhost','X-Forwarded-Proto':'https'})

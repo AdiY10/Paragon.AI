@@ -54,3 +54,13 @@ def test_missing_build_is_explicit_and_private(settings, tmp_path, client):
     assert response.status_code == 503
     assert 'no-store' in response['Cache-Control']
     assert str(tmp_path).encode() not in response.content
+
+@pytest.mark.django_db
+def test_map_configuration_is_private_and_can_disable_external_tiles(settings, client):
+    settings.MAP_TILE_URL = ''
+    assert client.get('/api/session/').status_code == 403
+    user, _ = member()
+    client.force_login(user)
+    response = client.get('/api/session/')
+    assert response.json()['map'] == {'tile_url': None}
+    assert response['Referrer-Policy'] == 'strict-origin-when-cross-origin'

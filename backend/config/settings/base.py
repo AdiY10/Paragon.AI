@@ -98,3 +98,8 @@ Q_CLUSTER = {
         'workers': 2, 'timeout': 90, 'retry': 150, 'queue_limit': 2,
     }},
 }
+
+# Public raster endpoint; never place a private provider credential here.
+MAP_TILE_URL = os.environ.get('MAP_TILE_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
+# Raster provider policy requires a Referer; send only our origin cross-origin.
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'

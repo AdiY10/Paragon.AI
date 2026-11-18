@@ -1394,3 +1394,142 @@ th {
 .hero-banner p {
   color: #4b6049;
 }
+.map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font-size: 11px;
+  color: #53634f;
+}
+.portfolio-map {
+  padding: 0;
+  overflow: hidden;
+}
+.location-map {
+  height: 410px;
+  width: 100%;
+  background: #e8ecdf;
+}
+.pin-panel .location-map {
+  height: 320px;
+}
+.map-wrapper {
+  position: relative;
+  text-align: left;
+}
+.map-marker {
+  height: 19px;
+  width: 19px;
+  border: 3px solid #fffefa;
+  background: #a07c3d;
+  border-radius: 50%;
+  box-shadow: 0 1px 8px #193e3240;
+}
+.map-marker.verified {
+  background: #315c39;
+}
+.map-marker:hover,
+.map-marker:focus-visible {
+  transform: scale(1.3);
+  outline: 3px solid #153d32;
+}
+.map-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 17px;
+  background: #edf0e6;
+  font-size: 10px;
+  color: #45603d;
+}
+.map-privacy {
+  font-size: 9px;
+  color: #53634f;
+  padding: 0 17px;
+  margin: 10px 0 14px;
+  line-height: 1.7;
+}
+.map-privacy a {
+  text-decoration: underline;
+}
+.map-status {
+  position: relative;
+  font-size: 11px;
+  color: #72521f;
+  background: #f3ecd8;
+  padding: 12px 15px;
+  margin: 0;
+}
+.map-empty {
+  text-align: center;
+  background: #edf0e5;
+  padding: 40px 22px;
+}
+.map-empty p {
+  font-size: 12px;
+  max-width: 500px;
+  margin: auto;
+}
+.map-popup {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #243a34;
+  padding: 8px;
+}
+.map-popup strong {
+  font-size: 12px;
+}
+.map-popup p {
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.map-popup a {
+  font-size: 11px;
+  color: #254e32;
+  text-decoration: underline;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+  color: #203a2d !important;
+}
+.maplibregl-popup-close-button {
+  font-size: 20px !important;
+  padding: 3px 7px !important;
+  color: #153d32 !important;
+}
+.maplibregl-ctrl-scale {
+  color: #243a34 !important;
+}
+.maplibregl-canvas:focus-visible {
+  outline-offset: -4px;
+}
+.pin-panel .map-caption {
+  display: block;
+  line-height: 1.8;
+}
+.pin-panel .map-caption span {
+  display: block;
+}
+@media (max-width: 650px) {
+  .location-map {
+    height: 310px;
+  }
+  .pin-panel .location-map {
+    height: 280px;
+  }
+  .map-caption {
+    display: block;
+    font-size: 9px;
+  }
+  .map-caption span {
+    display: block;
+    line-height: 1.9;
+  }
+  .map-privacy {
+    font-size: 9px;
+  }
+  .portfolio-map {
+    padding: 0;
+  }
+}

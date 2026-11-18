@@ -48,3 +48,18 @@ is still required before claiming retention/recovery readiness.
   data workflows are pending; no deployed preview is claimed.
 - Production-settings Gunicorn smoke also passes for the built JavaScript/CSS,
   sign-in page, health endpoint, anonymous application redirect, and API denials.
+
+## Interactive maps (2026-11-18)
+
+153 PostgreSQL/PostGIS tests and eight frontend tests pass, including private runtime
+map configuration and independent distance checks for every display-ring vertex.
+The production build includes the explicit MapLibre v6 worker; its initial missing
+worker integration was caught in Chromium and corrected before submission. Actual
+OSM raster tiles, 35 saved pins, and three property rings were visually inspected.
+Browser coverage includes map loading, map/list filters, responsive widths, automated
+A/AA rules, and tile-failure retention of pins. Remaining deployed performance and
+full accessibility acceptance are documented in MAPS.md; no production claim is made.
+The final map browser run also passes injected external-tile failure, preserves all
+35 saved markers, and reports no automated A/AA violations on the portfolio map.
+SQLite passes 147 tests with six explicit skips. Production Gunicorn serves every
+built map JS/CSS chunk and worker, with anonymous data APIs still denied.
