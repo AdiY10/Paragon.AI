@@ -1,4 +1,10 @@
 import bootstrap from "../data/bootstrap.json";
+import {
+  createPreview,
+  previewPayload,
+  reviewedCandidate,
+} from "./geocoding.js";
+import { hash, locationAddress } from "./census.js";
 export class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -71,7 +77,7 @@ async function get(db, owner, id) {
   if (!row) throw new HttpError(404, "Record not found");
   return publicRecord(row);
 }
-async function mutate(db, owner, id, body, email, kind) {
+async function mutate(db, owner, id, body, email, kind, sourceEvidence = null) {
   const old = await get(db, owner, id);
   check(Number.isInteger(body.expected_version) && body.expected_version > 0);
   if (old.version !== body.expected_version)
@@ -97,10 +103,10 @@ async function mutate(db, owner, id, body, email, kind) {
       number: old.current_revision.number + 1,
       lat: body.lat,
       lon: body.lon,
-      method: "manual",
-      matched_address: "",
+      method: sourceEvidence ? "census_interpolated" : "manual",
+      matched_address: sourceEvidence?.matched_address ?? "",
       confirmed: body.confirmed ?? false,
-      context: { nature: "User-provided" },
+      context: sourceEvidence?.context ?? { nature: "User-provided" },
       actor_id: owner,
       created_at: now,
     };
@@ -217,15 +223,7 @@ export async function handleAPI(request, env, identity) {
       hosting: "temporary-sites",
     };
   if (path === "/api/sources/" && request.method === "GET")
-    return bootstrap.sources.map((source) => ({
-      ...source,
-      status: "Not checked",
-      health_scopes: source.health_scopes.map((scope) => ({
-        ...scope,
-        status: "Not checked",
-        needs_alert: false,
-      })),
-    }));
+    return sourceList(db, owner);
   if (!db) throw new HttpError(503, "Persistent storage is unavailable");
   if (path === "/api/admin/jobs/")
     throw new HttpError(
@@ -234,8 +232,14 @@ export async function handleAPI(request, env, identity) {
     );
   await seed(db, owner);
   if (path === "/api/export/" && request.method === "GET") {
-    const [records, audits, revisions] = await Promise.all(
-      ["records", "audits", "revisions"].map((table) =>
+    const [records, audits, revisions, geocodes, checks] = await Promise.all(
+      [
+        "records",
+        "audits",
+        "revisions",
+        "geocode_lookups",
+        "source_checks",
+      ].map((table) =>
         statement(
           db,
           `SELECT document FROM ${table} WHERE owner_id=?`,
@@ -244,14 +248,16 @@ export async function handleAPI(request, env, identity) {
       ),
     );
     return {
-      schema_version: 1,
+      schema_version: 2,
       exported_at: new Date().toISOString(),
       origin: "Paragon Radar temporary Sites workspace",
       source_commit: bootstrap.source_commit,
       locations: records.results.map(publicRecord),
       audits: audits.results.map(publicRecord),
       revisions: revisions.results.map(publicRecord),
-      sources: bootstrap.sources,
+      sources: await sourceList(db, owner),
+      geocode_lookups: geocodes.results.map(publicRecord),
+      source_checks: checks.results.map(publicRecord),
     };
   }
   if (
@@ -363,6 +369,81 @@ export async function handleAPI(request, env, identity) {
     ]);
     return item;
   }
+  const geo = path.match(
+    /^\/api\/locations\/([a-f0-9-]+)\/geocode\/(?:([a-f0-9-]+)\/accept\/)?$/,
+  );
+  if (geo && request.method === "POST") {
+    const id = geo[1],
+      lookupId = geo[2],
+      body = await request.json();
+    const fail = (status, message) => {
+      throw new HttpError(status, message);
+    };
+    const record = await get(db, owner, id);
+    if (!lookupId) {
+      strict(body, ["expected_version"]);
+      let preview;
+      try {
+        preview = await createPreview({
+          db,
+          owner,
+          record,
+          version: body.expected_version,
+          fail,
+        });
+      } catch (error) {
+        if (error.code === "INPUT_ERROR") fail(400, "Check the saved address.");
+        throw error;
+      }
+      if ((await get(db, owner, id)).version !== record.version)
+        fail(409, "Record changed while looking up the address.");
+      return previewPayload(preview);
+    }
+    const evidence = await reviewedCandidate({
+      db,
+      owner,
+      id,
+      lookupId,
+      body,
+      fail,
+    });
+    const repeated = (record) =>
+      record.version === body.expected_version + 1 &&
+      record.current_revision.context.lookup_id === lookupId &&
+      record.current_revision.context.candidate_index === body.candidate_index;
+    if (repeated(record)) return record;
+    if (
+      record.version !== body.expected_version ||
+      (await hash(locationAddress(record).toLowerCase())) !==
+        evidence.lookup.address_hash
+    )
+      fail(409, "Record changed. Request a new suggestion.");
+    try {
+      return await mutate(
+        db,
+        owner,
+        id,
+        {
+          expected_version: body.expected_version,
+          lat: evidence.candidate.lat,
+          lon: evidence.candidate.lon,
+          confirmed: false,
+        },
+        identity.email,
+        "pin_changed",
+        {
+          context: evidence.context,
+          matched_address: evidence.candidate.matched_address,
+        },
+      );
+    } catch (error) {
+      if (error.status === 409) {
+        const current = await get(db, owner, id);
+        if (repeated(current)) return current;
+      }
+      throw error;
+    }
+  }
   const match = path.match(
     /^\/api\/locations\/([a-f0-9-]+)\/(pin\/|confirm\/|history\/)?$/,
   );
@@ -398,4 +479,62 @@ export async function handleAPI(request, env, identity) {
           : "attributes_changed",
     );
   throw new HttpError(405, "Method not allowed");
+}
+
+async function sourceList(db, owner) {
+  const checks = db
+    ? (
+        await statement(
+          db,
+          "SELECT document FROM source_checks WHERE owner_id=? ORDER BY checked_at DESC,rowid DESC",
+          owner,
+        ).all()
+      ).results.map(publicRecord)
+    : [];
+  const scopes = [];
+  const ids = [...new Set(checks.map((check) => check.location_id))];
+  for (const id of ids) {
+    const entries = checks.filter((check) => check.location_id === id);
+    const good = entries.find((check) => check.succeeded);
+    let failures = 0;
+    for (const check of entries) {
+      if (check.succeeded) break;
+      failures++;
+    }
+    scopes.push({
+      scope: "geocode:" + id,
+      status: failures ? "Failing" : "OK",
+      last_checked_at: entries[0].completed_at,
+      last_success_at: good?.completed_at ?? null,
+      consecutive_failures: failures,
+      error_code: failures ? entries[0].error_code : null,
+      snapshot_id: good?.snapshot_id ?? null,
+      data_period: good
+        ? "Current address ranges; geography vintages retained per layer"
+        : null,
+      needs_alert: failures >= 2,
+    });
+  }
+  return bootstrap.sources.map((source) =>
+    source.id === "SRC-01"
+      ? {
+          ...source,
+          adapter_version: "census-single-v1-sites",
+          status: scopes.some((scope) => scope.status === "Failing")
+            ? "Failing"
+            : scopes.length
+              ? "OK"
+              : "Not checked",
+          health_scopes: scopes,
+        }
+      : {
+          ...source,
+          status: "Not checked",
+          health_scopes: source.health_scopes.map((scope) => ({
+            ...scope,
+            status: "Not checked",
+            needs_alert: false,
+          })),
+        },
+  );
 }

@@ -12,11 +12,13 @@ export default function LocationMap({
   locations,
   rings = false,
   editPin = false,
+  previewOnly = false,
   onPinChange,
 }: {
   locations: Location[];
   rings?: boolean;
   editPin?: boolean;
+  previewOnly?: boolean;
   onPinChange?: (lat: number, lon: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -123,7 +125,8 @@ export default function LocationMap({
         const link = document.createElement("a");
         link.href = `#/locations/${item.id}`;
         link.textContent = "Open property profile →";
-        popupContent.append(label, detail, link);
+        popupContent.append(label, detail);
+        if (!previewOnly) popupContent.append(link);
         const marker = new maplibregl.Marker({
           element: button,
           draggable: editPin,
@@ -141,7 +144,8 @@ export default function LocationMap({
       }
       if (pinned.length > 1)
         map.fitBounds(bounds, { padding: 65, maxZoom: 12, duration: 0 });
-      else map.jumpTo({ zoom: editPin ? 17 : rings ? 10 : 13 });
+      else
+        map.jumpTo({ zoom: editPin ? 17 : previewOnly ? 16 : rings ? 10 : 13 });
       map.on("error", () => setTilesFailed(true));
       map.on("load", () => {
         if (host.current) host.current.dataset.ready = "true";
@@ -196,7 +200,7 @@ export default function LocationMap({
       map = undefined;
     }
     return () => map?.remove();
-  }, [signature, rings, editPin, config?.tile_url]);
+  }, [signature, rings, editPin, previewOnly, config?.tile_url]);
   if (!pinned.length)
     return (
       <div className="map-empty">

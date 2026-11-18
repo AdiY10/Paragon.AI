@@ -8,6 +8,13 @@
       "when": 1795029463698,
       "tag": "0000_famous_inertia",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1795032750824,
+      "tag": "0001_freezing_katie_power",
+      "breakpoints": true
     }
   ]
 }

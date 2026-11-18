@@ -1,0 +1,50 @@
+{
+  "description": "Actual public Census Geocoder responses; test evidence only, never application seed values.",
+  "captures": [
+    {
+      "fixture": "norwalk.json",
+      "address": "444 Westport Avenue, Norwalk, CT 06851",
+      "retrieved_at": "2026-11-18T19:53:25.233831+00:00",
+      "endpoint": "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress",
+      "parameters": {
+        "benchmark": "Public_AR_Current",
+        "vintage": "Current_Current",
+        "layers": "all",
+        "format": "json"
+      },
+      "sha256": "7bc0444b9ed50f2cf1217c0c0cff94c6f878da977655769df29833663b73cf04",
+      "bytes": 7831,
+      "matches": 1
+    },
+    {
+      "fixture": "mount_kisco.json",
+      "address": "445 Main Street, Mount Kisco, NY",
+      "retrieved_at": "2026-11-18T19:53:25.448913+00:00",
+      "endpoint": "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress",
+      "parameters": {
+        "benchmark": "Public_AR_Current",
+        "vintage": "Current_Current",
+        "layers": "all",
+        "format": "json"
+      },
+      "sha256": "8a45545164a8a40dcc01873c8bccdbe54fae8d83bbefe080a1eb24dd6b21f1bf",
+      "bytes": 16323,
+      "matches": 2
+    },
+    {
+      "fixture": "kingston.json",
+      "address": "1200 Ulster Avenue, Kingston, NY",
+      "retrieved_at": "2026-11-18T19:53:25.051926+00:00",
+      "endpoint": "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress",
+      "parameters": {
+        "benchmark": "Public_AR_Current",
+        "vintage": "Current_Current",
+        "layers": "all",
+        "format": "json"
+      },
+      "sha256": "20e4ecd2b2fdfeb168be9009b3d8adead563551b2365c1a7b1381a80ea292857",
+      "bytes": 371,
+      "matches": 0
+    }
+  ]
+}

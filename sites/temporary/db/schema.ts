@@ -35,3 +35,27 @@ export const revisions = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.id] })],
 );
+export const geocodeLookups = sqliteTable(
+  "geocode_lookups",
+  {
+    ownerId: text("owner_id").notNull(),
+    id: text("id").notNull(),
+    locationId: text("location_id").notNull(),
+    addressHash: text("address_hash").notNull(),
+    checkedAt: text("checked_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    document: text("document").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ownerId, t.id] })],
+);
+export const sourceChecks = sqliteTable(
+  "source_checks",
+  {
+    ownerId: text("owner_id").notNull(),
+    id: text("id").notNull(),
+    locationId: text("location_id").notNull(),
+    checkedAt: text("checked_at").notNull(),
+    document: text("document").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ownerId, t.id] })],
+);

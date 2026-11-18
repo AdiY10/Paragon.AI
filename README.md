@@ -6,7 +6,7 @@ A private market-intelligence application in development for **John Nelson, Foun
 
 ## Temporary private workspace
 
-[Open Paragon Radar on OpenAI Sites](https://paragon-radar-workspace.amitsch5.chatgpt.site) using the owning ChatGPT account. The working temporary version supports real portfolio management, maps, persistent notes/pins, and workspace export. Source refresh and full trade-area analysis remain unavailable. See [temporary deployment and migration](docs/TEMPORARY_SITE.md).
+[Open Paragon Radar on OpenAI Sites](https://paragon-radar-workspace.amitsch5.chatgpt.site) using the owning ChatGPT account. The working temporary version supports real portfolio management, maps, persistent notes/pins, on-demand Census pin suggestions, and workspace export. Source refresh and full trade-area analysis remain unavailable. See [temporary deployment and migration](docs/TEMPORARY_SITE.md).
 
 ## Target Release 1 behavior
 - **This Week:** a Monday brief of meaningful changes around Paragon's properties (tenant SEC bankruptcy or closure filings, possible nearby closures, flood exposure, local jobs, population and income trends, traffic, housing pipeline), each with evidence.

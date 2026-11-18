@@ -2,7 +2,7 @@
 
 Live URL: https://paragon-radar-workspace.amitsch5.chatgpt.site
 
-The Sites plugin confirmed successful private publication on 2026-11-18. The Site
+The Sites plugin confirmed successful private publication and the Census update on 2026-11-18. The Site
 is owner-only and uses ChatGPT sign-in; no separate Render account, OIDC client,
 or paid hosting signup is required to use this temporary version. Open it with
 the same ChatGPT account that owns the Site. Sharing has not been enabled.
@@ -12,12 +12,15 @@ the same ChatGPT account that owns the Site. Sharing has not been enabled.
 - Actual public portfolio: 36 unconfirmed records, 35 reference pins, original
   source periods/attribution. Public listing data is not verified current ownership.
 - Responsive portfolio UI, real OSM maps/rings, filters, private POST search,
-  record creation/editing, notes, ownership confirmation, and manual pin verification.
+  record creation/editing, notes, ownership confirmation, manual pin verification,
+  and source-backed Census address suggestions with explicit review/acceptance.
 - Persistent D1 records, immutable stored manual pin revisions, atomic optimistic
   version checks, user-scoped storage, and attributed change history.
-- Historical metadata for all 16 sources. No fresh source check is claimed here.
+- Actual on-demand Census check history plus historical metadata for the other
+  sources. No fresh checks are claimed for the unimplemented background adapters.
 - **Export workspace** downloads a private, schema-versioned JSON containing saved
-  records, pin revisions, and audit history for the later move.
+  records, pin revisions, audit history, raw Census responses/hashes, and lookup/check history
+  for the later move (export schema version 2).
 
 The Site is a working limited workspace, not completed Release 1. PostGIS spatial
 aggregation, scheduled source ingestion, tenant SEC checks, weekly signals, screening,
@@ -31,7 +34,7 @@ bootstrap data, React UI, and verification scripts. The canonical backend/fronte
 remain in `backend/` and `frontend/`; do not replace them with this adapter. The
 hosted checkout is `/data/tml/code/as/vlm/paragon-radar-site`; its source was pushed
 through the Sites helper and published at commit
-`9e4e7436560e160bb80077f9d9d513c5b01e1a3e`.
+`15f361441b7d5b6b164229c52253baa89cb45d9d` (Census update).
 
 The tracked manifest preserves the existing Site identity. Reuse it for updates;
 do not create a replacement Site. Source credentials remain session-only and are
@@ -40,11 +43,12 @@ QA identity gateway is never included in the deployed Worker.
 
 ## Verification
 
-Eight frontend tests, TypeScript/Vite production build, and local actual Workers/D1
+Fifteen frontend/adapter tests, TypeScript/Vite production build, and local actual Workers/D1
 SQL execution pass. Checks cover anonymous denial, same-origin mutation protection,
 competing version updates, account isolation, 375/768/1280 overflow and automated
 A/AA rules, actual map-worker/pin loading, persisted edits after reload, manual pin
-revisions, and complete export. Native Sites publication returned `succeeded` and
+revisions, complete export, live Census match/ambiguity/no-match, cache age/replay,
+source-field spoof rejection, and cross-user acceptance denial. Native Sites publication returned `succeeded` and
 the live URL. Real owner sign-in/interaction must still be checked by opening the
 private link; no interactive owner session was impersonated for production testing.
 
