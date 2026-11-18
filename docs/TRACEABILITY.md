@@ -6,7 +6,7 @@ Production status remains pending until deployed verification.
 |---|---|---|---|
 | AC-01 | FR-01 | Implemented; production verification pending | Anonymous route tests and membership middleware |
 | AC-02 | FR-02 | Implemented; live OIDC verification pending | Invitation, role, revocation, and audit tests |
-| AC-03 | FR-04 | Pending | Not implemented |
+| AC-03 | FR-04 | Implemented; deployed verification pending | Real local 36-property import/reimport and private API tests |
 | AC-04 | FR-05 | Pending | Not implemented |
 | AC-05 | FR-05 | Pending | Not implemented |
 | AC-06 | FR-09 | Pending | Not implemented |

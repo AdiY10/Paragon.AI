@@ -4,8 +4,8 @@ No production deployment exists yet; this is not Release 1 acceptance.
 
 | Verification | Result |
 |---|---|
-| Offline suite, Python 3.13, SQLite | 130 passed, 6 explicit spatial/concurrency skips |
-| Same suite, PostgreSQL 17 and PostGIS 3.6 | 136 passed, no skips |
+| Offline suite, Python 3.13, SQLite | 139 passed, 6 explicit spatial/concurrency skips |
+| Same suite, PostgreSQL 17 and PostGIS 3.6 | 145 passed, no skips |
 | Django configuration / migration consistency | Passed |
 | Overture monthly captures | 70 extracts / 35 seed pins; all SHA-256 hashes verified; all imported into local PostGIS/artifact store |
 | Real capture import rerun | Published zero; reused all 70; no duplicate snapshots |
@@ -16,7 +16,7 @@ No production deployment exists yet; this is not Release 1 acceptance.
 | Real durable worker | 16 catalog definitions processed; one attempt; message acknowledged; graceful shutdown verified |
 | Historical Regal closure | Real Sep→Oct record pair preserved in tests |
 | GitHub Actions | Not run: workflow push rejected for missing OAuth workflow scope |
-| Production Gunicorn on private local socket | Health 200; app 302; anonymous API 403; sign-in 200; HSTS verified |
+| Production Gunicorn on private local socket | Health 200; app 302; anonymous session/locations/sources/jobs/schedules APIs 403; sign-in 200; HSTS verified |
 | Render manifest | Official JSON-schema validation passed |
 | Docker image / Compose | Prepared; cannot run without daemon access |
 | Live OIDC / HTTPS / production ACs | Pending owner credentials and deployment |
