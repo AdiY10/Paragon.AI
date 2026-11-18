@@ -48,12 +48,30 @@ def update_location(*,location_id,expected_version,attributes,actor):
     if not attributes or set(attributes)-EDITABLE:raise ValueError('Invalid editable location attributes')
     location=locked_location(location_id,expected_version)
     before={key:getattr(location,key) for key in attributes}
+    address_changed=any(key in attributes and attributes[key]!=getattr(location,key) for key in ('address','city','state'))
+    previous_address=location.address
+    previous_revision=location.current_revision
+    previous_confirmed=location.confirmed
     for key,value in attributes.items():setattr(location,key,value)
-    if 'ring_preset' in attributes and attributes['ring_preset']!=before['ring_preset']:
-        location.analysis_version+=1
+    ring_changed='ring_preset' in attributes and attributes['ring_preset']!=before['ring_preset']
+    if address_changed or ring_changed:location.analysis_version+=1
+    after=dict(attributes)
+    if address_changed:
+        location.current_revision=LocationRevision.objects.create(location=location,
+            number=previous_revision.number+1,lat=None,lon=None,method='unplaced',
+            matched_address='',confirmed=False,actor=actor,
+            context={'reason':'Address changed; pin placement requires review',
+                'previous_revision_id':str(previous_revision.pk)})
+        location.confirmed=False;location.confirmed_at=None;location.confirmed_by=None
+        location.source_context={**location.source_context,'address_override':{
+            'original_address':location.source_context.get('address_override',{}).get('original_address',previous_address),
+            'changed_at':timezone.now().isoformat(),'nature':'User-edited address'}}
+        before.update(revision=str(previous_revision.pk),confirmed=previous_confirmed)
+        after.update(revision=str(location.current_revision.pk),confirmed=False,
+            analysis_version=location.analysis_version,reason='Address changed; pin and ownership require review')
     location.version+=1
     location.full_clean();location.save()
-    audit(location,actor,'attributes_changed',before,attributes)
+    audit(location,actor,'address_changed' if address_changed else 'attributes_changed',before,after)
     return location
 
 

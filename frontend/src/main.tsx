@@ -155,6 +155,15 @@ function RecordEvidence({ location }: { location: Location }) {
             ? "Paragon public property listing"
             : "User-provided record"}
         </dd>
+        {Boolean(location.source_context.address_override) && (
+          <>
+            <dt>Address origin</dt>
+            <dd>
+              User-edited; the original listing is historical reference. See
+              change history.
+            </dd>
+          </>
+        )}
         <dt>Reference period</dt>
         <dd>
           {location.source_context.source_as_of
