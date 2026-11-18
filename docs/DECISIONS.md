@@ -54,3 +54,13 @@ unimplemented refresh/analysis and provide a versioned export. Mirror adapter so
 and document the future importer/identity mapping instead of claiming URL changes
 alone migrate data. No external paid provisioning or separate OIDC client is needed
 for this temporary workspace.
+
+## D-026 — Preserve Census interpolation uncertainty and mixed geography vintages
+
+Use server-side single-address Census JSON with bounded transport, refused redirects,
+request-echo validation, and sanitized errors. This endpoint does not report the
+batch Exact/Non_Exact flag, so add a distinct interpolated method rather than infer
+accuracy. Preserve ambiguous alternatives and no-match outcomes. Current Connecticut
+county/BG and returned decennial blocks have different county prefixes: retain each
+vintage rather than forcing a false hierarchy. Captured the three real documented
+reference addresses before writing the parser.
