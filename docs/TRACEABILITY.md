@@ -34,3 +34,8 @@ UI increment: SCR-1/2/3/6/8 now have a real authenticated frontend for implement
 record/source/job APIs. Automated browser checks cover responsive dashboard layouts
 and real record mutations; see USER_INTERFACE.md. SCR-4/5 remain explicit unavailable
 states until their data workflows exist. Full P0 acceptance remains open.
+
+SCR-3 pin correction now supports unsaved map dragging or keyboard coordinate entry,
+explicit verification, version-conflict protection, and immutable revision history.
+SCR-1/2 phone navigation now traps/restores keyboard focus. Browser verification
+covers these actual API flows and concurrent updates; final deployed ACs remain open.

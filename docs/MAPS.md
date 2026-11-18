@@ -3,7 +3,10 @@
 Portfolio filters drive both the map and the property list. The public seed has
 35 reference pins and one unplaced record; the unplaced record remains in the list.
 Markers open linked property popups. A property map shows the selected 1/3/5 or
-3/5/10-mile preset. Pin confirmation is separate from ownership confirmation.
+3/5/10-mile preset. Pin confirmation is separate from ownership confirmation. **Correct / confirm pin**
+opens an unsaved preview: drag its marker or enter coordinates, then save explicitly.
+The verification checkbox resets on movement. Unplaced records support coordinate
+entry; automatic geocoding remains pending. Cancel leaves the saved revision intact.
 
 MapLibre GL JS is lazy-loaded only on screens that show a map. Its v6 module worker
 is bundled using Vite's `?worker&url` integration, then served from the application's

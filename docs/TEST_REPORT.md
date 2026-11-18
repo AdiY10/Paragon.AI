@@ -63,3 +63,20 @@ The final map browser run also passes injected external-tile failure, preserves 
 35 saved markers, and reports no automated A/AA violations on the portfolio map.
 SQLite passes 147 tests with six explicit skips. Production Gunicorn serves every
 built map JS/CSS chunk and worker, with anonymous data APIs still denied.
+
+## Pin correction and safe editing (2026-11-18)
+
+The production frontend build and eight frontend tests pass. Chromium exercises
+actual marker dragging, coordinate entry, explicit pin verification, and a save
+through the real private API in the disposable seed database. It verifies a second
+immutable manual revision, incremented analysis generation, and separate pin and
+ownership confirmation. Phone navigation traps focus, closes on Escape, and restores
+focus to its trigger; hidden desktop navigation cannot take focus.
+
+A concurrent API edit while the record dialog is open is followed by an actual
+background query refresh. Saving the older form returns a conflict, retains the
+newer server notes, and offers a reload action. This catches the stale-form overwrite
+risk when the live location prop's version changes during editing. Backend code is
+unchanged from the 153-test PostGIS baseline. Full production acceptance remains open.
+The final browser run also verifies phone-width pin-dialog overflow and retains an
+inspected 375-pixel screenshot. Coordinate inputs and Save pin remain usable.
