@@ -32,7 +32,7 @@ def test_missing_source_handlers_remain_disabled_and_visible(client):
 def test_dispatch_coalesces_backlog_and_advances_persisted_cursor():
     item=schedule();owner=uuid.uuid4()
     result=dispatch_due(owner=owner,now=anchor())
-    assert result=={'leader':True,'dispatched':1,'blocked':0}
+    assert result['leader'] is True and result['dispatched']==1 and result['blocked']==0
     occurrence=ScheduleOccurrence.objects.get()
     assert occurrence.missed_count==3 and occurrence.delay_seconds==3600
     assert occurrence.scheduled_for==anchor()-timedelta(hours=1)

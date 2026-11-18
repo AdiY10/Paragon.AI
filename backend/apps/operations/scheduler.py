@@ -11,6 +11,7 @@ from .calendar import CalendarRule,next_occurrence,coalesce_due
 from .models import JobSchedule,ScheduleOccurrence,SchedulerState
 from .registry import REGISTRY
 from .service import enqueue_job
+from .recovery import recover_jobs
 
 
 def load_definitions(path=None):
@@ -67,6 +68,7 @@ def dispatch_due(*,owner,now=None):
     now=now or timezone.now()
     if timezone.is_naive(now):raise ValueError('Scheduler time must be timezone-aware')
     if not acquire_leader(owner,now):return {'leader':False,'dispatched':0,'blocked':0}
+    recovery=recover_jobs(now=now)
     dispatched=blocked=0
     names=list(JobSchedule.objects.filter(enabled=True,next_due_at__lte=now).values_list('name',flat=True))
     for name in names:
@@ -88,4 +90,4 @@ def dispatch_due(*,owner,now=None):
                 dispatched+=1
             schedule.next_due_at=following;schedule.last_dispatched_at=now
             schedule.save(update_fields=['next_due_at','last_dispatched_at','updated_at'])
-    return {'leader':True,'dispatched':dispatched,'blocked':blocked}
+    return {'leader':True,'dispatched':dispatched,'blocked':blocked,'recovery':recovery}

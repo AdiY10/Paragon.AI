@@ -9,7 +9,7 @@ from .registry import REGISTRY
 from .service import enqueue_job
 
 FIELDS=['id','kind','scope','queue','status','attempts','max_attempts','created_at',
-    'started_at','finished_at','heartbeat_at','next_attempt_at','records','error_code','rerun_of_id']
+    'started_at','finished_at','heartbeat_at','next_attempt_at','recovery_count','last_recovered_at','records','error_code','rerun_of_id']
 
 
 def payload(job):

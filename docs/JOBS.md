@@ -41,9 +41,8 @@ imports into a single job or execute them inside web requests.
 
 The built-in Q2 recurring scheduler is disabled. The application scheduler is documented
 in SCHEDULER.md and uses Eastern wall time, persisted occurrences, and leader leases.
-Source handlers remain disabled until implemented. The remaining recovery sweep must
-handle domain rows whose transport retries were exhausted or whose worker died without
-finalizing their lease. No production refresh schedule is claimed running.
+Source handlers remain disabled until implemented. The recovery sweep described in JOB_RECOVERY.md handles lost messages and expired
+attempts under bounded limits. No production refresh schedule is claimed running.
 
 ## Verification
 
