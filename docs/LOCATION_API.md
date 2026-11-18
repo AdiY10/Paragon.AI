@@ -31,3 +31,12 @@ Verification includes private access, Members' edit rights, source-bearing seede
 records, real portfolio search/state filters, confirmation/archive/history, pin changes,
 forged input rejection, optimistic conflicts, and CSRF. The production Gunicorn smoke
 also verifies anonymous denial on locations, sources, jobs, and schedules.
+
+Address/locality edits now invalidate prior location-dependent state atomically.
+Changing address, city, or state creates an unplaced current pin revision, clears
+building and ownership confirmation, and advances the analysis generation once
+(even when a ring preset changes in the same patch). Original coordinates and
+confirmation remain in immutable history. The record keeps the original source
+address and a dated user-edit marker; the provenance drawer labels the edited
+address as user-provided. Exact unchanged values and notes-only edits keep the pin.
+A rejected/invalid edit rolls back the entire invalidation and revision.

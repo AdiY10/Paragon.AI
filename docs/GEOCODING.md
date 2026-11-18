@@ -104,3 +104,8 @@ The isolated browser smoke now performs live Census requests for the three actua
 public reference properties. It checks explicit ambiguous selection, no-match pin
 retention, source-backed acceptance without manufactured confirmation, mobile overflow,
 and automated A/AA rules. Test artifacts stay inside the disposable test directory.
+
+Changing a saved address/city/state invalidates the previous current pin and both
+confirmation states before any new lookup. It preserves prior revisions and source
+address context, and rejects acceptance of old previews. This behavior is currently
+in the canonical API; temporary-Site address editing is not enabled yet.

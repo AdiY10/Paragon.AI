@@ -93,3 +93,12 @@ Append schema-only lookup/check tables; do not change existing record/pin tables
 reseed user edits. Export schema 2 adds raw response and check evidence for later
 migration. Keep ChatGPT authentication/audience unchanged. Only on-demand Census
 checks are live; other background sources remain explicitly unimplemented.
+
+## D-030 — Address/locality changes invalidate location-specific confirmation
+
+Treat changes to address, city, or state as a new location context. In one locked
+transaction, create an unplaced revision, clear ownership/building confirmation,
+advance analysis once, preserve the original source address and immutable pin history,
+and audit the reason. Ring and address changes together advance one generation.
+Unchanged values and notes-only edits preserve their existing pin. Mark edited
+addresses explicitly in provenance rather than attributing them to the old listing.

@@ -140,3 +140,13 @@ re-checks, idempotent replay, rejected source spoofing and other-user acceptance
 real source health, and schema-2 export of raw lookup evidence. Existing persistence,
 private APIs, responsive A/AA checks, and map loading pass. Real production owner
 interaction is not impersonated or claimed; full Release 1 analysis remains pending.
+
+## Address-change invalidation (2026-11-18)
+
+206 tests pass on real PostgreSQL/PostGIS. New checks cover address/city/state
+invalidation, pin/ownership reset with immutable old confirmation preserved,
+original source-address retention after repeated edits, one analysis increment for
+combined address/ring changes, unchanged-address/notes preservation, and rollback
+of invalid edits. Frontend production build checks the explicit user-edited-address
+provenance label. Temporary-Site address editing remains disabled until its adapter
+and UI gain the same safeguards.
