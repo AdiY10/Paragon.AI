@@ -65,6 +65,31 @@ try {
           })),
         ),
       );
+    if (width === 375) {
+      await page
+        .getByRole("button", { name: "Open navigation", exact: true })
+        .click();
+      const navigation = page.getByRole("dialog", {
+        name: "Workspace navigation",
+      });
+      await navigation.waitFor();
+      for (let tab = 0; tab < 12; tab++) {
+        await page.keyboard.press("Tab");
+        if (
+          !(await navigation.evaluate((element) =>
+            element.contains(document.activeElement),
+          ))
+        )
+          throw new Error("Mobile navigation lost its focus trap");
+      }
+      await page.keyboard.press("Escape");
+      if (
+        (await page.evaluate(() =>
+          document.activeElement?.getAttribute("aria-label"),
+        )) !== "Open navigation"
+      )
+        throw new Error("Mobile navigation did not restore focus");
+    }
     if (output)
       await page.screenshot({
         path: `${output}/dashboard-${width}.png`,
@@ -140,6 +165,108 @@ try {
     .getByRole("button", { name: "Confirm record", exact: true })
     .click();
   await page.getByText("Record confirmed.", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Correct / confirm pin" }).click();
+  const pinDialog = page.getByRole("dialog", {
+    name: "Review the property pin",
+  });
+  await pinDialog.locator(".location-map[data-ready=true]").waitFor();
+  const beforeDrag = await pinDialog
+    .getByLabel("Longitude", { exact: true })
+    .inputValue();
+  const dragPin = await pinDialog.locator(".map-marker").boundingBox();
+  if (!dragPin) throw new Error("Missing draggable preview pin");
+  await page.mouse.move(
+    dragPin.x + dragPin.width / 2,
+    dragPin.y + dragPin.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    dragPin.x + dragPin.width / 2 + 30,
+    dragPin.y + dragPin.height / 2,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+  await page.waitForFunction(
+    (before) =>
+      document.querySelector("input[name=longitude]")?.value !== before,
+    beforeDrag,
+  );
+  await pinDialog.getByLabel("Latitude", { exact: true }).fill("41.138370");
+  await pinDialog.getByLabel("Longitude", { exact: true }).fill("-73.300803");
+  await page.setViewportSize({ width: 375, height: 1000 });
+  if (
+    await pinDialog.evaluate(
+      (element) => element.scrollWidth > element.clientWidth,
+    )
+  )
+    throw new Error("Pin dialog overflows on phone");
+  if (output)
+    await page.screenshot({
+      path: `${output}/pin-editor-375.png`,
+      fullPage: false,
+    });
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await pinDialog
+    .getByLabel("I checked that this pin is on the property building.")
+    .check();
+  await pinDialog
+    .getByRole("button", { name: "Save pin", exact: true })
+    .click();
+  await pinDialog.waitFor({ state: "hidden" });
+  await page
+    .getByText("Pin confirmed by a team member.", { exact: true })
+    .waitFor();
+  const savedPin = await page.evaluate(async () => {
+    const path =
+      location.hash.slice(1).replace("/locations/", "/api/locations/") + "/";
+    return (await fetch(path)).json();
+  });
+  if (
+    savedPin.current_revision.number !== 2 ||
+    savedPin.current_revision.method !== "manual" ||
+    !savedPin.current_revision.confirmed ||
+    savedPin.analysis_version !== 2
+  )
+    throw new Error(
+      "Pin save did not preserve revision and analysis semantics",
+    );
+  await page.getByRole("button", { name: "Edit record" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit property record" });
+  await editDialog
+    .getByLabel("Team notes")
+    .fill("Stale form must not overwrite the newer record.");
+  await page.evaluate(async () => {
+    const path =
+      location.hash.slice(1).replace("/locations/", "/api/locations/") + "/";
+    const record = await (await fetch(path)).json();
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    const response = await fetch(path, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+      body: JSON.stringify({
+        expected_version: record.version,
+        notes: "Concurrent browser test update — isolated database only.",
+      }),
+    });
+    if (!response.ok) throw new Error("Concurrent test update failed");
+    window.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForFunction(
+    () =>
+      document.querySelector(".notes p")?.textContent ===
+      "Concurrent browser test update — isolated database only.",
+  );
+  await editDialog.getByRole("button", { name: "Save changes" }).click();
+  await editDialog
+    .getByRole("alert")
+    .filter({ hasText: "This record changed." })
+    .waitFor();
+  await editDialog.getByRole("button", { name: "Reload record" }).click();
+  await page
+    .getByText("Concurrent browser test update — isolated database only.", {
+      exact: true,
+    })
+    .waitFor();
   if (output)
     await page.screenshot({
       path: `${output}/property-1280.png`,
@@ -181,7 +308,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, and POST search.",
+    "UI browser smoke passed: 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, and mobile keyboard focus.",
   );
 } finally {
   await browser.close();

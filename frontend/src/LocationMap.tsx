@@ -11,9 +11,13 @@ import { circleCoordinates } from "./geography";
 export default function LocationMap({
   locations,
   rings = false,
+  editPin = false,
+  onPinChange,
 }: {
   locations: Location[];
   rings?: boolean;
+  editPin?: boolean;
+  onPinChange?: (lat: number, lon: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [unavailable, setUnavailable] = useState(false),
@@ -120,16 +124,24 @@ export default function LocationMap({
         link.href = `#/locations/${item.id}`;
         link.textContent = "Open property profile →";
         popupContent.append(label, detail, link);
-        new maplibregl.Marker({ element: button })
+        const marker = new maplibregl.Marker({
+          element: button,
+          draggable: editPin,
+        })
           .setLngLat([pin.lon!, pin.lat!])
           .setPopup(
             new maplibregl.Popup({ offset: 18 }).setDOMContent(popupContent),
           )
           .addTo(map);
+        if (editPin)
+          marker.on("dragend", () => {
+            const point = marker.getLngLat();
+            onPinChange?.(point.lat, point.lng);
+          });
       }
       if (pinned.length > 1)
         map.fitBounds(bounds, { padding: 65, maxZoom: 12, duration: 0 });
-      else map.jumpTo({ zoom: rings ? 10 : 13 });
+      else map.jumpTo({ zoom: editPin ? 17 : rings ? 10 : 13 });
       map.on("error", () => setTilesFailed(true));
       map.on("load", () => {
         if (host.current) host.current.dataset.ready = "true";
@@ -184,7 +196,7 @@ export default function LocationMap({
       map = undefined;
     }
     return () => map?.remove();
-  }, [signature, rings, config?.tile_url]);
+  }, [signature, rings, editPin, config?.tile_url]);
   if (!pinned.length)
     return (
       <div className="map-empty">

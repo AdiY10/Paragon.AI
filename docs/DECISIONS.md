@@ -32,3 +32,14 @@ browser caching, and origin-only cross-origin Referer. Document IP/viewed-area
 privacy and permit disabling external tiles through runtime configuration. Retain
 an accessible list, explicit tile/WebGL failures, and unplaced records. Browser
 rings are geodesic display geometry, not server metric aggregation boundaries.
+
+## D-024 — Snapshot edit versions and explicit pin-preview persistence
+
+Capture the property version when opening an edit or pin dialog, rather than
+reading a potentially refreshed prop at submit time. A newer background record
+must force a conflict instead of permitting a stale form to overwrite it. Manual
+pin changes remain a local preview until explicit save and create an immutable
+revision through the existing API. Pin verification resets on movement and stays
+independent of ownership. Native coordinate inputs provide a keyboard alternative
+to drag. Use Radix modal navigation on phones so hidden desktop links cannot take
+focus and the menu traps/restores focus correctly.

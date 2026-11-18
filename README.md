@@ -53,7 +53,7 @@ uv run pytest -q
 npm test --prefix frontend
 ```
 
-The default test suite uses isolated SQLite; the [database testing guide](docs/DATABASE_TESTING.md) covers the required real PostGIS checks. The [UI guide](docs/USER_INTERFACE.md) explains implemented screens, browser verification, and current limitations. See [deployment](docs/DEPLOYMENT.md) and [authentication](docs/AUTHENTICATION.md) for real environment configuration. A Vite development server alone does not provide authentication or backend APIs.
+The default test suite uses isolated SQLite; the [database testing guide](docs/DATABASE_TESTING.md) covers the required real PostGIS checks. The [UI guide](docs/USER_INTERFACE.md) explains implemented screens, browser verification, and current limitations. See [deployment](docs/DEPLOYMENT.md) and [authentication](docs/AUTHENTICATION.md) for real environment configuration. A Vite development server alone does not provide authentication or backend APIs. The [workspace review guide](docs/TESTING_GUIDE.md) covers the currently implemented UI without claiming final acceptance.
 
 ## Key dependencies still open
 - Owner: provide approved hosting access/budget, OIDC client configuration, the test-account email, and a contact email for SEC API access. GitHub access works; hosted CI publication needs workflow scope.

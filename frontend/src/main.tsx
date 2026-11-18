@@ -37,7 +37,8 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { api, allLocations, csrfToken, dateLabel } from "./api";
+import PinEditor from "./PinEditor";
+import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
 
@@ -356,163 +357,180 @@ function App() {
     body = (
       <Overview locations={portfolio.data ?? []} sources={sources.data ?? []} />
     );
-  return (
-    <div className="app">
-      <a
-        className="skip-link"
-        href="#main"
-        onClick={(event) => {
-          event.preventDefault();
-          document.getElementById("main")?.focus();
-        }}
-      >
-        Skip to content
+  const sidebarContent = (
+    <>
+      <a className="brand" href="#/">
+        <span className="brand-mark">
+          P<span />
+        </span>
+        <span>
+          PARAGON<small>RADAR</small>
+        </span>
       </a>
-      <aside className={`sidebar ${mobile ? "open" : ""}`}>
-        <a className="brand" href="#/">
-          <span className="brand-mark">
-            P<span />
-          </span>
+      <div className="workspace-label">YOUR WORKSPACE</div>
+      <nav aria-label="Main navigation">
+        {nav.map(([path, label, Icon]) => (
+          <a
+            key={path}
+            className={
+              route === path ||
+              (path === "/portfolio" && route.startsWith("/locations/"))
+                ? "active"
+                : ""
+            }
+            href={"#" + path}
+            onClick={() => setMobile(false)}
+          >
+            <Icon size={19} />
+            {label}
+          </a>
+        ))}
+      </nav>
+      <div className="sidebar-bottom">
+        <div className="privacy">
+          <ShieldCheck size={17} />
           <span>
-            PARAGON<small>RADAR</small>
+            Private workspace<small>Invite-only access</small>
           </span>
-        </a>
-        <div className="workspace-label">YOUR WORKSPACE</div>
-        <nav aria-label="Main navigation">
-          {nav.map(([path, label, Icon]) => (
-            <a
-              key={path}
-              className={
-                route === path ||
-                (path === "/portfolio" && route.startsWith("/locations/"))
-                  ? "active"
-                  : ""
-              }
-              href={"#" + path}
-              onClick={() => setMobile(false)}
-            >
-              <Icon size={19} />
-              {label}
-            </a>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="privacy">
-            <ShieldCheck size={17} />
-            <span>
-              Private workspace<small>Invite-only access</small>
-            </span>
-          </div>
-          <div className="user">
-            <span className="avatar">
-              {session.data.email.slice(0, 1).toUpperCase()}
-            </span>
-            <div>
-              <strong>{session.data.email.split("@")[0]}</strong>
-              <small>{titleCase(session.data.role)}</small>
-            </div>
-            <form action="/accounts/logout/" method="post">
-              <input
-                type="hidden"
-                name="csrfmiddlewaretoken"
-                value={csrfToken()}
-              />
-              <button className="text-button" type="submit">
-                Sign out
-              </button>
-            </form>
-          </div>
         </div>
-      </aside>
-      {mobile && (
-        <button
-          className="mobile-shade"
-          aria-label="Close navigation"
-          onClick={() => setMobile(false)}
-        />
-      )}
-      <div className="workspace">
-        <header className="topbar">
-          <button
-            className="icon-button mobile-menu"
-            aria-label="Open navigation"
-            onClick={() => setMobile(!mobile)}
-          >
-            <Menu />
-          </button>
-          <div className="breadcrumb">
-            Workspace <ChevronRight size={14} />{" "}
-            <strong>
-              {route.startsWith("/locations/")
-                ? "Property profile"
-                : (nav.find((item) => item[0] === route)?.[1] ?? "This Week")}
-            </strong>
-          </div>
-          <form
-            className="global-search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setSearching(true);
-            }}
-          >
-            <Search size={17} />
-            <input
-              aria-label="Search portfolio by name or address"
-              placeholder="Search a property or address"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setSearching(false);
-              }}
-            />
-            <kbd>↵</kbd>
-          </form>
-          <span className="private-label">
-            <span /> PRIVATE
+        <div className="user">
+          <span className="avatar">
+            {session.data.email.slice(0, 1).toUpperCase()}
           </span>
-        </header>
-        {searching && search.trim() && (
-          <section className="search-results">
-            <div className="section-heading">
-              <h2>Search results</h2>
+          <div>
+            <strong>{session.data.email.split("@")[0]}</strong>
+            <small>{titleCase(session.data.role)}</small>
+          </div>
+          <form action="/accounts/logout/" method="post">
+            <input
+              type="hidden"
+              name="csrfmiddlewaretoken"
+              value={csrfToken()}
+            />
+            <button className="text-button" type="submit">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+  return (
+    <Dialog.Root open={mobile} onOpenChange={setMobile}>
+      <div className="app">
+        <a
+          className="skip-link"
+          href="#main"
+          onClick={(event) => {
+            event.preventDefault();
+            document.getElementById("main")?.focus();
+          }}
+        >
+          Skip to content
+        </a>
+        <aside className="sidebar desktop-sidebar">{sidebarContent}</aside>
+        <Dialog.Portal>
+          <Dialog.Overlay className="navigation-overlay" />
+          <Dialog.Content className="sidebar mobile-sidebar">
+            <Dialog.Title className="sr-only">
+              Workspace navigation
+            </Dialog.Title>
+            <Dialog.Description className="sr-only">
+              Choose a workspace screen or sign out.
+            </Dialog.Description>
+            <Dialog.Close
+              className="icon-button navigation-close"
+              aria-label="Close navigation"
+            >
+              <X />
+            </Dialog.Close>
+            {sidebarContent}
+          </Dialog.Content>
+        </Dialog.Portal>
+        <div className="workspace">
+          <header className="topbar">
+            <Dialog.Trigger asChild>
               <button
-                className="icon-button"
-                aria-label="Close search"
-                onClick={() => setSearching(false)}
+                className="icon-button mobile-menu"
+                aria-label="Open navigation"
               >
-                <X size={18} />
+                <Menu />
               </button>
+            </Dialog.Trigger>
+            <div className="breadcrumb">
+              Workspace <ChevronRight size={14} />{" "}
+              <strong>
+                {route.startsWith("/locations/")
+                  ? "Property profile"
+                  : (nav.find((item) => item[0] === route)?.[1] ?? "This Week")}
+              </strong>
             </div>
-            {searchResults.error ? (
-              <ErrorNotice error={searchResults.error} />
-            ) : searchResults.isPending ? (
-              <p>Searching…</p>
-            ) : searchResults.data?.results.length ? (
-              searchResults.data.results.map((item) => (
-                <a
-                  href={"#/locations/" + item.id}
-                  key={item.id}
+            <form
+              className="global-search"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setSearching(true);
+              }}
+            >
+              <Search size={17} />
+              <input
+                aria-label="Search portfolio by name or address"
+                placeholder="Search a property or address"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setSearching(false);
+                }}
+              />
+              <kbd>↵</kbd>
+            </form>
+            <span className="private-label">
+              <span /> PRIVATE
+            </span>
+          </header>
+          {searching && search.trim() && (
+            <section className="search-results">
+              <div className="section-heading">
+                <h2>Search results</h2>
+                <button
+                  className="icon-button"
+                  aria-label="Close search"
                   onClick={() => setSearching(false)}
                 >
-                  {item.name}
-                  <small>{item.address}</small>
-                </a>
-              ))
-            ) : (
-              <p>No matching property records.</p>
-            )}
-          </section>
-        )}
-        <main id="main" tabIndex={-1}>
-          {body}
-        </main>
-        <footer className="footer">
-          <span>PARAGON RADAR</span>
-          <p>Evidence for the area. Perspective for your portfolio.</p>
-          <span>Private · US locations</span>
-        </footer>
+                  <X size={18} />
+                </button>
+              </div>
+              {searchResults.error ? (
+                <ErrorNotice error={searchResults.error} />
+              ) : searchResults.isPending ? (
+                <p>Searching…</p>
+              ) : searchResults.data?.results.length ? (
+                searchResults.data.results.map((item) => (
+                  <a
+                    href={"#/locations/" + item.id}
+                    key={item.id}
+                    onClick={() => setSearching(false)}
+                  >
+                    {item.name}
+                    <small>{item.address}</small>
+                  </a>
+                ))
+              ) : (
+                <p>No matching property records.</p>
+              )}
+            </section>
+          )}
+          <main id="main" tabIndex={-1}>
+            {body}
+          </main>
+          <footer className="footer">
+            <span>PARAGON RADAR</span>
+            <p>Evidence for the area. Perspective for your portfolio.</p>
+            <span>Private · US locations</span>
+          </footer>
+        </div>
       </div>
-    </div>
+    </Dialog.Root>
   );
 }
 function Overview({
@@ -847,6 +865,7 @@ function Portfolio({
 function LocationPage({ id }: { id: string }) {
   const query = useQuery({
     queryKey: ["location", id],
+    staleTime: 0,
     queryFn: () => api<Location>(`/api/locations/${id}/`),
   });
   const cache = useQueryClient(),
@@ -879,7 +898,11 @@ function LocationPage({ id }: { id: string }) {
         action={
           <div className="actions">
             <Badge tone={item.confirmed ? "green" : "amber"}>
-              {item.confirmed ? "Confirmed" : "Ownership unconfirmed"}
+              {item.confirmed
+                ? "Confirmed"
+                : item.status === "owned"
+                  ? "Ownership unconfirmed"
+                  : "Record unconfirmed"}
             </Badge>
             <EditLocation location={item} />
           </div>
@@ -922,7 +945,11 @@ function LocationPage({ id }: { id: string }) {
             <div className="confirm-box">
               <ShieldCheck size={22} />
               <div>
-                <strong>Is this still part of your portfolio?</strong>
+                <strong>
+                  {item.status === "owned"
+                    ? "Is this still part of your portfolio?"
+                    : "Have you reviewed this record?"}
+                </strong>
                 <p>Confirm this record after reviewing its source.</p>
                 <button
                   className="button small-button"
@@ -946,6 +973,7 @@ function LocationPage({ id }: { id: string }) {
           >
             <LocationMap locations={[item]} rings />
           </Suspense>
+          <PinEditor location={item} />
           <Badge>{titleCase(pin.method)}</Badge>
           <p>
             {pin.lat === null
@@ -1219,6 +1247,7 @@ function AddLocation() {
 }
 function EditLocation({ location }: { location: Location }) {
   const [open, setOpen] = useState(false);
+  const [snapshot, setSnapshot] = useState(location);
   const cache = useQueryClient();
   const mutation = useMutation({
     mutationFn: (data: unknown) =>
@@ -1234,7 +1263,7 @@ function EditLocation({ location }: { location: Location }) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     mutation.mutate({
-      expected_version: location.version,
+      expected_version: snapshot.version,
       name: data.get("name"),
       status: data.get("status"),
       ring_preset: data.get("ring_preset"),
@@ -1242,7 +1271,16 @@ function EditLocation({ location }: { location: Location }) {
     });
   }
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setSnapshot(location);
+          mutation.reset();
+        }
+        setOpen(next);
+      }}
+    >
       <Dialog.Trigger asChild>
         <button className="button secondary">
           Edit record <Settings2 size={16} />
@@ -1267,11 +1305,11 @@ function EditLocation({ location }: { location: Location }) {
           <form onSubmit={submit}>
             <label>
               Name
-              <input name="name" required defaultValue={location.name} />
+              <input name="name" required defaultValue={snapshot.name} />
             </label>
             <label>
               Status
-              <select name="status" defaultValue={location.status}>
+              <select name="status" defaultValue={snapshot.status}>
                 <option value="owned">Owned</option>
                 <option value="candidate">Candidate</option>
                 <option value="archived">Archived</option>
@@ -1279,16 +1317,31 @@ function EditLocation({ location }: { location: Location }) {
             </label>
             <label>
               Ring preset
-              <select name="ring_preset" defaultValue={location.ring_preset}>
+              <select name="ring_preset" defaultValue={snapshot.ring_preset}>
                 <option>1/3/5</option>
                 <option>3/5/10</option>
               </select>
             </label>
             <label>
               Team notes
-              <textarea name="notes" defaultValue={location.notes} rows={4} />
+              <textarea name="notes" defaultValue={snapshot.notes} rows={4} />
             </label>
             {mutation.error && <ErrorNotice error={mutation.error} />}
+            {mutation.error instanceof ApiError &&
+              mutation.error.status === 409 && (
+                <button
+                  className="button secondary"
+                  type="button"
+                  onClick={() => {
+                    cache.invalidateQueries({
+                      queryKey: ["location", location.id],
+                    });
+                    setOpen(false);
+                  }}
+                >
+                  Reload record
+                </button>
+              )}
             <button className="button" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save changes"}
               <Check size={16} />

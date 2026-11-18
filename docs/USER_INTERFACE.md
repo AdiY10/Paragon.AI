@@ -14,8 +14,8 @@ that Release 1's data calculations or production deployment are complete.
   an add-location dialog. Counts use all API pages, including archived records
   when the corresponding filter is selected.
 - **Property record:** source period, pin method/coordinates, confirmation status,
-  ring preset, user-provided GLA/notes, record confirmation, and version-checked
-  editing. The provenance drawer includes the original listing and change history.
+  ring preset, user-provided GLA/notes, record confirmation, version-checked
+  editing, and previewed manual pin correction/confirmation. The provenance drawer includes the original listing and change history.
 - **Data Sources:** the real 16-entry registry, recorded scoped health, periods,
   last successful check, licensing, attribution, and privacy notes. No check is
   displayed as “Not checked,” never as healthy.
@@ -28,7 +28,7 @@ Portfolio and property screens now include interactive MapLibre maps with OSM
 raster tiles, linked reference pins, and geodesic distance rings. The list remains
 available when tiles or WebGL fail. See [MAPS.md](MAPS.md) for attribution, privacy,
 and display-geometry limits.
-Geocoding, pin correction controls, tenant management, signal evidence, comparison,
+Geocoding, tenant management, signal evidence, comparison,
 and complete administrator controls remain in the implementation plan.
 
 ## Build and serve
@@ -69,6 +69,11 @@ actual public portfolio CSV and catalog, and creates one **test-only** member in
 that temporary database. It launches Gunicorn on loopback, exercises the real APIs
 from Chromium, and removes the database and server afterward. It never modifies
 the configured production/local portfolio database or creates a production user.
+
+The browser check also verifies pin dragging, explicit pin verification, immutable
+revision/analysis generations, an actual concurrent edit conflict after background
+refresh, and mobile menu focus trapping/restoration. Editing dialogs keep the version
+seen on opening; a background refresh cannot silently authorize stale form contents.
 
 The browser check covers 375/768/1280 widths, horizontal overflow, automated WCAG
 A/AA rules, filters, provenance, editing, confirmation, source cards, body-based
