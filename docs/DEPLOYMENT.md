@@ -1,4 +1,8 @@
-# Deployment — prepared, not yet provisioned
+# Full backend deployment — prepared, not yet provisioned
+
+A limited private OpenAI Site is now deployed. See [TEMPORARY_SITE.md](TEMPORARY_SITE.md)
+for its URL, working features, verification, and later migration. The resource and
+OIDC requirements below apply to the full Django/PostGIS deployment.
 
 This repository now includes a Node-built React UI, collected WhiteNoise assets, a non-root Python container, Gunicorn configuration,
 a disposable local PostGIS Compose service, and a Render web-service blueprint.
