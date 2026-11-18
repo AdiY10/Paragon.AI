@@ -93,3 +93,13 @@ manual pin revisions, and schema-versioned export. The test identity gateway is 
 only and absent from the deployed artifact. Real owner interaction with the private
 published URL is not impersonated or claimed. Full data-source/Release 1 acceptance
 remains open; see TEMPORARY_SITE.md.
+
+## Census adapter (2026-11-18)
+
+Thirty adapter tests pass against the actual Norwalk match, Mount Kisco ambiguity,
+and Kingston no-match responses, with SHA-256 manifests. Boundary tests reject
+nonfinite/boolean/string coordinates, invalid GEOIDs, wrong response echoes,
+oversized payloads, HTML, malformed JSON, and address-bearing transport errors.
+Live retrievals reproduce Norwalk at 41.12661107292, -73.388299045728 and preserve
+current CT planning-region codes separately from 2020 block geography. This adapter
+milestone does not claim persisted lookup acceptance or a live Site geocoding UI.
