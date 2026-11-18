@@ -1,10 +1,10 @@
-# Paragon Radar: Release 1 product and data specification
+# Paragon Radar
 
-A ready-to-build documentation package for a private market-intelligence web app for **John Nelson, Founder and CEO of [Paragon Realty Group](https://paragonct.com/)**.
+A private market-intelligence application in development for **John Nelson, Founder and CEO of [Paragon Realty Group](https://paragonct.com/)**.
 
-**Status (2026-11-17):** research, data verification and specification are complete. **Nothing has been built yet.** Implementation is handed to Amit's agent.
+**Status (2026-11-18):** implementation is underway. Invite-only access, source archives and health, durable jobs, schedules, private property management, and a responsive React UI are implemented and locally verified. The 36 public portfolio records remain unconfirmed until reviewed. **Release 1 is not deployed or ready for acceptance:** geocoding, trade-area calculations, signals, screening, and metric comparisons are still being implemented. See [progress.md](progress.md) for current evidence and blockers.
 
-## What Release 1 does
+## Target Release 1 behavior
 - **This Week:** a Monday brief of meaningful changes around Paragon's properties (tenant SEC bankruptcy or closure filings, possible nearby closures, flood exposure, local jobs, population and income trends, traffic, housing pipeline), each with evidence.
 - **Location profiles:** current 1/3/5-mile (or 3/5/10-mile) trade-area data for any US address, sourced from Census, BLS, FHWA, FEMA, Overture Maps and SEC EDGAR, with periods, margins of error and freshness shown.
 - **Screen and compare:** a first-pass read on any acquisition address with strengths and concerns benchmarked against Paragon's own portfolio, and side-by-side comparison of up to 4 locations.
@@ -32,13 +32,31 @@ Out of scope for Release 1: rents, comps, listings, occupancy, financials, foot 
 ## Repository layout
 ```
 AGENT_HANDOFF.md          entry point for the implementing agent
-docs/                     specification (01–08)
+backend/                  Django, private APIs, jobs, and versioned models
+frontend/                 React / TypeScript UI, Vite build, browser verification
+docs/                     specification (01–08), implementation and operations guides
 data/seed/                36 publicly listed Paragon properties (unconfirmed; from paragonct.com)
 scripts/feasibility/      re-runnable probes that verify the core data sources
+scripts/verification/     production, worker, and isolated UI smoke checks
+config/                   source registry and job schedule definitions
 ```
 
+## Build and verification
+
+Use Python 3.12–3.13 and Node.js 22.12 or newer. Install the locked dependencies and build the UI before starting Django:
+
+```sh
+uv sync --locked
+npm ci --prefix frontend
+npm run build --prefix frontend
+uv run pytest -q
+npm test --prefix frontend
+```
+
+The default test suite uses isolated SQLite; the [database testing guide](docs/DATABASE_TESTING.md) covers the required real PostGIS checks. The [UI guide](docs/USER_INTERFACE.md) explains implemented screens, browser verification, and current limitations. See [deployment](docs/DEPLOYMENT.md) and [authentication](docs/AUTHENTICATION.md) for real environment configuration. A Vite development server alone does not provide authentication or backend APIs.
+
 ## Key dependencies still open
-- Adi: add Amit as a collaborator on this repo; approve any paid hosting; give Amit the email for the test account and a contact email for SEC API access.
+- Owner: provide approved hosting access/budget, OIDC client configuration, the test-account email, and a contact email for SEC API access. GitHub access works; hosted CI publication needs workflow scope.
 - John (not blocking): confirm which listed properties are still owned and current tenants (Q-01, Q-05 in doc 01).
 
 No credentials are stored in this repository.

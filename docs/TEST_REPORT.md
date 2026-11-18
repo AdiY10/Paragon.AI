@@ -30,3 +30,21 @@ performance, or production reliability. Test fixtures never populate production.
 P21 (Mt. Kisco) has no resolved seed pin and has no Overture capture. The 70 archived
 extracts are currently in ignored local runtime storage; durable off-machine storage
 is still required before claiming retention/recovery readiness.
+
+## Private UI milestone (2026-11-18)
+
+- Production frontend build passes TypeScript and Vite bundling.
+- 152 tests pass against PostgreSQL/PostGIS; 146 pass with six intentional skips
+  on isolated SQLite. New coverage checks private HTML, local manifest paths,
+  missing-build behavior, CSRF enforcement, and absence of account data in HTML.
+- Four frontend transport tests pass: CSRF/body-based search, complete pagination,
+  cross-origin pagination rejection, and sanitized conflict errors.
+- Chromium passes 375/768/1280 layouts with no horizontal overflow and no automated
+  WCAG A/AA violations on the dashboard after contrast corrections. Real API
+  editing, confirmation, provenance, filters, source catalog, search, and anonymous
+  denial pass in a disposable database using the actual public seed.
+- Local screenshots were visually inspected. This does not establish full manual
+  WCAG 2.2 compliance or production acceptance. Interactive geography and remaining
+  data workflows are pending; no deployed preview is claimed.
+- Production-settings Gunicorn smoke also passes for the built JavaScript/CSS,
+  sign-in page, health endpoint, anonymous application redirect, and API denials.

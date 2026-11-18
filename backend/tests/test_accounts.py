@@ -27,13 +27,15 @@ def login_payload(email, verified):
 def test_invited_member_can_access_session(client):
     user, _ = member()
     client.force_login(user)
-    assert client.get('/api/session/').json() == {'email': user.email, 'role': 'member'}
+    payload = client.get('/api/session/').json()
+    assert payload['email'] == user.email and payload['role'] == 'member'
+    assert len(payload['csrfToken']) == 64
 
 
 def test_revocation_denies_next_request_and_logs_out(client):
     user, membership = member()
     client.force_login(user)
-    assert client.get('/').status_code == 200
+    assert client.get('/api/session/').status_code == 200
     membership.active = False
     membership.save()
     assert client.get('/api/session/').status_code == 403

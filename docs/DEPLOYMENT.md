@@ -1,6 +1,6 @@
 # Deployment — prepared, not yet provisioned
 
-This repository now includes a non-root Python container, Gunicorn configuration,
+This repository now includes a Node-built React UI, collected WhiteNoise assets, a non-root Python container, Gunicorn configuration,
 a disposable local PostGIS Compose service, and a Render web-service blueprint.
 The full Release 1 worker/storage/scheduler topology is still being implemented.
 No deployed URL or completed production acceptance is claimed.
@@ -65,7 +65,7 @@ Do not attempt a blind reverse migration against valuable production data.
 not been started in the present environment. The local isolated verification used
 an equivalent socket-only PostgreSQL server instead.
 
-With production environment variables supplied and a migrated disposable database:
+Build the frontend and run `uv run python backend/manage.py collectstatic --noinput` first. With production environment variables supplied and a migrated disposable database:
 
 ```sh
 uv run python scripts/verification/production_smoke.py

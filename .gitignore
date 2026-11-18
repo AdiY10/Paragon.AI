@@ -21,3 +21,7 @@ node_modules/
 # Runtime source archives
 var/
 .pytest_cache/
+# Reproducible frontend build output
+backend/static/ui/
+frontend/coverage/
+frontend/test-results/
