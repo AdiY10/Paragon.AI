@@ -28,6 +28,8 @@ class JobRun(models.Model):
     heartbeat_at=models.DateTimeField(null=True)
     lease_expires_at=models.DateTimeField(null=True)
     next_attempt_at=models.DateTimeField(null=True)
+    recovery_count=models.PositiveSmallIntegerField(default=0)
+    last_recovered_at=models.DateTimeField(null=True)
     records=models.PositiveBigIntegerField(default=0)
     error_code=models.CharField(max_length=32,blank=True)
     class Meta:
@@ -68,3 +70,15 @@ class SchedulerState(models.Model):
     owner=models.UUIDField(null=True)
     lease_until=models.DateTimeField()
     last_tick_at=models.DateTimeField(null=True)
+
+
+class JobRecoveryEvent(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    job=models.ForeignKey(JobRun,on_delete=models.PROTECT,related_name='recovery_events')
+    reason=models.CharField(max_length=32)
+    outcome=models.CharField(max_length=16)
+    recorded_at=models.DateTimeField()
+    previous_task_id=models.CharField(max_length=64,blank=True)
+    replacement_task_id=models.CharField(max_length=64,blank=True)
+    class Meta:
+        ordering=['recorded_at','id']
