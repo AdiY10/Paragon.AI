@@ -42,6 +42,7 @@ import GeocodeDialog from "./GeocodeDialog";
 import TradeArea from "./TradeArea";
 import AreaSections from "./AreaSections";
 import SummaryPanel from "./Summary";
+import ThisWeek from "./ThisWeek";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -396,7 +397,7 @@ function App() {
       );
   else
     body = (
-      <Overview locations={portfolio.data ?? []} sources={sources.data ?? []} />
+      <Overview locations={portfolio.data ?? []} sources={sources.data ?? []} isAdmin={session.data.role === "admin"} />
     );
   const sidebarContent = (
     <>
@@ -580,9 +581,11 @@ function App() {
 function Overview({
   locations,
   sources,
+  isAdmin,
 }: {
   locations: Location[];
   sources: Source[];
+  isAdmin: boolean;
 }) {
   const owned = locations.filter((l) => l.status === "owned"),
     unconfirmed = owned.filter((l) => !l.confirmed),
@@ -602,22 +605,7 @@ function Overview({
         description="One place to understand your locations—and the evidence behind them."
         action={<AddLocation />}
       />
-      <div className="hero-banner">
-        <div className="hero-icon">
-          <Activity size={24} />
-        </div>
-        <div>
-          <span className="eyebrow">THIS WEEK</span>
-          <h2>Weekly brief unavailable</h2>
-          <p>
-            The required source checks have not completed. Review your property
-            records and data coverage in the meantime.
-          </p>
-        </div>
-        <a href="#/sources">
-          View data coverage <ArrowRight size={17} />
-        </a>
-      </div>
+      <ThisWeek isAdmin={isAdmin} />
       <div className="stat-grid">
         {[
           [
@@ -759,6 +747,7 @@ function Overview({
     </>
   );
 }
+const rankAttention = (l: Location) => (l.attention === "High" ? 0 : l.attention === "Watch" ? 1 : 2);
 function PropertyCard({ location }: { location: Location }) {
   return (
     <a className="property-card" href={"#/locations/" + location.id}>
@@ -766,9 +755,14 @@ function PropertyCard({ location }: { location: Location }) {
         <span className="property-icon">
           <Building2 size={22} />
         </span>
-        <Badge tone={location.confirmed ? "green" : "amber"}>
-          {location.confirmed ? "Confirmed" : "Unconfirmed"}
-        </Badge>
+        <span className="card-badges">
+          {location.attention && location.attention !== "Clear" && (
+            <Badge tone={location.attention === "High" ? "red" : "amber"}>{location.attention}</Badge>
+          )}
+          <Badge tone={location.confirmed ? "green" : "amber"}>
+            {location.confirmed ? "Confirmed" : "Unconfirmed"}
+          </Badge>
+        </span>
       </div>
       <span className="eyebrow">
         {location.state} · {titleCase(location.asset_type)}
@@ -797,13 +791,15 @@ function Portfolio({
   const [state, setState] = useState(""),
     [status, setStatus] = useState(candidates ? "candidate" : "owned"),
     [type, setType] = useState(""),
+    [attention, setAttention] = useState(""),
     [showMap, setShowMap] = useState(!candidates);
   const filtered = locations.filter(
     (item) =>
       (!state || item.state === state) &&
       (!status || item.status === status) &&
-      (!type || item.asset_type === type),
-  );
+      (!type || item.asset_type === type) &&
+      (!attention || (item.attention ?? "Clear") === attention),
+  ).sort((a, b) => rankAttention(a) - rankAttention(b) || a.name.localeCompare(b.name));
   return (
     <>
       {!candidates && (
@@ -864,6 +860,15 @@ function Portfolio({
                   {titleCase(t)}
                 </option>
               ))}
+          </select>
+        </label>
+        <label>
+          Attention
+          <select aria-label="Attention" value={attention} onChange={(e) => setAttention(e.target.value)}>
+            <option value="">Any attention</option>
+            <option value="High">High</option>
+            <option value="Watch">Watch</option>
+            <option value="Clear">Clear</option>
           </select>
         </label>
       </div>

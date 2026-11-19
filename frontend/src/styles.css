@@ -2055,3 +2055,24 @@ th {
     grid-template-columns: 9rem 1fr 5.5rem;
   }
 }
+
+/* This Week brief and attention */
+.brief .brief-items li a {
+  text-decoration: underline;
+}
+.brief .change-list small {
+  display: block;
+}
+.brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+.card-badges {
+  display: inline-flex;
+  gap: 6px;
+}

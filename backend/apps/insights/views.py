@@ -50,3 +50,30 @@ def signal_review(request, signal_id):
         signal.status = 'dismissed'
     signal.save(update_fields=['reviewed_by', 'review_note', 'status'])
     return Response(serialize(signal))
+
+
+@api_view(['GET'])
+def brief_latest(request):
+    from .models import Brief
+    from .brief import serialize_brief
+    latest = Brief.objects.order_by('-generated_at').first()
+    history = [{'id': str(b.id), 'title': b.title, 'generated_at': b.generated_at.isoformat(), 'kind': b.kind}
+        for b in Brief.objects.order_by('-generated_at')[:26]]
+    return Response({'brief': serialize_brief(latest) if latest else None, 'history': history})
+
+
+@api_view(['GET'])
+def brief_detail(request, brief_id):
+    from .models import Brief
+    from .brief import serialize_brief
+    return Response(serialize_brief(get_object_or_404(Brief, pk=brief_id)))
+
+
+@api_view(['POST'])
+def brief_generate(request):
+    """Admin: generate a brief now (in addition to Monday 07:00 US Eastern)."""
+    from apps.accounts.models import Membership
+    from .brief import generate, serialize_brief
+    if not Membership.objects.filter(user=request.user, role='admin').exists():
+        return Response({'detail': 'Administrators only'}, status=403)
+    return Response(serialize_brief(generate(kind='manual')), status=201)
