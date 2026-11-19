@@ -83,6 +83,16 @@ def brief_weekly(context,parameters):
     brief=generate(kind='weekly')
     return JobResult(records=len(brief.items)+len(brief.fyi))
 
+def sec_daily(context,parameters):
+    from apps.insights.sec import refresh_all
+    from apps.area.http import SourceError
+    from .contracts import JobFailure
+    try:
+        fetched,failed=refresh_all(context)
+    except SourceError as exc:
+        raise JobFailure(exc.code if exc.code in JobFailure.CODES else 'SOURCE_ERROR',retryable=exc.code!='NOT_CONFIGURED') from None
+    return JobResult(records=fetched)
+
 # Only code-defined handlers are executable. No API accepts arbitrary Python paths.
 REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance',1800),
     'compute_ring_demographics':JobSpec(compute_ring_demographics,'paragon-maintenance',900,
@@ -94,4 +104,5 @@ REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance
     'overture_check':JobSpec(overture_check,'paragon-maintenance',7200),
     'flood_recheck':JobSpec(flood_recheck,'paragon-maintenance',3600),
     'annual_sources_check':JobSpec(annual_sources_check,'paragon-maintenance',7200),
-    'brief_weekly':JobSpec(brief_weekly,'paragon-maintenance',600)}
+    'brief_weekly':JobSpec(brief_weekly,'paragon-maintenance',600),
+    'sec_daily':JobSpec(sec_daily,'paragon-maintenance',1800)}

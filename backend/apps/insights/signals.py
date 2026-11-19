@@ -34,7 +34,7 @@ def _candidate(rule, subject, category, severity, direction, title, why, evidenc
         'period': (period or '')[:120], 'source': source, 'event_date': event_date}
 
 
-def candidates(location, t=None):
+def candidates(location, t=None, today=None):
     """All signals whose conditions currently hold for the location, from stored results."""
     from apps.demographics.service import current_result
     from apps.area.models import AreaSection
@@ -151,7 +151,7 @@ def candidates(location, t=None):
                 'Newly appears in map data (may be a new opening or a data addition); possible competitor or traffic driver.',
                 {'overture_id': c['id'], 'distance_mi': c['distance_mi'], 'category': c.get('category'), 'release': rel},
                 f'Overture {rel}', 'SRC-13', event_date=_release_date(rel)))
-    out.extend(_tenant_candidates(location))
+    out.extend(_tenant_candidates(location, today))
     return out
 
 
@@ -162,12 +162,9 @@ def _release_date(release):
         return None
 
 
-def _tenant_candidates(location):
-    try:
-        from .sec import tenant_candidates
-    except ImportError:
-        return []
-    return tenant_candidates(location)
+def _tenant_candidates(location, today=None):
+    from .sec import tenant_candidates
+    return tenant_candidates(location, today=today)
 
 
 @transaction.atomic
@@ -176,7 +173,7 @@ def evaluate(location, *, today=None):
     t = thresholds()
     today = today or timezone.now().date()
     now = timezone.now()
-    found = {(c['rule_id'], c['subject']): c for c in candidates(location, t)}
+    found = {(c['rule_id'], c['subject']): c for c in candidates(location, t, today)}
     created = updated = resolved = 0
     existing = {(s.rule_id, s.subject): s for s in Signal.objects.select_for_update().filter(location=location)}
     for key, c in found.items():

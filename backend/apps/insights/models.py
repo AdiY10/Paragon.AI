@@ -54,3 +54,13 @@ class Brief(models.Model):
         if not self._state.adding:
             raise ValueError('Briefs are immutable')
         super().save(*args, **kwargs)
+
+
+class TenantFiler(models.Model):
+    """An admin-confirmed mapping from a tenant (brand) to an SEC filer (FR-22). Never auto-applied."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.OneToOneField('locations.Tenant', on_delete=models.CASCADE, related_name='sec_filer')
+    cik = models.CharField(max_length=10)
+    company_name = models.CharField(max_length=200)
+    mapped_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    mapped_at = models.DateTimeField(auto_now_add=True)

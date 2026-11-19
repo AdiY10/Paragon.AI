@@ -70,3 +70,23 @@
 - `GET /api/compare/?ids=a,b,c` returns every comparable measure per location, with period and source, the portfolio median and range, the flood zone, attention level and top signals.
 - Strongest and weakest are highlighted only for directional measures (lower is better for unemployment change).
 - Print-friendly via the browser's print or save-as-PDF.
+
+## Tenants and SEC tenant watch (T8, T9; FR-07, FR-22, SIG-12, SIG-13)
+- **T8 finding:** the tenant domain (`apps/locations/tenants.py`, Amit's agent) exists, but no API, UI or listing import is on GitHub (Amit's in-progress API and seed are in a local stash). This adds a **thin API and UI over the existing service functions**, without new tenant rules. Amit's agent should reconcile its stash with `apps/insights/tenant_views.py` and the `import_listing_tenants` command.
+- **API:**
+  - `GET/POST /api/locations/<id>/tenants/`
+  - `PATCH .../tenants/<tid>/` (name, anchor, notes, archived; `expected_version`)
+  - `POST .../tenants/<tid>/confirm/`
+  - Tenant edits advance the location's analysis version (existing domain behaviour), so the API queues a recompute from cached snapshots.
+- **Listing import:** `python manage.py import_listing_tenants` imports tenants named on paragonct.com for owned seed properties as **unconfirmed listing claims**.
+  - Presence values: `listed_unverified`; `neighbor_or_cotenant` where the listing says "Join"; `planned_unverified` for "soon to open"; `name_only`.
+  - Anchors are marked only where the listing says "anchor". The import is idempotent.
+- **SEC mapping:** admins search EDGAR entities (`GET /api/sec/search/?q=`) and map a tenant to a filer (`POST/DELETE .../tenants/<tid>/sec/`). Suggestions are never applied automatically.
+- **Daily watch:** `sec_daily` (06:00 ET) fetches `data.sec.gov` submissions for mapped filers (at most 5 requests/s), stores SRC-14 snapshots, records health and re-evaluates affected properties.
+  - **SIG-12 (High):** Item 1.03 within 90 days.
+  - **SIG-13 (Watch):** Item 2.05 or 2.06.
+  - Repeated filings collapse into one signal per tenant and rule. Older events are listed as past events with filing links.
+- **Requires `SEC_USER_AGENT="<App name> <contact email>"`**. Without it the job fails with `NOT_CONFIGURED` and search shows a clear message. No request is sent to SEC.
+- **Real-data tests:**
+  - Leslie's (CIK 1821806): three 1.03 filings from 2026-09-30 to 2026-10-22 produce one SIG-12 High plus a SIG-13 Watch.
+  - Rite Aid (CIK 84129): the 2023-10-16 Item 1.03 filing is listed as a past event with no signal.

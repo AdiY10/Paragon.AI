@@ -2168,3 +2168,52 @@ th {
     display: none !important;
   }
 }
+
+/* Tenants */
+.tenant-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+.tenant-list > li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.tenant-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.tenant-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 10px;
+}
+.sec-line small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.sec-mapper input,
+.tenant-form input[name="name"] {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+}
+.sec-mapper {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+.tenant-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+.tenant-form input[name="name"] {
+  flex: 1 1 220px;
+}
