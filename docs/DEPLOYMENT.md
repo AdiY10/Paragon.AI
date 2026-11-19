@@ -1,80 +1,113 @@
-# Full backend deployment — prepared, not yet provisioned
+# Regular-host password workspace — prepared, not provisioned
 
-A limited private OpenAI Site is now deployed. See [TEMPORARY_SITE.md](TEMPORARY_SITE.md)
-for its URL, working features, verification, and later migration. The resource and
-OIDC requirements below apply to the full Django/PostGIS deployment.
+Adi's priority is a normal HTTPS URL that does not require ChatGPT. The initial
+`render.yaml` provisions one Docker web service, PostgreSQL 17/PostGIS, and a private
+5 GB disk. It enables named password access and retains the optional OIDC path.
+The existing temporary Site stays available until the new host passes acceptance.
 
-This repository now includes a Node-built React UI, collected WhiteNoise assets, a non-root Python container, Gunicorn configuration,
-a disposable local PostGIS Compose service, and a Render web-service blueprint.
-The full Release 1 worker/storage/scheduler topology is still being implemented.
-No deployed URL or completed production acceptance is claimed.
+## Concrete resource quote
 
-## Current verification
+Checked 2026-11-19 against [Render pricing](https://render.com/pricing) and
+[compute plans](https://render.com/docs/compute-plans):
 
-- The production Django settings, migrations, and Gunicorn entrypoint were exercised
-  against isolated local PostgreSQL 17/PostGIS 3.6.
-- A private-socket HTTP smoke test verified health 200, app redirect to sign-in,
-  anonymous API denial, sign-in rendering, and HSTS.
-- The Render manifest validates against Render's official JSON schema.
-- Container image build and Compose startup remain unverified: this environment
-  cannot access the Docker daemon. These are explicit remaining checks.
+| Resource | Configuration | Monthly USD estimate |
+|---|---|---:|
+| Web | `0.5c-512mb`, one instance/one Gunicorn worker | $7.00 |
+| PostgreSQL | `0.1c-256mb`, 1 GB disk | $6.00 compute |
+| Database storage | 1 GB, autoscaling disabled | Up to $0.30 |
+| Private evidence disk | 5 GB at $0.25/GB | $1.25 |
+| Hobby workspace | No paid workspace upgrade | $0.00 |
+| Total initial host | Before tax/usage overages | **Budget $14.55/month** |
 
-## Owner prerequisites and cost
+Pricing mentions 1 GB included database storage; the budget conservatively includes
+$0.30 until the creation screen confirms the actual charge. Explicit 1 GB storage
+avoids Render's larger default allocation. There is no custom domain purchase.
+Confirm the resource summary before creation; stop if it exceeds this scope.
+Bandwidth/build overages, future background workers, independent backups, larger
+source history, and a larger compute tier are outside this initial estimate.
+Do not enable automatic storage growth or paid upgrades without approval.
 
-The prepared web service uses Render's paid Starter plan. Do not provision it
-without the owner's explicit cost approval. The previously researched estimate
-is $7/month for this web service alone. It excludes PostgreSQL, the required
-long-running worker, durable source storage, bandwidth, and seven-day backups.
-A complete resource quote must be prepared and rechecked before provisioning.
-The current blueprint deliberately accepts an externally provisioned PostGIS
-`DATABASE_URL`; it creates no database or worker and is not the complete topology.
+Free Render web services cannot attach the required persistent disk, and free
+Postgres expires after 30 days. They are unsuitable for this retained workspace.
+See [free limits](https://render.com/docs/free) and
+[persistent disks](https://render.com/docs/disks). No resources have been purchased.
 
-The owner must supply hosting/repository access and these secrets/configuration:
-`DJANGO_ALLOWED_HOSTS`, `DATABASE_URL`, `CSRF_TRUSTED_ORIGINS`, and the three OIDC
-settings documented in AUTHENTICATION.md. Render can generate `DJANGO_SECRET_KEY`.
-Only enable `TRUST_PROXY_SSL_HEADER=true` when the ingress strips incoming
-client-supplied forwarding headers. The app then trusts `X-Forwarded-Proto` for
-HTTPS detection. Keep all credentials in the hosting secret store.
+**Owner approval is required before provisioning.** AGENT_HANDOFF §0.1 says to
+“get Amit's or Adi's approval before any paid plan”; §4.8 prohibits paid sign-ups
+without explicit approval. Deployment also needs an owner-connected Render account
+with access to this repository. Do not put hosting tokens or passwords in Git/chat.
 
-## Build and release
+## Build and deploy
 
-1. Run the offline and PostGIS suites for the exact release commit.
-2. With Docker access, build `docker build -t paragon-radar:<commit> .` and smoke
-   test the image against a disposable PostGIS database. The image defaults to
-   production settings and will reject missing configuration.
-3. After cost/access approval, create the Render blueprint from `render.yaml` and
-   configure an existing approved PostGIS connection.
-4. The pre-deploy command applies versioned migrations before traffic switches.
-5. Run `python backend/manage.py invite_admin <owner-email>` once through the
-   platform shell. No passwords or auth bypass are created.
-6. Validate HTTPS, real OIDC callback, revocation, and source-free anonymous routes.
-7. Keep auto-deploy gated on passing checks. The GitHub credential currently lacks
-   workflow scope, so CI publication must be resolved before automatic releases.
+1. Verify the exact release commit with backend/PostGIS tests and the frontend build.
+   Validate `render.yaml` against `https://render.com/schema/render.yaml.json`.
+2. With Docker access, build the image and smoke it against disposable PostGIS.
+   Container execution remains unverified in the current environment because Docker
+   is unavailable; local production settings/Gunicorn tests do not replace this check.
+3. After cost approval and owner account connection, create a Blueprint from this
+   repository. Automatic deployment is **off**: release tested commits manually while
+   the GitHub OAuth credential lacks workflow scope.
+4. Enter `DJANGO_ALLOWED_HOSTS` as the assigned hostname and
+   `CSRF_TRUSTED_ORIGINS` as its `https://` origin. Keep the generated Django secret.
+   The database connection is injected over Render's private network; external
+   database access is disabled. PostGIS is supported on this PostgreSQL version.
+5. Enter the approved administrator email and a generated strong password as
+   `ACCESS_BOOTSTRAP_EMAIL` and `ACCESS_BOOTSTRAP_PASSWORD` in the host secret store.
+   They provision a named account once. They never reset, elevate, or reactivate an
+   existing account. Remove both secrets after verified login; subsequent restarts
+   require an active password administrator. See [PASSWORD_ACCESS.md](PASSWORD_ACCESS.md).
+6. Startup runs `prepare_release` after the disk mounts, under a PostgreSQL advisory
+   lock: migrate, sync source definitions, optionally import a checksum-verified
+   private workspace, seed missing public properties, sync disabled schedules, and
+   bootstrap access. Gunicorn starts only after success. The password is removed
+   from its environment. No migration export or password enters the image.
+7. Verify the disk is writable by the non-root application user. The startup write
+   check fails closed if not. Only `/app/var/artifacts` persists. Nothing under that
+   directory is served by WhiteNoise or an unauthenticated API. Render disks are
+   unavailable during pre-deploy; there is deliberately no pre-deploy import.
+8. For the first migration, upload the private export through the owner's secure
+   host shell/file facility. Set `WORKSPACE_IMPORT_PATH` to that private file and
+   `WORKSPACE_IMPORT_SHA256` to its independently checked digest, then restart.
+   Alternatively run `import_site_workspace` manually, first dry-run then `--apply`.
+   Follow [WORKSPACE_MIGRATION.md](WORKSPACE_MIGRATION.md), including fresh-export
+   comparison before cutover. Do not accept user edits at the destination first.
+   Remove the optional import environment pair after receipt verification; the
+   retained private content-addressed export remains available for recovery.
+9. Deliver the URL and credentials privately only after acceptance. Add approved
+   additional named accounts with `set_access_password`, using the hidden prompt.
+   Password rotation and membership revocation require no source change. Never
+   automatically reactivate a revoked membership during release startup.
 
-Application checks alone are not sufficient to declare Release 1 ready. Source
-jobs, retained history, production backups, performance, and all 25 acceptance
-criteria remain required by docs/07.
+## External acceptance before cutover
 
-## Rollback
+From a browser without ChatGPT sign-in: HTTPS works, root shows only password login,
+wrong password denies access, anonymous business APIs return no data, correct login
+loads the real 36-property portfolio, notes/pins/history match the latest export,
+logout denies API access, and password rotation/revocation takes effect. Verify
+restart persistence of database records, sessions, and private artifacts. Check
+rate limits and real ingress behavior; the local socket smoke cannot verify TLS.
+Render's ingress must sanitize the trusted forwarded-protocol header before
+`TRUST_PROXY_SSL_HEADER=true` is used. IP throttling deliberately ignores arbitrary
+forwarded-IP headers and can share an ingress-IP budget.
 
-Retain the previous image/commit. Application rollback is safe only while its code
-is compatible with the current schema. Use additive migrations and defer destructive
-changes. Before a migration that changes data semantics, take and verify a backup.
-Do not attempt a blind reverse migration against valuable production data.
+Current evidence: 253 backend tests pass on PostgreSQL 17/PostGIS 3.6; the manifest
+passes Render's official schema. Password browser QA and a private 36-record import
+smoke pass. The actual production startup also passes a disposable PostGIS smoke:
+private import, wrong/correct password, secure HttpOnly cookies, anonymous denial,
+logout, two process starts, session/note persistence, and artifact checksum. Record final image/build/HTTPS/restart checks in TEST_REPORT after deploy.
 
-## Local database and smoke command
+## Operational limits and rollback
 
-`compose.yaml` provides a disposable database on localhost port 55432. Set
-`PARAGON_LOCAL_DB_PASSWORD` locally; never use production credentials. Compose has
-not been started in the present environment. The local isolated verification used
-an equivalent socket-only PostgreSQL server instead.
+This initial host is for password access and migration. It does not run Q2 workers
+or the continuous scheduler, enable missing source handlers, or constitute Release 1.
+Independent artifact/database backup and restore verification, background source
+jobs, all P0 workflows, and production acceptance remain mandatory. A Render disk
+belongs to one service and cannot be shared with a separate worker. Prepare approved
+object storage or another supported durable arrangement before scaling ingestion.
+The small compute plans require actual load checks before broader use.
 
-Build the frontend and run `uv run python backend/manage.py collectstatic --noinput` first. With production environment variables supplied and a migrated disposable database:
-
-```sh
-uv run python scripts/verification/production_smoke.py
-```
-
-This starts the actual Gunicorn entrypoint on a private temporary UNIX socket,
-verifies anonymous route behavior, and shuts the process down. It does not complete
-a real provider login and does not replace HTTPS deployment verification.
+Disk-backed services have deployment downtime. Retain the previous image and use
+additive migrations. Roll back application code only while compatible with the
+current schema; take database and artifact backups before data-changing releases.
+Do not blindly reverse migrations against valuable data. Do not retire the Site
+until the owner confirms the replacement and migrated data.

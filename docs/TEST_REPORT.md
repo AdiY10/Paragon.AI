@@ -170,3 +170,14 @@ The production frontend build passes. A real Chromium password login without any
 ChatGPT session or force-login bypass reaches the actual 36-record disposable seed,
 survives reload, logs out, and loses API access. This is local verification; regular
 hosting is not yet provisioned and external-browser/HTTPS acceptance remains open.
+
+## Regular-host preparation (2026-11-19)
+
+253 backend tests pass on PostgreSQL 17/PostGIS 3.6. Render blueprint validation passes
+the official schema. The private 36-property live snapshot imports and replays with
+field/pin/date comparisons. The production entrypoint passes disposable PostGIS QA:
+wrong password denies access, real password opens the portfolio, cookies are secure
+and HttpOnly, APIs deny anonymous access, logout works, notes/sessions survive process
+restart, and archived export bytes match their original SHA-256. No auth bypass is
+used. The socket simulates a trusted HTTPS ingress; external TLS, real Render mounts,
+Docker image execution, and final production cutover remain unverified.
