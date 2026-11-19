@@ -77,6 +77,12 @@ def annual_sources_check(context,parameters):
     from apps.area.refresh import refresh_annual
     return _refresh(refresh_annual)(context,parameters)
 
+def brief_weekly(context,parameters):
+    from apps.insights.brief import generate
+    context.heartbeat()
+    brief=generate(kind='weekly')
+    return JobResult(records=len(brief.items)+len(brief.fyi))
+
 # Only code-defined handlers are executable. No API accepts arbitrary Python paths.
 REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance',1800),
     'compute_ring_demographics':JobSpec(compute_ring_demographics,'paragon-maintenance',900,
@@ -87,4 +93,5 @@ REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance
     'bls_bps_check':JobSpec(bls_bps_check,'paragon-maintenance',3600),
     'overture_check':JobSpec(overture_check,'paragon-maintenance',7200),
     'flood_recheck':JobSpec(flood_recheck,'paragon-maintenance',3600),
-    'annual_sources_check':JobSpec(annual_sources_check,'paragon-maintenance',7200)}
+    'annual_sources_check':JobSpec(annual_sources_check,'paragon-maintenance',7200),
+    'brief_weekly':JobSpec(brief_weekly,'paragon-maintenance',600)}

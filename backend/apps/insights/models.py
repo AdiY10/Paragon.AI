@@ -33,3 +33,24 @@ class Signal(models.Model):
         ordering = ['-last_changed_at', 'id']
         constraints = [models.UniqueConstraint(fields=['location', 'rule_id', 'subject'], name='signal_identity_unique')]
         indexes = [models.Index(fields=['status', 'severity']), models.Index(fields=['location', 'status'])]
+
+
+class Brief(models.Model):
+    """Immutable This Week brief (FR-21)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    kind = models.CharField(max_length=10, choices=[('baseline', 'Baseline'), ('weekly', 'Weekly'), ('manual', 'Manual')])
+    title = models.CharField(max_length=200)
+    generated_at = models.DateTimeField(auto_now_add=True)
+    since = models.DateTimeField(null=True, blank=True)
+    items = models.JSONField(default=list)
+    fyi = models.JSONField(default=list)
+    sources_updated = models.JSONField(default=list)
+    stats = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ['-generated_at']
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError('Briefs are immutable')
+        super().save(*args, **kwargs)

@@ -43,3 +43,15 @@
   - `POST /api/signals/<id>/review/` with `{"action": "reviewed" | "dismissed", "note": ""}`
   - Each location now has `attention` (High, Watch or Clear; FYI-only counts as Clear).
 - **UI:** active signals appear at the top of the property Summary panel and rank first among concerns.
+
+## This Week brief and attention (T5; FR-21, FR-35)
+- **Generation:** `apps/insights/brief.py` runs from `brief_weekly` (schedule: Monday 07:00 US Eastern) or via `POST /api/briefs/generate/` (admin only).
+- **Contents:** an immutable `Brief` with:
+  - signals on **owned** properties that are new or changed since the previous brief, plus still-active High signals, ranked per docs/04 §5.4
+  - High and Watch items in full, FYI items collapsed
+  - the sources that published new periods since the previous brief
+- **Titles:** the first brief is "Baseline: current conditions"; when nothing qualifies the title is "No material changes this week".
+- **API:** `GET /api/briefs/latest/` (with a history of the last 26), `GET /api/briefs/<id>/`.
+- **UI:**
+  - The home page shows the brief, with an evidence drawer per item, past briefs, and the admin "Generate brief now" button.
+  - Portfolio cards show a High or Watch attention badge, can be filtered by attention, and sort by attention first.

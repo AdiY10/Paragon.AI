@@ -38,6 +38,7 @@ export interface Location {
   current_revision: Pin;
   created_at: string;
   updated_at: string;
+  attention?: "High" | "Watch" | "Clear";
 }
 export interface Page<T> {
   count: number;
