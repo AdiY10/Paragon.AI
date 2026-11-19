@@ -379,6 +379,7 @@ name = "paragon-radar"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "certifi" },
     { name = "django" },
     { name = "django-allauth", extra = ["socialaccount"] },
     { name = "django-q2" },
@@ -400,6 +401,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", specifier = ">=2025.1" },
     { name = "django", specifier = ">=5.2,<5.3" },
     { name = "django-allauth", extras = ["socialaccount"], specifier = ">=65.22,<66" },
     { name = "django-q2", specifier = ">=1.11,<2" },

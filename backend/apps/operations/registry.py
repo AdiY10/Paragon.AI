@@ -30,7 +30,25 @@ def compute_ring_demographics(context,parameters):
             retryable=exc.code=='SOURCE_ERROR') from None
     return JobResult(records=len(result.rings))
 
+def compute_area_profile(context,parameters):
+    from apps.area.service import compute_area
+    from apps.area.http import SourceError
+    from apps.locations.models import Location
+    from .contracts import JobFailure
+    context.heartbeat()
+    location=Location.objects.get(pk=parameters['location_id'])
+    if location.analysis_version!=parameters['analysis_version']:
+        return JobResult(records=0)
+    try:
+        rows=compute_area(location.pk)
+    except SourceError as exc:
+        raise JobFailure('NOT_CONFIGURED' if exc.code=='NOT_PROVIDED' else 'SOURCE_ERROR',
+            retryable=exc.code!='NOT_PROVIDED') from None
+    return JobResult(records=len(rows))
+
 # Only code-defined handlers are executable. No API accepts arbitrary Python paths.
 REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance',1800),
     'compute_ring_demographics':JobSpec(compute_ring_demographics,'paragon-maintenance',900,
+        frozenset({'location_id','analysis_version'})),
+    'compute_area_profile':JobSpec(compute_area_profile,'paragon-maintenance',900,
         frozenset({'location_id','analysis_version'}))}

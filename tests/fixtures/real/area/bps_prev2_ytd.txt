@@ -1,0 +1,5 @@
+Survey,FIPS,FIPS,Region,Division,County,,1-unit,,,2-units,,,3-4 units,,,5+ units,,,1-unit rep,,,2-units rep,,,3-4 units rep,,, 5+units rep
+Date,State,County,Code,Code,Name,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units,Value
+202409,09,190,1,1,Western Connecticut Planning Region                         ,292,292,248299270,10,20,6592952,5,16,3449468,25,544,92303823,225,225,199043886,9,18,6380250,5,16,3449468,19,502,84913793
+202409,12,071,3,5,Lee County                                                  ,8084,8084,2287193691,50,100,16347166,2,8,2533000,79,3697,737885440,8084,8084,2287193691,50,100,16347166,2,8,2533000,79,3697,737885440
+202409,36,111,1,2,Ulster County                                               ,217,217,81981448,3,6,900000,1,3,421550,7,170,52295244,138,138,57822148,3,6,900000,0,0,0,7,170,52295244
