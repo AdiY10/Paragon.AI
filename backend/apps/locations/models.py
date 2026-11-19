@@ -1,5 +1,6 @@
 import uuid
 from django.conf import settings
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -61,7 +62,7 @@ class LocationRevision(models.Model):
     confirmed=models.BooleanField(default=False)
     context=models.JSONField(default=dict)
     actor=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
-    created_at=models.DateTimeField(auto_now_add=True)
+    created_at=models.DateTimeField(default=timezone.now)
     objects=ImmutableQuerySet.as_manager()
     class Meta:
         ordering=['number']
@@ -172,3 +173,40 @@ class TenantAudit(models.Model):
         if not self._state.adding:raise ValueError('Tenant audit history is immutable')
         super().save(*args,**kwargs)
     def delete(self,*args,**kwargs):raise ValueError('Tenant audit history cannot be deleted')
+
+
+class WorkspaceImport(models.Model):
+    sha256=models.CharField(primary_key=True,max_length=64)
+    workspace_id=models.CharField(max_length=160)
+    source_project_id=models.CharField(max_length=160,blank=True)
+    artifact_key=models.CharField(max_length=80)
+    size_bytes=models.PositiveBigIntegerField()
+    imported_at=models.DateTimeField(auto_now_add=True)
+    locations=models.PositiveIntegerField()
+    revisions=models.PositiveIntegerField()
+    audits=models.PositiveIntegerField()
+    objects=ImmutableQuerySet.as_manager()
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValueError('Workspace import receipts are immutable')
+        super().save(*args,**kwargs)
+    def delete(self,*args,**kwargs):raise ValueError('Workspace import receipts cannot be deleted')
+
+
+class ImportedSiteAudit(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    receipt=models.ForeignKey(WorkspaceImport,on_delete=models.PROTECT,related_name='events')
+    original_id=models.UUIDField()
+    location=models.ForeignKey(Location,on_delete=models.PROTECT,related_name='imported_events')
+    actor_email=models.CharField(max_length=254,null=True,blank=True)
+    action=models.CharField(max_length=32)
+    created_at=models.DateTimeField()
+    before=models.JSONField(default=dict)
+    after=models.JSONField(default=dict)
+    objects=ImmutableQuerySet.as_manager()
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['receipt','original_id'],name='workspace_import_audit_unique')]
+        ordering=['-created_at','-id']
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValueError('Imported source history is immutable')
+        super().save(*args,**kwargs)
+    def delete(self,*args,**kwargs):raise ValueError('Imported source history cannot be deleted')
