@@ -2,7 +2,7 @@
 
 ## Current priority: regular host, password access, and Site data migration
 
-- PRs #1–#34 merged; password access and complete workspace migration are in main. Commits and PRs disclose Codex assistance.
+- PRs #1–#35 merged; password access and complete workspace migration are in main. Commits and PRs disclose Codex assistance.
 - Canonical backend: invite-only auth; source registry/artifacts/snapshots/checks; durable jobs, schedules, recovery; versioned locations, public seed, Census previews/acceptance, manual pins, and address-change invalidation.
 - Tenant domain now has explicit review, unknown anchor flags, version conflicts, idempotent creation, archive/history, and retirement on address changes. Seed/API/UI are next; no SEC mappings are guessed.
 - Validation: 217 tests pass against PostgreSQL 17/PostGIS 3.6. Latest published Site has 15 frontend/adapter tests plus real Workers/D1/browser verification. Production backend build/static/private-route smoke and real Census reference flows passed in prior increments.

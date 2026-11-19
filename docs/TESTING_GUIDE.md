@@ -10,15 +10,16 @@ requests no longer return business data. Wrong passwords must reveal no data.
 # Reviewing the implemented workspace (about 10 minutes)
 
 **Current status:** this guide covers working UI features. It is not the final
-Release 1 acceptance walkthrough. There is no deployed test URL or completed
-owner sign-in setup yet. The data calculations, signals, screening, and comparison
+Release 1 acceptance walkthrough. The temporary Site is live with ChatGPT sign-in; the regular-host
+URL and named password accounts have not been issued yet. The data calculations, signals, screening, and comparison
 workflows remain incomplete; use docs/08 for the full acceptance requirements.
 
 Developers can run the isolated browser review described in USER_INTERFACE.md.
 Once a real environment and invited account are available, use the steps below.
 No test account, password, or bypass is provided by this guide.
 
-1. Sign in with your invited organization account. Confirm you can see your own
+1. On the regular host, sign in with your privately supplied named password account
+   (or the invited organization account when OIDC is configured). Confirm you can see your own
    workspace and sign out. An uninvited account must be denied access.
 2. On **This Week**, review the real record counts and confirmation queue. The
    initial imported portfolio contains 36 public records across 12 states, with
