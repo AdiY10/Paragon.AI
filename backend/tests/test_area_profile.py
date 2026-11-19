@@ -393,3 +393,39 @@ def test_jobs_section_reuses_ring_geography_and_lodes_snapshots(tmp_path, client
     again = LodesOpener('norwalk')
     compute_area(location.pk, sections=('jobs',), opener=again, store=store)
     assert not any(c.startswith('GET') for c in again.calls if 'lehd' in c)  # year checks only, no re-downloads
+
+
+# ---- T1: source health and stale fallback ------------------------------------------
+
+@pytest.mark.django_db
+def test_fetches_record_health_and_failures_fall_back_to_last_good(tmp_path, client, settings):
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.area.service import compute_area
+    from apps.sources.models import SourceHealth, SourceSnapshot
+    from apps.sources.health import health_status
+    location = setup(tmp_path, client, *KINGSTON, settings)
+    compute_area(location.pk, sections=('economy',), opener=FixtureOpener('kingston'))
+    laus = SourceHealth.objects.get(source_id='SRC-07', scope='laus:36111')
+    assert health_status(laus) == 'OK' and laus.latest_snapshot is not None
+    # Age the LAUS snapshot past its 7-day freshness window, then break the network.
+    from django.db import connection
+    with connection.cursor() as cur:
+        cur.execute('UPDATE sources_sourcesnapshot SET retrieved_at=%s WHERE source_id=%s',
+            [timezone.now() - timedelta(days=30), 'SRC-07'])
+
+    class Down(FixtureOpener):
+        def open(self, request, timeout=None):
+            if 'publicAPI' in request.full_url:
+                raise OSError('down')
+            return super().open(request, timeout)
+    row = compute_area(location.pk, sections=('economy',), opener=Down('kingston'))[0]
+    laus.refresh_from_db()
+    assert health_status(laus) == 'Failing' and laus.error_code == 'SOURCE_ERROR'
+    assert row.data['unemployment']['rate'] == pytest.approx(0.038)  # last good value still shown
+    entry = next(s for s in row.sources if s['id'] == 'SRC-07')
+    assert entry['stale'] is True and entry['stale_reason'] == 'SOURCE_ERROR'
+    body = client.get(f'/api/locations/{location.pk}/area/').json()
+    assert body['sections']['economy']['stale'] is True
+    sources = {s['id']: s for s in client.get('/api/sources/').json()}
+    assert sources['SRC-07']['status'] == 'Failing' and sources['SRC-06']['status'] == 'OK'

@@ -56,3 +56,6 @@ Tests: `backend/tests/test_area_profile.py` (13 tests). They replay recorded rea
 - Signals SIG-03 to SIG-05, SIG-07, SIG-08 and SIG-11 from these values (needs the signal engine).
 - Map markers for nearby businesses; Overture brand coverage is partial, so the anchor list depends on the curated brand list.
 - Place-level (city/town) building permits; county only for now.
+
+## Source health (T1)
+Every fetch made while computing a section records a scoped `SourceCheck` (`note_check` in `apps/area/service.py`), so the Data Sources page shows the last check and status (OK, Stale, Failing) for SRC-03 to SRC-13. If a refresh fails while an older snapshot exists, the older data is used, the citation is marked `stale` with the error code, the section payload has `stale: true`, and the property page shows a "Stale" notice. Health bookkeeping never breaks a computation. `NOT_COVERED` (no data for the area) is not recorded as a source failure.
