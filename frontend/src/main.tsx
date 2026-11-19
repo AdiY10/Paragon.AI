@@ -41,6 +41,7 @@ import PinEditor from "./PinEditor";
 import GeocodeDialog from "./GeocodeDialog";
 import TradeArea from "./TradeArea";
 import AreaSections from "./AreaSections";
+import SummaryPanel from "./Summary";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -957,6 +958,7 @@ function LocationPage({ id }: { id: string }) {
         </p>
       )}
       {confirm.error && <ErrorNotice error={confirm.error} />}
+      <SummaryPanel location={item} />
       <div className="location-columns">
         <section className="panel">
           <div className="section-heading">
