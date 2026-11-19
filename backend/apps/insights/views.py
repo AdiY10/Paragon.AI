@@ -18,3 +18,35 @@ def location_summary(request, location_id):
     location = get_object_or_404(Location.objects.select_related('current_revision'), pk=location_id)
     signals = _signals(location)
     return Response({**summary(location, signals), 'signals': signals})
+
+
+@api_view(['GET'])
+def signal_list(request):
+    """Portfolio-wide signals, ranked (docs/04 §5.4). ?status=active|resolved|all, ?location=<uuid>."""
+    from .models import Signal
+    from .signals import serialize, rank_key
+    qs = Signal.objects.select_related('location').exclude(location__status='archived')
+    status = request.query_params.get('status', 'active')
+    if status != 'all':
+        qs = qs.filter(status=status)
+    if loc := request.query_params.get('location'):
+        qs = qs.filter(location_id=loc)
+    return Response({'results': [serialize(s) for s in sorted(qs, key=rank_key)][:500]})
+
+
+@api_view(['POST'])
+def signal_review(request, signal_id):
+    """FR-23: mark a signal reviewed (kept active) or dismissed (hidden unless it escalates)."""
+    from .models import Signal
+    from .signals import serialize
+    signal = get_object_or_404(Signal.objects.select_related('location'), pk=signal_id)
+    action = request.data.get('action')
+    if action not in ('reviewed', 'dismissed'):
+        return Response({'detail': 'action must be reviewed or dismissed'}, status=400)
+    note = str(request.data.get('note', ''))[:2000]
+    signal.reviewed_by = request.user
+    signal.review_note = note
+    if action == 'dismissed':
+        signal.status = 'dismissed'
+    signal.save(update_fields=['reviewed_by', 'review_note', 'status'])
+    return Response(serialize(signal))

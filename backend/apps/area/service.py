@@ -394,6 +394,8 @@ def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, cap
                 row = AreaSection.objects.get(location=location, analysis_version=version, section=name,
                     inputs_sha256=inputs)
         results.append(row)
+    from apps.insights.signals import safe_evaluate
+    safe_evaluate(location.pk)
     return results
 
 

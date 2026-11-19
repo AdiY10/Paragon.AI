@@ -14,3 +14,32 @@
 - **API:** `GET /api/locations/<id>/summary/` returns `metrics` (value, period, source, percentile, n), `strengths`, `concerns`, `signals`.
 - **UI:** a "How this location compares" panel at the top of each property page, with an expandable percentile list.
 - **Portfolio benchmarks** (median, min, max) via `metrics.benchmarks()`, used by Compare.
+
+## Signal engine (T4; FR-19, FR-20, FR-23)
+`backend/apps/insights/signals.py` derives signals only from stored section results. Thresholds live in `config/signals.yaml`, which holds the docs/04 §5.2 defaults (configuration, to validate with John).
+
+| Rule | Source section | Fires when (defaults) | Severity |
+|---|---|---|---|
+| SIG-01 | Demographics (3 mi) | Population change is significant and abs ≥ 3% | Watch if down, FYI if up |
+| SIG-02 | Demographics (3 mi) | Real income change is significant and ≤ −5% or ≥ +5% | Watch / FYI |
+| SIG-03 | Economy | County private jobs YoY ≤ −2% or ≥ +3% | Watch / FYI |
+| SIG-04 | Economy | County retail jobs YoY ≤ −4% | Watch |
+| SIG-05 | Economy | Unemployment up ≥ 1.0 pt vs a year earlier (preliminary flagged) | Watch |
+| SIG-06 | Jobs (3 mi) | Jobs change ≤ −5% or ≥ +5% (both years ≥ 1,000) | Watch / FYI |
+| SIG-07 | Economy | Permits ±25% and ±50 units vs prior 12 months | FYI |
+| SIG-08 | Traffic | Main-road AADT ≤ −10% or ≥ +10%, same route | Watch / FYI |
+| SIG-09 | Businesses | Possible closure (severity from the closure rules, tenant match → High) | per item |
+| SIG-10 | Businesses | New key business | FYI |
+| SIG-11 | Hazards | Pin in a Special Flood Hazard Area → High; one within ~100 m → Watch | High / Watch |
+| SIG-12/13 | SEC (T9) | Tenant bankruptcy (1.03) / restructuring (2.05, 2.06) within 90 days | High / Watch |
+
+- **Lifecycle:** one row per (location, rule, subject).
+  - Re-evaluation creates, updates or escalates a signal, or resolves it ("condition no longer holds"; "location corrected" after a pin move).
+  - Event signals (SIG-09, 10, 12, 13) expire 90 days after the event date.
+  - A dismissed signal stays hidden unless its severity increases.
+- **When it runs:** evaluation runs automatically after every section computation. `python manage.py evaluate_signals` re-evaluates everything, for a baseline or after threshold edits.
+- **API:**
+  - `GET /api/signals/?status=active|resolved|all&location=<id>` (ranked per §5.4)
+  - `POST /api/signals/<id>/review/` with `{"action": "reviewed" | "dismissed", "note": ""}`
+  - Each location now has `attention` (High, Watch or Clear; FYI-only counts as Clear).
+- **UI:** active signals appear at the top of the property Summary panel and rank first among concerns.

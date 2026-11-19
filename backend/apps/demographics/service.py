@@ -127,13 +127,16 @@ def compute_for_location(location_id, *, year=DEFAULT_ACS_YEAR, baseline_year=BA
             raise DemographicsUnavailable('STALE', 'The pin or ring preset changed during computation; retry.')
         try:
             with transaction.atomic():
-                return RingDemographics.objects.create(location=location, revision=revision,
+                result = RingDemographics.objects.create(location=location, revision=revision,
                     analysis_version=analysis_version, ring_preset=location.ring_preset, acs_year=year,
                     data_period=acs.vintage_period(year), geography_snapshot=geo_snapshot,
                     acs_snapshot_ids=acs_ids, baseline=baseline, inputs_sha256=inputs_sha, rings=rings)
         except IntegrityError:
-            return RingDemographics.objects.get(location=location, analysis_version=analysis_version,
+            result = RingDemographics.objects.get(location=location, analysis_version=analysis_version,
                 acs_year=year, inputs_sha256=inputs_sha)
+    from apps.insights.signals import safe_evaluate
+    transaction.on_commit(lambda: safe_evaluate(location.pk))
+    return result
 
 
 def current_result(location):
