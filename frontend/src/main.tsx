@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import PinEditor from "./PinEditor";
 import GeocodeDialog from "./GeocodeDialog";
+import TradeArea from "./TradeArea";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -1031,18 +1032,18 @@ function LocationPage({ id }: { id: string }) {
           </p>
         </section>
       </div>
+      <TradeArea location={item} />
       <section className="panel">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">TRADE-AREA EVIDENCE</span>
-            <h2>Area data unavailable</h2>
+            <span className="eyebrow">MORE AREA EVIDENCE</span>
+            <h2>Economy, businesses, traffic and hazards</h2>
           </div>
           <Database size={22} />
         </div>
         <p className="muted">
-          Demographics, economy, nearby businesses, traffic, and hazards have
-          not completed their required checks for this property. Missing data is
-          not a zero or a clear risk assessment.
+          These sections have not completed their required checks for this
+          property yet. Missing data is not a zero or a clear risk assessment.
         </p>
         <a className="text-button" href="#/sources">
           Review sources and coverage <ArrowRight size={16} />

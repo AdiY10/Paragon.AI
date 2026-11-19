@@ -16,6 +16,9 @@ that Release 1's data calculations or production deployment are complete.
 - **Property record:** source period, pin method/coordinates, confirmation status,
   ring preset, user-provided GLA/notes, record confirmation, version-checked
   editing, and previewed manual pin correction/confirmation, and source-backed Census suggestion review. The provenance drawer includes the original listing and change history.
+  Ring demographics and 2015–19 → 2020–24 trends appear in a "Who lives around this
+  property" section with margins of error, significance and an evidence drawer
+  (see [RING_DEMOGRAPHICS.md](RING_DEMOGRAPHICS.md)).
 - **Data Sources:** the real 16-entry registry, recorded scoped health, periods,
   last successful check, licensing, attribution, and privacy notes. No check is
   displayed as “Not checked,” never as healthy.
