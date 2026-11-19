@@ -21,12 +21,14 @@ def schedule():
 
 
 def test_missing_source_handlers_remain_disabled_and_visible(client):
+    from apps.operations.registry import REGISTRY
     assert sync_schedules(enable_available=True,now=anchor())==8
-    assert not JobSchedule.objects.filter(enabled=True).exists()
+    implemented={s.name for s in JobSchedule.objects.all() if s.kind in REGISTRY}
+    assert set(JobSchedule.objects.filter(enabled=True).values_list('name',flat=True))==implemented
     user,_=member('admin@example.org','admin');client.force_login(user)
     data=client.get('/api/admin/schedules/').json()
     assert len(data['schedules'])==8
-    assert all(s['blocked_reason']=='HANDLER_NOT_IMPLEMENTED' for s in data['schedules'])
+    assert all(s['blocked_reason']=='HANDLER_NOT_IMPLEMENTED' for s in data['schedules'] if s['name'] not in implemented)
 
 
 def test_dispatch_coalesces_backlog_and_advances_persisted_cursor():
@@ -59,7 +61,7 @@ def test_failed_enqueue_keeps_cursor_and_occurrence_history_unchanged():
 
 
 def test_enabled_missing_handler_is_blocked_without_fake_success():
-    item=schedule();item.kind='sec_daily';item.save()
+    item=schedule();item.kind='backup_daily';item.save()
     assert dispatch_due(owner=uuid.uuid4(),now=anchor())['blocked']==1
     assert not JobRun.objects.exists()
 

@@ -59,3 +59,15 @@ Tests: `backend/tests/test_area_profile.py` (13 tests). They replay recorded rea
 
 ## Source health (T1)
 Every fetch made while computing a section records a scoped `SourceCheck` (`note_check` in `apps/area/service.py`), so the Data Sources page shows the last check and status (OK, Stale, Failing) for SRC-03 to SRC-13. If a refresh fails while an older snapshot exists, the older data is used, the citation is marked `stale` with the error code, the section payload has `stale: true`, and the property page shows a "Stale" notice. Health bookkeeping never breaks a computation. `NOT_COVERED` (no data for the area) is not recorded as a source failure.
+
+## Scheduled refreshes (T2)
+Handlers in `apps/area/refresh.py` are registered for the schedules in `config/schedules.yaml`, so they enable automatically. Each recomputes only **monitored** locations (Owned or Candidate, pinned, not archived, not an unsaved screen), one at a time with heartbeats, and skips a failing location without stopping the batch. Section rows are keyed by their input snapshots, so a run with no newer source period stores nothing new.
+
+| Schedule | Handler | Work |
+|---|---|---|
+| `bls_bps_check` (weekly) | `refresh_economy` | QCEW, LAUS and BPS (7-day cache, so the weekly run re-checks) |
+| `overture_check` (weekly) | `refresh_businesses` | Discover the newest release (health scope `SRC-13 releases`), capture every monitored pin, recompute businesses |
+| `flood_recheck` (monthly) | `refresh_hazards` | FEMA NFHL and NRI |
+| `annual_sources_check` (monthly) | `refresh_annual` | Detect a new ACS bulk vintage and ingest it for monitored states and neighbours; also ingest the 2019 baseline if missing. Recompute demographics on a new vintage, then traffic and jobs (new HPMS and LODES years) |
+
+`sec_daily` and `brief_weekly` arrive with T9 and T5. `maintenance_daily` and `backup_daily` remain unimplemented and visibly blocked.
