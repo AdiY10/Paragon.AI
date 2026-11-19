@@ -1,28 +1,51 @@
-# Prepared infrastructure only. Provisioning paid resources requires owner approval.
+# Initial password-access host only. Do not provision before owner cost approval.
+# Full background ingestion/backup topology remains a separate milestone.
 services:
   - type: web
     name: paragon-radar
     runtime: docker
-    plan: starter
+    plan: 0.5c-512mb
     region: virginia
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: 'off'
     healthCheckPath: /health/
-    preDeployCommand: python backend/manage.py migrate --noinput && python backend/manage.py sync_sources && python backend/manage.py sync_schedules && python backend/manage.py import_portfolio
+    disk:
+      name: paragon-private-evidence
+      mountPath: /app/var/artifacts
+      sizeGB: 5
+    # Disk is unavailable to pre-deploy commands. The container prepares releases
+    # at startup, after the private disk is mounted, before starting Gunicorn.
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_ALLOWED_HOSTS
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: paragon-radar-db
+          property: connectionString
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
-      - key: OIDC_SERVER_URL
+      - key: PASSWORD_ACCESS_ENABLED
+        value: 'true'
+      - key: ACCESS_BOOTSTRAP_EMAIL
         sync: false
-      - key: OIDC_CLIENT_ID
+      - key: ACCESS_BOOTSTRAP_PASSWORD
         sync: false
-      - key: OIDC_CLIENT_SECRET
-        sync: false
+      - key: SOURCE_ARTIFACT_ROOT
+        value: /app/var/artifacts
+      - key: WEB_CONCURRENCY
+        value: '1'
       - key: TRUST_PROXY_SSL_HEADER
         value: 'true'
+
+databases:
+  - name: paragon-radar-db
+    databaseName: paragon
+    user: paragon
+    region: virginia
+    plan: 0.1c-256mb
+    postgresMajorVersion: '17'
+    diskSizeGB: 1
+    storageAutoscalingEnabled: false
+    ipAllowList: []

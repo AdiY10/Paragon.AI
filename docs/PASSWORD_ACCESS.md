@@ -40,3 +40,8 @@ Run scripts/verification/password_smoke.py with Node/Chromium available for a re
 password-browser flow against an isolated copy of the public portfolio. It uses no
 ChatGPT identity or forced session. Local test HTTP is disposable; deployment still
 requires real HTTPS and a successful external-browser acceptance check.
+
+The regular-host entrypoint can create the first named administrator using
+`ACCESS_BOOTSTRAP_EMAIL` and `ACCESS_BOOTSTRAP_PASSWORD` from the host secret store.
+Remove both after login verification. Bootstrap never resets an existing password,
+changes a role, or reactivates a revoked account. See [DEPLOYMENT.md](DEPLOYMENT.md).
