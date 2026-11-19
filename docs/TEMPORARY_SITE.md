@@ -1,11 +1,11 @@
-# Temporary OpenAI Site — retained during migration
+# Current OpenAI Site
 
 Live URL: https://paragon-radar-workspace.amitsch5.chatgpt.site
 
 The owner changed the Site audience to **public**. ChatGPT sign-in remains required,
 and every visitor has a separate workspace. Preserve that audience on publication.
-Adi's priority is to move to a regular password-protected host so ChatGPT is no
-longer required; the current Site remains available until that migration is verified.
+On 2026-11-19 the user explicitly chose to stay on this Site without external
+hosting. Continue development here; the earlier migration request is deferred.
 
 ## Available now
 
@@ -52,7 +52,7 @@ source-field spoof rejection, and cross-user acceptance denial. Native Sites pub
 the live URL. Real visitor sign-in/interaction must still be checked by opening the
 live link; no interactive owner session was impersonated for production testing.
 
-## Migration status
+## Deferred migration reference
 
 The Django transactional importer is implemented and tested. It validates complete
 portfolios, retains original private export bytes/checksums, imports notes/pins/audits,
@@ -64,10 +64,10 @@ A schema-3 Worker/D1 test creates a note/manual pin and exports their history, c
 owner isolation, then imports that actual export through the Django smoke check.
 This verifies the migration contract without modifying production business data.
 
-The costed regular-host blueprint and named password login are ready. Hosting account
-connection, paid-resource approval, actual image/HTTPS verification, fresh export
-comparison, private credential delivery, and production cutover remain open. Do not
-retire this Site until the replacement works and the owner confirms migrated data.
+The regular-host blueprint and named password login are retained for a possible
+later move. That work is deferred by user choice, not a prerequisite for Site feature
+development. Keep this Site active and preserve existing records. A future move
+would require separate authorization and completed production cutover checks.
 
 No business metrics or completed jobs were manufactured. No external paid resources
 were provisioned. Export files remain private and are never committed.

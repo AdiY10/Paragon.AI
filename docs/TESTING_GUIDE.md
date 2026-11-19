@@ -1,26 +1,27 @@
 # Access and workspace review
 
-Adi's current priority is a regular HTTPS host with named email/password access,
-without a ChatGPT account. The password implementation is locally verified; a regular
-host URL and private credentials have not yet been issued. See PASSWORD_ACCESS.md.
-When deployed, open the supplied URL in a fresh browser, sign in with the separately
-delivered account/password, verify portfolio data, sign out, and verify that API
-requests no longer return business data. Wrong passwords must reveal no data.
+Use the existing Site: https://paragon-radar-workspace.amitsch5.chatgpt.site
+
+The user chose to continue here on 2026-11-19. Sign in with ChatGPT; each visitor has
+an isolated workspace even though the Site audience is public. No external hosting
+account or separate password is needed. Export important saved work before a future
+move. The prepared Django password option is deferred; see PASSWORD_ACCESS.md only
+if an external migration is later authorized.
 
 # Reviewing the implemented workspace (about 10 minutes)
 
 **Current status:** this guide covers working UI features. It is not the final
-Release 1 acceptance walkthrough. The temporary Site is live with ChatGPT sign-in; the regular-host
-URL and named password accounts have not been issued yet. The data calculations, signals, screening, and comparison
+Release 1 acceptance walkthrough. The current Site is live with ChatGPT sign-in.
+External hosting is deferred. Data calculations, signals, screening, and comparison
 workflows remain incomplete; use docs/08 for the full acceptance requirements.
 
 Developers can run the isolated browser review described in USER_INTERFACE.md.
-Once a real environment and invited account are available, use the steps below.
+Use the steps below in your signed-in Site workspace.
 No test account, password, or bypass is provided by this guide.
 
-1. On the regular host, sign in with your privately supplied named password account
-   (or the invited organization account when OIDC is configured). Confirm you can see your own
-   workspace and sign out. An uninvited account must be denied access.
+1. Open the Site and sign in with ChatGPT. Confirm you see your own workspace.
+   Other visitors must not see your private notes or edits. Requests without
+   sign-in must not receive business data.
 2. On **This Week**, review the real record counts and confirmation queue. The
    initial imported portfolio contains 36 public records across 12 states, with
    35 reference pins. These counts change as your team edits records. The brief
@@ -62,4 +63,4 @@ an issue. Keep private addresses and notes out of public issue reports. Producti
 acceptance still requires a real deployed URL, actual source jobs, reference checks,
 owner access, backups, and the remaining requirements in docs/07.
 
-Migration operators: follow [WORKSPACE_MIGRATION.md](WORKSPACE_MIGRATION.md) for private export validation, import, and cutover checks. The current local snapshot is verified; no new public host has been issued yet.
+Migration operators: follow [WORKSPACE_MIGRATION.md](WORKSPACE_MIGRATION.md) for private export validation, import, and cutover checks. The current local snapshot is verified; migration is deferred by user choice.

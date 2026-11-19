@@ -2,9 +2,9 @@
 
 A private market-intelligence application in development for **John Nelson, Founder and CEO of [Paragon Realty Group](https://paragonct.com/)**.
 
-**Status (2026-11-19):** implementation is underway. Invite-only access, source archives and health, durable jobs, schedules, private property management, and a responsive React UI are implemented and locally verified. The 36 public portfolio records remain unconfirmed until reviewed. **The full Django/PostGIS Release 1 is not deployed or ready for acceptance:** trade-area calculations, signals, screening, and metric comparisons are still being implemented. Named password access, Census pin review, and a tested Site-to-Django importer are ready; regular hosting needs owner connection and cost approval. See [progress.md](progress.md) for current evidence and blockers.
+**Status (2026-11-19):** implementation is underway. Invite-only access, source archives and health, durable jobs, schedules, private property management, and a responsive React UI are implemented and locally verified. The 36 public portfolio records remain unconfirmed until reviewed. **The full Django/PostGIS Release 1 is not deployed or ready for acceptance:** trade-area calculations, signals, screening, and metric comparisons are still being implemented. Named password access, Census pin review, and a tested Site-to-Django importer are ready; the user chose to continue on the current OpenAI Site, with external hosting deferred. See [progress.md](progress.md) for current evidence and blockers.
 
-## Temporary workspace
+## Current workspace
 
 [Open Paragon Radar on OpenAI Sites](https://paragon-radar-workspace.amitsch5.chatgpt.site) with ChatGPT sign-in. Its audience is public; each visitor gets an isolated workspace. The working temporary version supports real portfolio management, maps, persistent notes/pins, on-demand Census pin suggestions, and workspace export. Source refresh and full trade-area analysis remain unavailable. See [temporary deployment and migration](docs/TEMPORARY_SITE.md).
 

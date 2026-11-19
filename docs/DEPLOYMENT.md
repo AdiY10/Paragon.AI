@@ -1,9 +1,12 @@
-# Regular-host password workspace — prepared, not provisioned
+# Deferred regular-host deployment reference
 
-Adi's priority is a normal HTTPS URL that does not require ChatGPT. The initial
-`render.yaml` provisions one Docker web service, PostgreSQL 17/PostGIS, and a private
-5 GB disk. It enables named password access and retains the optional OIDC path.
-The existing temporary Site stays available until the new host passes acceptance.
+**User decision, 2026-11-19:** stay on the current OpenAI Site without external
+hosting. Do not provision this configuration or request its budget as a prerequisite
+to feature work. See [TEMPORARY_SITE.md](TEMPORARY_SITE.md) for the active deployment.
+
+The remaining instructions describe a prepared future option, not an approved
+migration. The tested `render.yaml` and password implementation are retained for
+portability. No external resources have been purchased or provisioned.
 
 ## Concrete resource quote
 
