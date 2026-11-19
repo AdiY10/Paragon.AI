@@ -47,13 +47,18 @@ def _geography(lat, lon, radius, year, store, opener, decennial=2020):
     snapshot = _latest('SRC-04', geography.scope_for(lat, lon, radius, decennial))
     if snapshot and snapshot.context.get('acs_year') == year:
         return snapshot, geography.load_capture(snapshot, store)
+    from apps.area.service import note_check
+    scope = geography.scope_for(lat, lon, radius, decennial)
     try:
         capture = geography.fetch_geography(lat, lon, radius, acs_year=year, decennial=decennial, opener=opener)
     except geography.GeographyError as exc:
+        note_check('SRC-04', scope, error='SOURCE_ERROR')
         raise DemographicsUnavailable('SOURCE_ERROR', f'Census {decennial} geography unavailable: {exc}') from None
     except OSError:
+        note_check('SRC-04', scope, error='SOURCE_ERROR')
         raise DemographicsUnavailable('SOURCE_ERROR', f'Census {decennial} geography service unreachable') from None
     snapshot, _ = geography.publish_capture(capture, store)
+    note_check('SRC-04', scope, snapshot=snapshot)
     return snapshot, capture
 
 
@@ -78,8 +83,12 @@ def _cpi(years, store, opener):
         try:
             values, retrieved = cpi.fetch(years, opener=opener)
         except (cpi.CpiError, OSError, ValueError, KeyError):
+            from apps.area.service import note_check
+            note_check('SRC-08', cpi.SCOPE, error='SOURCE_ERROR')
             raise DemographicsUnavailable('SOURCE_ERROR', 'BLS CPI unavailable for inflation adjustment.') from None
         snapshot, _ = cpi.publish(values, retrieved, store)
+        from apps.area.service import note_check
+        note_check('SRC-08', cpi.SCOPE, snapshot=snapshot)
     return snapshot, cpi.load(snapshot, store)
 
 

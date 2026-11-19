@@ -46,28 +46,62 @@ def _store(store):
     return store or LocalArtifactStore(settings.SOURCE_ARTIFACT_ROOT)
 
 
+HEALTH_CODES = {'TIMEOUT', 'HTTP_ERROR', 'SCHEMA_ERROR', 'NOT_CONFIGURED', 'STORAGE_ERROR', 'SOURCE_ERROR'}
+
+
+def note_check(source_id, scope, *, snapshot=None, error=None):
+    """Record a scoped source check for the Data Sources page (FR-30/31). Never raises."""
+    from apps.sources.health import record_check
+    import uuid
+    try:
+        if error is None:
+            record_check(source_id=source_id, scope=scope[:160], run_key=f'area:{uuid.uuid4()}', succeeded=True,
+                completed_at=timezone.now(), snapshot=snapshot if snapshot and snapshot.scope == scope[:160] else None)
+        elif error in HEALTH_CODES:
+            record_check(source_id=source_id, scope=scope[:160], run_key=f'area:{uuid.uuid4()}', succeeded=False,
+                completed_at=timezone.now(), error_code=error)
+    except Exception:  # health bookkeeping must never break a computation
+        pass
+
+
 class Run:
     """Collects snapshots and source citations for one section computation."""
     def __init__(self, store, opener):
         self.store, self.opener, self.snapshots, self.sources = store, opener, [], {}
 
     def cached(self, source_id, scope, max_age_days, fetcher, *, release_match=None):
-        """Reuse a fresh snapshot, else fetch, validate and publish. Returns (raw, snapshot)."""
+        """Reuse a fresh snapshot, else fetch, validate and publish. Returns (raw, snapshot).
+
+        If a refresh fails but an older snapshot exists, the older one is used and the
+        citation is marked stale with its date (docs/04 §7 CACHED_AFTER_ERROR).
+        """
         snap = (SourceSnapshot.objects.filter(source_id=source_id, scope=scope)
             .order_by('-retrieved_at', '-published_at').first())
         fresh = snap and (max_age_days is None or snap.retrieved_at >= timezone.now() - timedelta(days=max_age_days))
+        stale_error = None
         if fresh and (release_match is None or snap.release == release_match):
             with self.store.open_verified(snap.artifact_key) as handle:
                 raw = handle.read()
         else:
-            raw, url, release, period = fetcher()
-            snap, _ = publish_snapshot(source_id=source_id, scope=scope[:160], release=str(release)[:96],
-                data_period=period[:160], source_url=url, adapter_version=ADAPTER, stream=io.BytesIO(raw),
-                store=self.store, validation=ValidationReport(True, True, {'format': 'raw response'}, 1))
+            try:
+                raw, url, release, period = fetcher()
+                snap, _ = publish_snapshot(source_id=source_id, scope=scope[:160], release=str(release)[:96],
+                    data_period=period[:160], source_url=url, adapter_version=ADAPTER, stream=io.BytesIO(raw),
+                    store=self.store, validation=ValidationReport(True, True, {'format': 'raw response'}, 1))
+                note_check(source_id, scope, snapshot=snap)
+            except SourceError as exc:
+                note_check(source_id, scope, error=exc.code)
+                if snap is None or exc.code == 'NOT_COVERED':
+                    raise
+                stale_error = exc.code
+                with self.store.open_verified(snap.artifact_key) as handle:
+                    raw = handle.read()
         self.snapshots.append(str(snap.pk))
         name, link = SOURCE_META[source_id]
-        self.sources.setdefault(source_id + snap.data_period, {'id': source_id, 'name': name, 'url': link,
-            'period': snap.data_period, 'retrieved_at': snap.retrieved_at.isoformat()})
+        entry = self.sources.setdefault(source_id + snap.data_period, {'id': source_id, 'name': name, 'url': link,
+            'period': snap.data_period, 'retrieved_at': snap.retrieved_at.isoformat(), 'stale': False})
+        if stale_error:
+            entry.update(stale=True, stale_reason=stale_error)
         return raw, snap
 
 
@@ -346,7 +380,8 @@ def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, cap
                 data, ok = BUILDERS[name](run, revision.lat, revision.lon)
         except SourceError as exc:
             data, ok = {'reason': exc.code}, False
-        inputs = hashlib.sha256(json.dumps([name, run.snapshots], sort_keys=True).encode()).hexdigest()
+        stale = sorted(k for k, v in run.sources.items() if v.get('stale'))
+        inputs = hashlib.sha256(json.dumps([name, run.snapshots, stale], sort_keys=True).encode()).hexdigest()
         with transaction.atomic():
             if Location.objects.select_for_update().get(pk=location.pk).analysis_version != version:
                 raise SourceError('STALE', 'Pin changed during computation')
@@ -373,5 +408,6 @@ def serialize(location):
             out[name] = {'status': 'not_computed', 'reason': 'NOT_PROVIDED' if not placed else ('STALE' if stale else 'NOT_COMPUTED')}
         else:
             out[name] = {'status': row.status, 'data': row.data, 'sources': row.sources,
-                'computed_at': row.computed_at.isoformat()}
+                'computed_at': row.computed_at.isoformat(),
+                'stale': any(s.get('stale') for s in row.sources)}
     return {'sections': out, 'placed': bool(placed)}

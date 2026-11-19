@@ -7,6 +7,8 @@ export interface SourceRef {
   url: string;
   period: string;
   retrieved_at: string;
+  stale?: boolean;
+  stale_reason?: string;
 }
 export interface Section<T> {
   status: "available" | "unavailable" | "not_computed";
@@ -14,6 +16,7 @@ export interface Section<T> {
   data?: T & { reason?: string };
   sources?: SourceRef[];
   computed_at?: string;
+  stale?: boolean;
 }
 export interface Industry {
   label: string;

@@ -128,6 +128,11 @@ function Panel({
         </div>
         {icon}
       </div>
+      {section.stale && (
+        <p className="notice" role="status">
+          Stale: a source could not be refreshed, so the last good values are shown with their dates.
+        </p>
+      )}
       {section.status === "not_computed" ? (
         <p className="muted">
           {section.reason === "STALE" ? "Out of date for the current pin." : "Not checked yet."}
@@ -158,6 +163,7 @@ function Sources({ sources, computedAt }: { sources: SourceRef[]; computedAt?: s
               {s.name}
             </a>{" "}
             · {monthLabel(s.period)} · retrieved {dateLabel(s.retrieved_at)}
+            {s.stale && <span className="badge amber"> Stale</span>}
           </li>
         ))}
       </ul>
