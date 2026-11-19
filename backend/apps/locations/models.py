@@ -123,3 +123,52 @@ class GeocodeLookup(models.Model):
         if not self._state.adding:raise ValueError('Geocode lookup evidence is immutable')
         super().save(*args,**kwargs)
     def delete(self,*args,**kwargs):raise ValueError('Geocode lookup evidence cannot be deleted')
+
+
+class Tenant(models.Model):
+    """An explicitly reviewed tenant or an unverified, dated listing reference."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    location=models.ForeignKey(Location,on_delete=models.PROTECT,related_name='tenants')
+    name=models.CharField(max_length=200)
+    normalized_key=models.CharField(max_length=64)
+    is_anchor=models.BooleanField(null=True,blank=True)
+    confirmed=models.BooleanField(default=False)
+    confirmed_at=models.DateTimeField(null=True,blank=True)
+    confirmed_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name='+')
+    archived=models.BooleanField(default=False)
+    notes=models.TextField(blank=True)
+    origin=models.CharField(max_length=16,choices=[('public_seed','Public listing'),('user','User-provided')])
+    source_url=models.URLField(max_length=2048,blank=True)
+    source_context=models.JSONField(default=dict)
+    presence=models.CharField(max_length=32,choices=[(v,v) for v in ['unverified','listed_unverified','neighbor_or_cotenant','planned_unverified','name_only']],default='unverified')
+    seed_key=models.CharField(max_length=64,null=True,blank=True)
+    request_key=models.UUIDField(null=True,blank=True)
+    creation_hash=models.CharField(max_length=64,blank=True)
+    version=models.PositiveIntegerField(default=1)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name='+')
+    created_at=models.DateTimeField(auto_now_add=True)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering=['name','id']
+        constraints=[
+            models.UniqueConstraint(fields=['location','normalized_key'],condition=models.Q(archived=False),name='tenant_active_name_unique'),
+            models.UniqueConstraint(fields=['location','seed_key'],condition=models.Q(seed_key__isnull=False),name='tenant_seed_reference_unique'),
+            models.UniqueConstraint(fields=['location','request_key'],condition=models.Q(request_key__isnull=False),name='tenant_request_key_unique'),
+            models.CheckConstraint(condition=models.Q(confirmed=False)|models.Q(confirmed_at__isnull=False),name='tenant_confirmation_dated'),
+            models.CheckConstraint(condition=models.Q(archived=False)|models.Q(confirmed=False),name='tenant_archived_unconfirmed')]
+
+
+class TenantAudit(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    tenant=models.ForeignKey(Tenant,on_delete=models.PROTECT,related_name='history')
+    actor=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL)
+    action=models.CharField(max_length=32)
+    before=models.JSONField(default=dict)
+    after=models.JSONField(default=dict)
+    created_at=models.DateTimeField(auto_now_add=True)
+    objects=ImmutableQuerySet.as_manager()
+    class Meta:ordering=['-created_at','id']
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValueError('Tenant audit history is immutable')
+        super().save(*args,**kwargs)
+    def delete(self,*args,**kwargs):raise ValueError('Tenant audit history cannot be deleted')
