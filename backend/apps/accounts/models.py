@@ -39,3 +39,10 @@ class AccessAuditEvent(models.Model):
     before = models.JSONField(default=dict)
     after = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class LoginThrottle(models.Model):
+    """HMAC identifiers only; no submitted password, address, or email is retained."""
+    key=models.CharField(primary_key=True,max_length=64)
+    window_start=models.DateTimeField()
+    attempts=models.PositiveIntegerField(default=0)

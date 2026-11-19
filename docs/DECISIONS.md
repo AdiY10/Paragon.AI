@@ -110,3 +110,13 @@ unknown and confirmation to false. Deduplicate cautiously within each property,
 retain immutable audit history, use idempotent creation keys, and lock parent
 locations to coordinate roster/pin/attribute changes. Archive the former active
 roster when its address changes, so tenant exposure cannot silently move elsewhere.
+
+## D-032 — Follow Adi's new regular-host/password priority
+
+Preserve unfinished tenant seed/API work in a named Git stash on its feature branch.
+Implement opt-in named password accounts using Django hashes/sessions, active
+membership, generic errors, CSRF/POST logout, safe same-origin return paths, and
+shared-database HMAC throttles. Keep OIDC available. Provision/rotate through hidden
+prompt or stdin, never password arguments. Rotation revokes prior sessions without
+code changes. Continue data migration and host preparation before asking for paid
+provisioning approval; the regular-host priority is not complete at local verification.

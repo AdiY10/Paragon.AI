@@ -1,3 +1,12 @@
+# Access and workspace review
+
+Adi's current priority is a regular HTTPS host with named email/password access,
+without a ChatGPT account. The password implementation is locally verified; a regular
+host URL and private credentials have not yet been issued. See PASSWORD_ACCESS.md.
+When deployed, open the supplied URL in a fresh browser, sign in with the separately
+delivered account/password, verify portfolio data, sign out, and verify that API
+requests no longer return business data. Wrong passwords must reveal no data.
+
 # Reviewing the implemented workspace (about 10 minutes)
 
 **Current status:** this guide covers working UI features. It is not the final

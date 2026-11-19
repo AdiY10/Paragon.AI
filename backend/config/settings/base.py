@@ -32,6 +32,7 @@ TEMPLATES = [{
     'DIRS': [BASE_DIR / 'backend' / 'templates'], 'APP_DIRS': True,
     'OPTIONS': {'context_processors': [
         'django.template.context_processors.request',
+        'apps.accounts.context_processors.access_options',
         'django.contrib.auth.context_processors.auth',
         'django.contrib.messages.context_processors.messages',
     ]},
@@ -48,7 +49,14 @@ FRONTEND_MANIFEST = BASE_DIR / 'backend' / 'static' / 'ui' / '.vite' / 'manifest
 STORAGES = {'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
             'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'}}
 WHITENOISE_INDEX_FILE = False
-LOGIN_URL = '/accounts/login/'
+PASSWORD_ACCESS_ENABLED = os.environ.get('PASSWORD_ACCESS_ENABLED','false').lower()=='true'
+LOGIN_URL = '/access/login/' if PASSWORD_ACCESS_ENABLED else '/accounts/login/'
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME':'django.contrib.auth.password_validation.MinimumLengthValidator','OPTIONS':{'min_length':14}},
+    {'NAME':'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME':'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {'NAME':'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+]
 LOGIN_REDIRECT_URL = '/'
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'

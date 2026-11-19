@@ -1,12 +1,15 @@
 from django.urls import path, include
 from . import views
 from apps.accounts import views as accounts
+from apps.accounts import password_access
 from apps.sources.views import source_list
 from apps.operations import views as operations
 from apps.locations import views as locations
 
 urlpatterns = [
     path('health/', views.health, name='health'),
+    path('access/login/', password_access.sign_in, name='password_login'),
+    path('access/logout/', password_access.sign_out, name='password_logout'),
     path('accounts/', include('allauth.urls')),
     path('api/admin/users/', accounts.users),
     path('api/admin/users/<uuid:member_id>/', accounts.member_detail),
