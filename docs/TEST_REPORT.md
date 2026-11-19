@@ -159,3 +159,14 @@ rejection, cautious brand normalization, explicit confirmation, rename invalidat
 archive/restore, duplicate conflicts, unsupported mapping/source fields, owned-only
 mutations, address-change retirement/rollback, and competing idempotent creation.
 This domain increment does not yet claim a published tenant UI or SEC coverage.
+
+## Priority password access (2026-11-19)
+
+230 PostgreSQL/PostGIS tests pass, including shared-database concurrent throttle
+limits, explicit opt-in, unknown/wrong/revoked account denial, CSRF, secure redirect
+validation, logout, secret-free output, role preservation, and password rotation
+invalidating sessions. SQLite passes 221 with nine explicit concurrency/spatial skips.
+The production frontend build passes. A real Chromium password login without any
+ChatGPT session or force-login bypass reaches the actual 36-record disposable seed,
+survives reload, logs out, and loses API access. This is local verification; regular
+hosting is not yet provisioned and external-browser/HTTPS acceptance remains open.

@@ -19,8 +19,8 @@ def application(request):
         assets = frontend_assets()
     except ImproperlyConfigured:
         return HttpResponse('Workspace UI unavailable. The application build must be installed.', status=503)
-    return render(request, 'application/index.html', {**assets, 'csrf_token': get_token(request)})
+    return render(request, 'application/index.html', {**assets, 'csrf_token': get_token(request), 'login_url':settings.LOGIN_URL})
 
 @api_view(['GET'])
 def session(request):
-    return Response({'email': request.user.email, 'role': request.membership.role, 'csrfToken': get_token(request), 'map': {'tile_url': settings.MAP_TILE_URL or None}})
+    return Response({'email': request.user.email, 'role': request.membership.role, 'csrfToken': get_token(request), 'logout_url':'/access/logout/' if settings.PASSWORD_ACCESS_ENABLED else '/accounts/logout/', 'map': {'tile_url': settings.MAP_TILE_URL or None}})

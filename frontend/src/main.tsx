@@ -301,7 +301,13 @@ function App() {
         <ShieldCheck size={36} />
         <h1>Your workspace is private.</h1>
         <p>Sign in with your invited account to continue.</p>
-        <a className="button" href="/accounts/login/">
+        <a
+          className="button"
+          href={
+            document.querySelector<HTMLMetaElement>('meta[name="login-url"]')
+              ?.content ?? "/accounts/login/"
+          }
+        >
           Sign in <ArrowRight size={16} />
         </a>
       </div>
@@ -433,7 +439,10 @@ function App() {
             <strong>{session.data.email.split("@")[0]}</strong>
             <small>{titleCase(session.data.role)}</small>
           </div>
-          <form action="/accounts/logout/" method="post">
+          <form
+            action={session.data.logout_url ?? "/accounts/logout/"}
+            method="post"
+          >
             <input
               type="hidden"
               name="csrfmiddlewaretoken"

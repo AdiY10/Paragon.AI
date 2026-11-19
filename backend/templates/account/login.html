@@ -5,4 +5,5 @@
 {% get_providers as providers %}
 {% for provider in providers %}<form method="post" action="{% provider_login_url provider.id %}">{% csrf_token %}<button type="submit">Continue with {{ provider.name }}</button></form>
 {% empty %}<p>Organization sign-in is not configured yet. Contact your administrator.</p>{% endfor %}
+{% if password_access_enabled %}<p><a href="{% url 'password_login' %}">Sign in with your access password</a></p>{% endif %}
 </main></body></html>

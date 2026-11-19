@@ -1,8 +1,8 @@
 # Implementation progress
 
-## Current milestone: M1 — locations, tenants, geography
+## Current priority: regular host, password access, and Site data migration
 
-- PRs #1–#30 merged before the tenant-domain increment. Commits and PRs disclose Codex assistance.
+- PRs #1–#31 merged before the password-access increment. Commits and PRs disclose Codex assistance.
 - Canonical backend: invite-only auth; source registry/artifacts/snapshots/checks; durable jobs, schedules, recovery; versioned locations, public seed, Census previews/acceptance, manual pins, and address-change invalidation.
 - Tenant domain now has explicit review, unknown anchor flags, version conflicts, idempotent creation, archive/history, and retirement on address changes. Seed/API/UI are next; no SEC mappings are guessed.
 - Validation: 217 tests pass against PostgreSQL 17/PostGIS 3.6. Latest published Site has 15 frontend/adapter tests plus real Workers/D1/browser verification. Production backend build/static/private-route smoke and real Census reference flows passed in prior increments.
@@ -16,7 +16,9 @@ The user changed its audience to public. The application still requires ChatGPT 
 
 ## Next
 
-Import only the actual dated tenant listing claims with qualifications; add private roster APIs and a working review UI; publish the corresponding Site adapter. Then implement versioned geography and the real profile data slice. No full Release 1 acceptance is claimed.
+Adi added a higher-priority regular-host/password migration task in AGENT_HANDOFF §0. Password access now passes 230 PostGIS tests and a real browser flow; hosting access/budget and data migration remain. The tenant seed/API work is preserved in Git stash on feat/tenant-seed-and-api. Resume it after the access priority.
+
+Later, import only the actual dated tenant listing claims with qualifications; add private roster APIs and a working review UI; publish the corresponding Site adapter. Then implement versioned geography and the real profile data slice. No full Release 1 acceptance is claimed.
 
 BLOCKER: Hosting credentials and approved resource budget for the full Django/PostGIS backend are not available.
 Impact: Full-backend deployment, source workers, and final production acceptance cannot run yet. The limited temporary Site is available.
