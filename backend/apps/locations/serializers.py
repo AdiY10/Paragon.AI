@@ -16,11 +16,16 @@ class RevisionSerializer(serializers.ModelSerializer):
 
 class LocationSerializer(serializers.ModelSerializer):
     current_revision=RevisionSerializer(read_only=True)
+    attention=serializers.SerializerMethodField()
     class Meta:
         model=Location
         fields=['id','seed_id','name','address','city','state','status','asset_type','ring_preset',
             'gla_sqft','notes','confirmed','confirmed_at','origin','source_url','source_context',
-            'version','analysis_version','current_revision','created_at','updated_at']
+            'version','analysis_version','current_revision','created_at','updated_at','attention']
+    def get_attention(self,obj):
+        # FR-20: highest active signal severity (High, Watch) or Clear.
+        from apps.insights.signals import attention
+        return attention(obj.pk)
 
 class CreateSerializer(StrictInputMixin,serializers.Serializer):
     name=serializers.CharField(max_length=200)

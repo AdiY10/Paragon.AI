@@ -30,6 +30,8 @@ urlpatterns = [
     path('api/locations/<uuid:location_id>/demographics/', demographics.demographics),
     path('api/locations/<uuid:location_id>/area/', area.area),
     path('api/locations/<uuid:location_id>/summary/', insights.location_summary),
+    path('api/signals/', insights.signal_list),
+    path('api/signals/<uuid:signal_id>/review/', insights.signal_review),
     path('api/sources/', source_list),
     path('api/session/', views.session, name='session'),
     path('', views.application, name='application'),
