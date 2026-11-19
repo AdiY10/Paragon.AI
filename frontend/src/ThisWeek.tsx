@@ -17,6 +17,7 @@ export interface BriefItem {
   evidence: Record<string, unknown>;
   flag: "new" | "changed" | "still_active";
   location: { id: string; name: string; city: string; state: string };
+  locations?: { id: string; name: string; city: string; state: string }[];
 }
 export interface Brief {
   id: string;
@@ -142,10 +143,31 @@ function BriefRow({ item }: { item: BriefItem }) {
       <span className={`badge ${severityTone(item.severity)}`}>{item.severity}</span>
       <div>
         <strong>
-          <a href={`#/locations/${item.location.id}`}>{item.location.name}</a>: {item.title}
+          {(item.locations?.length ?? 1) > 1 ? (
+            <>{item.title}</>
+          ) : (
+            <>
+              <a href={`#/locations/${item.location.id}`}>{item.location.name}</a>: {item.title}
+            </>
+          )}
         </strong>
         <small>
-          {item.location.city}, {item.location.state} · {flagLabel(item.flag)} · {item.period}
+          {(item.locations?.length ?? 1) > 1 ? (
+            <>
+              Affects {item.locations!.length} properties:{" "}
+              {item.locations!.map((l, n) => (
+                <span key={l.id}>
+                  {n > 0 && ", "}
+                  <a href={`#/locations/${l.id}`}>{l.name}</a>
+                </span>
+              ))}
+            </>
+          ) : (
+            <>
+              {item.location.city}, {item.location.state}
+            </>
+          )}{" "}
+          · {flagLabel(item.flag)} · {item.period}
         </small>
         <small>{item.why}</small>
         <Evidence item={item} />

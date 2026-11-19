@@ -32,6 +32,8 @@ Out of scope for Release 1: rents, comps, listings, occupancy, financials, foot 
 | 6 | [docs/06_ENGINEERING_AND_OPERATIONS.md](docs/06_ENGINEERING_AND_OPERATIONS.md) | Security, privacy, secrets, jobs, monitoring, performance, deployment, cost |
 | 7 | [docs/07_DELIVERY_AND_VERIFICATION.md](docs/07_DELIVERY_AND_VERIFICATION.md) | Milestones, prerequisites, risks, test plan, "Ready for Adi to test" |
 | 8 | [docs/08_ADI_ACCEPTANCE_CHECKLIST.md](docs/08_ADI_ACCEPTANCE_CHECKLIST.md) | Plain-language checklist for Adi |
+| 10 | [docs/DELIVERY_STATUS.md](docs/DELIVERY_STATUS.md) | What is done, what is waiting on Adi, known limitations |
+| 11 | [docs/TEST_REPORT.md](docs/TEST_REPORT.md) | Test, accessibility, performance and acceptance evidence |
 | 9 | [docs/NEXT_TASKS.md](docs/NEXT_TASKS.md) | Ordered task batch (T1–T11) with acceptance criteria and an agent kickoff prompt |
 
 ## Repository layout

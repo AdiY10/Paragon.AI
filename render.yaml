@@ -1,5 +1,5 @@
-# Initial password-access host only. Do not provision before owner cost approval.
-# Full background ingestion/backup topology remains a separate milestone.
+# Password-access host with web, job worker and scheduler in one container.
+# Do not provision before owner cost approval (see docs/DEPLOYMENT.md, Release 1 runbook).
 services:
   - type: web
     name: paragon-radar
@@ -9,6 +9,8 @@ services:
     branch: main
     autoDeployTrigger: 'off'
     healthCheckPath: /health/
+    # Web + background job worker + scheduler in one container (the private disk attaches to one service).
+    dockerCommand: python infra/start_all.py
     disk:
       name: paragon-private-evidence
       mountPath: /app/var/artifacts
@@ -38,6 +40,14 @@ services:
         value: '1'
       - key: TRUST_PROXY_SSL_HEADER
         value: 'true'
+      - key: RUN_BACKGROUND_WORKERS
+        value: 'true'
+      - key: OVERTURE_MEMORY_LIMIT
+        value: 256MB
+      - key: SEC_USER_AGENT
+        sync: false
+      - key: BLS_API_KEY
+        sync: false
 
 databases:
   - name: paragon-radar-db
