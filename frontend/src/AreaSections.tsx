@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Briefcase, Car, RefreshCw, ShieldAlert } from "lucide-react";
+import { Briefcase, Car, RefreshCw, ShieldAlert, Store } from "lucide-react";
 import { api, dateLabel } from "./api";
 import type { Location } from "./types";
 import { reasonText } from "./demographics";
@@ -13,7 +13,11 @@ import {
   pct,
   signedPct,
   signedPts,
+  miles,
+  placeName,
+  releaseLabel,
   type Area,
+  type Businesses,
   type Economy,
   type Hazards,
   type Section,
@@ -66,8 +70,8 @@ export default function AreaSections({ location }: { location: Location }) {
         {computing
           ? "Checking federal sources… this usually takes under a minute."
           : stale
-            ? "The pin moved. Re-check economy, traffic and hazards for the new location."
-            : "Economy, traffic and hazards have not been checked for this location yet."}
+            ? "The pin moved. Re-check area data for the new location."
+            : "Economy, traffic, hazards and nearby businesses have not been checked for this location yet."}
       </p>
       {timedOut && (
         <p className="notice error" role="alert">
@@ -81,7 +85,7 @@ export default function AreaSections({ location }: { location: Location }) {
       )}
       {!computing && (
         <button className="button small-button" onClick={() => compute.mutate()}>
-          <RefreshCw size={15} /> Check economy, traffic and hazards
+          <RefreshCw size={15} /> Check area data
         </button>
       )}
     </div>
@@ -95,6 +99,7 @@ export default function AreaSections({ location }: { location: Location }) {
         <TrafficPanel section={sections.traffic} />
         <HazardsPanel section={sections.hazards} />
       </div>
+      <BusinessesPanel section={sections.businesses} />
     </>
   );
 }
@@ -331,4 +336,136 @@ function HazardsPanel({ section }: { section: Section<Hazards> }) {
       )}
     </Panel>
   );
+}
+
+function BusinessesPanel({ section }: { section: Section<Businesses> }) {
+  const d = section.data;
+  return (
+    <Panel eyebrow="RETAIL LANDSCAPE" title="Nearby businesses" icon={<Store size={22} />} section={section}>
+      {d && d.counts && (
+        <>
+          <p className="trade-meta">
+            <span className="badge">Map data</span>
+            <span>
+              Overture Maps, {releaseLabel(d.release)} release. Listings may be incomplete; changes are
+              possible, not confirmed.
+            </span>
+          </p>
+          <div className="area-stats three">
+            <Stat
+              label="Retail and service businesses"
+              value={count(d.retail_and_services_total["1mi"])}
+              detail="within 1 mile"
+              note={`${count(d.retail_and_services_total["3mi"])} within 3 miles`}
+            />
+            <Stat
+              label="Nearest supermarket chain"
+              value={d.nearest_supermarket ? miles(d.nearest_supermarket.distance_mi) : "None within 3 mi"}
+              detail={d.nearest_supermarket ? placeName(d.nearest_supermarket) : "From a list of known chains"}
+            />
+            <Stat
+              label="Marked closed within 1 mile"
+              value={count(d.closed_within_1mi)}
+              detail="Places Overture lists as permanently closed"
+            />
+          </div>
+          <Changes d={d} />
+          <div className="business-columns">
+            <div>
+              <h3>Mix within 1 mile</h3>
+              <Bars counts={d.counts["1mi"]} />
+            </div>
+            <div>
+              <h3>Anchors and national chains nearby</h3>
+              {d.anchors.length === 0 ? (
+                <p className="muted small">No listed anchor brands within 3 miles.</p>
+              ) : (
+                <ul className="anchor-list">
+                  {d.anchors.slice(0, 12).map((a) => (
+                    <li key={a.id}>
+                      <span>{placeName(a)}</span>
+                      <small>{miles(a.distance_mi)}</small>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function Changes({ d }: { d: Businesses }) {
+  const c = d.changes;
+  if (c.reason === "NOT_ENOUGH_DATA" || !d.prior_release)
+    return <p className="small muted">Changes appear once two monthly releases are stored for this pin.</p>;
+  const tone = (s?: string) => (s === "High" ? "red" : s === "Watch" ? "amber" : "neutral");
+  return (
+    <div className="business-changes">
+      <h3>
+        Changes since {releaseLabel(d.prior_release)}
+        <small>
+          {" "}
+          · {plural(c.total_closures ?? c.closures.length, "possible closure")} ·{" "}
+          {plural(c.total_openings ?? c.openings.length, "new key business", "new key businesses")}
+        </small>
+      </h3>
+      {c.broad_data_change && (
+        <p className="notice">
+          Overture changed broadly across many properties this release, so these changes are shown as FYI only.
+        </p>
+      )}
+      {c.closures.length === 0 && c.openings.length === 0 ? (
+        <p className="small muted">No changes to anchors or national chains nearby.</p>
+      ) : (
+        <ul className="change-list">
+          {c.closures.slice(0, 8).map((p) => (
+            <li key={p.id}>
+              <span className={`badge ${tone(p.severity)}`}>{p.severity}</span>
+              <div>
+                <strong>Possible closure: {placeName(p)}</strong>
+                <small>
+                  {miles(p.distance_mi)} · {p.evidence}
+                  {p.tenant_match ? " · matches a tenant at this property" : ""} · verify before acting
+                </small>
+              </div>
+            </li>
+          ))}
+          {c.openings.slice(0, 5).map((p) => (
+            <li key={p.id}>
+              <span className="badge">FYI</span>
+              <div>
+                <strong>New in map data: {placeName(p)}</strong>
+                <small>{miles(p.distance_mi)} · may be a new opening or a data addition</small>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Bars({ counts }: { counts: Record<string, number> }) {
+  const entries = Object.entries(counts);
+  const max = Math.max(1, ...entries.map(([, n]) => n));
+  return (
+    <ul className="bars" aria-label="Businesses within 1 mile by group">
+      {entries.map(([group, n]) => (
+        <li key={group}>
+          <span>{group}</span>
+          <span className="bar" aria-hidden="true">
+            <span style={{ width: `${(n / max) * 100}%` }} />
+          </span>
+          <strong>{count(n)}</strong>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function plural(n: number, one: string, many = one + "s") {
+  return `${n} ${n === 1 ? one : many}`;
 }
