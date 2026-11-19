@@ -2076,3 +2076,95 @@ th {
   display: inline-flex;
   gap: 6px;
 }
+
+/* Screen and Compare */
+.screen-form {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr auto;
+  gap: 12px;
+  align-items: end;
+}
+.screen-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.screen-form input {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+}
+.screen-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.compare-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfaf5;
+  font-size: 13px;
+}
+.chip button {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+}
+.compare-table thead th small {
+  display: block;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.compare-table thead th a {
+  text-decoration: underline;
+}
+.compare-table .group-row {
+  padding-top: 18px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #65775c;
+}
+.compare-table td.best strong {
+  color: #2f6a3a;
+}
+.compare-table td.best {
+  background: #f1f6ee;
+}
+.compare-table td.worst strong {
+  color: #8b3a26;
+}
+.compare-table td.worst {
+  background: #fbf1ec;
+}
+@media (max-width: 900px) {
+  .screen-form {
+    grid-template-columns: 1fr;
+  }
+  .screen-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .compare-table {
+    min-width: 640px;
+  }
+}
+@media print {
+  .sidebar, .topbar, .compare-picker, .button, nav {
+    display: none !important;
+  }
+}

@@ -29,7 +29,7 @@ import {
 const POLL_MS = 4000;
 const POLL_LIMIT_MS = 240_000;
 
-export default function AreaSections({ location }: { location: Location }) {
+export default function AreaSections({ location, autoStart = false }: { location: Location; autoStart?: boolean }) {
   const [pollingSince, setPollingSince] = useState<number | null>(null);
   const query = useQuery({
     queryKey: ["area", location.id, location.analysis_version],
@@ -54,6 +54,11 @@ export default function AreaSections({ location }: { location: Location }) {
     if (allDone || timedOut) setPollingSince(null);
   }, [allDone, timedOut]);
 
+  const missing = !!sections && Object.values(sections).some((s) => s.status === "not_computed" && s.reason === "NOT_COMPUTED");
+  useEffect(() => {
+    if (autoStart && query.data?.placed && missing && pollingSince === null && !compute.isPending) compute.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, missing, query.data?.placed]);
   if (query.error)
     return (
       <p className="notice error" role="alert">

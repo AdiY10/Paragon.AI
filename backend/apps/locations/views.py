@@ -32,6 +32,7 @@ def locations(request):
 
 def listed_locations(request,filters):
     queryset=Location.objects.select_related('current_revision')
+    if filters.get('screening')!='include':queryset=queryset.filter(screening=False)
     status=filters.get('status')
     if status is None:queryset=queryset.exclude(status='archived')
     elif status!='all':

@@ -43,6 +43,7 @@ import TradeArea from "./TradeArea";
 import AreaSections from "./AreaSections";
 import SummaryPanel from "./Summary";
 import ThisWeek from "./ThisWeek";
+import { ComparePage, CompareButton, ScreenBanner, ScreenPage } from "./Acquisitions";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -345,46 +346,14 @@ function App() {
   else if (route === "/screen")
     body = (
       <>
-        <PageHead
-          eyebrow="Acquisitions"
-          title="A place to start."
-          description="Save an address for review and keep your candidates together."
-          action={<AddLocation />}
-        />
-        <section className="panel">
-          <Empty title="Trade-area screening unavailable">
-            Demographic and hazard checks have not completed. You can save a
-            candidate record without assigning it a score or estimated metrics.
-          </Empty>
-        </section>
+        <ScreenPage />
         <Portfolio
-          locations={(portfolio.data ?? []).filter(
-            (item) => item.status === "candidate",
-          )}
+          locations={(portfolio.data ?? []).filter((item) => item.status === "candidate")}
           candidates
         />
       </>
     );
-  else if (route === "/compare")
-    body = (
-      <>
-        <PageHead
-          eyebrow="Acquisitions"
-          title="Compare with confidence."
-          description="A consistent view of the evidence behind each location."
-        />
-        <section className="panel">
-          <Empty title="Comparable metrics are not ready">
-            Location records are available in your portfolio. Side-by-side area
-            comparisons will be available when the required source checks are
-            complete.
-          </Empty>
-        </section>
-        <a className="button secondary" href="#/portfolio">
-          Review locations <ArrowRight size={16} />
-        </a>
-      </>
-    );
+  else if (route === "/compare") body = <ComparePage />;
   else if (route === "/admin")
     body =
       session.data.role === "admin" ? (
@@ -953,6 +922,7 @@ function LocationPage({ id }: { id: string }) {
                   ? "Ownership unconfirmed"
                   : "Record unconfirmed"}
             </Badge>
+            <CompareButton id={item.id} />
             <EditLocation location={item} />
           </div>
         }
@@ -963,6 +933,7 @@ function LocationPage({ id }: { id: string }) {
         </p>
       )}
       {confirm.error && <ErrorNotice error={confirm.error} />}
+      <ScreenBanner location={item} />
       <SummaryPanel location={item} />
       <div className="location-columns">
         <section className="panel">
@@ -1040,8 +1011,8 @@ function LocationPage({ id }: { id: string }) {
           </p>
         </section>
       </div>
-      <TradeArea location={item} />
-      <AreaSections location={item} />
+      <TradeArea location={item} autoStart={item.screening} />
+      <AreaSections location={item} autoStart={item.screening} />
       {item.notes && (
         <section className="panel notes">
           <h2>Team notes</h2>
