@@ -44,6 +44,7 @@ import AreaSections from "./AreaSections";
 import SummaryPanel from "./Summary";
 import ThisWeek from "./ThisWeek";
 import { ComparePage, CompareButton, ScreenBanner, ScreenPage } from "./Acquisitions";
+import TenantsPanel from "./Tenants";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -881,6 +882,7 @@ function Portfolio({
   );
 }
 function LocationPage({ id }: { id: string }) {
+  const session = useQuery({ queryKey: ["session"], queryFn: () => api<Session>("/api/session/") });
   const query = useQuery({
     queryKey: ["location", id],
     staleTime: 0,
@@ -1013,6 +1015,7 @@ function LocationPage({ id }: { id: string }) {
       </div>
       <TradeArea location={item} autoStart={item.screening} />
       <AreaSections location={item} autoStart={item.screening} />
+      <TenantsPanel location={item} isAdmin={session.data?.role === "admin"} />
       {item.notes && (
         <section className="panel notes">
           <h2>Team notes</h2>
