@@ -125,6 +125,22 @@ export interface Businesses {
     reason: string | null;
   };
 }
+export interface RingJobs {
+  radius_miles: number;
+  total: number;
+  retail: number;
+  food_service: number;
+  workplace_blocks: number;
+  prior_total: number | null;
+  change_pct: number | null;
+  change_reason: string | null;
+}
+export interface Jobs {
+  year: number;
+  prior_year: number | null;
+  rings: RingJobs[];
+  note: string;
+}
 export interface Area {
   placed: boolean;
   sections: {
@@ -132,6 +148,7 @@ export interface Area {
     traffic: Section<Traffic>;
     hazards: Section<Hazards>;
     businesses: Section<Businesses>;
+    jobs: Section<Jobs>;
   };
 }
 

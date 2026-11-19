@@ -323,3 +323,73 @@ def test_businesses_unavailable_when_capture_fails(tmp_path, client, settings):
         raise SourceError('SOURCE_ERROR', 'S3 unreachable')
     row = compute_area(location.pk, sections=('businesses',), opener=ListingOpener('kingston'), capturer=broken)[0]
     assert row.status == 'unavailable' and row.data == {'reason': 'SOURCE_ERROR'}
+
+
+# ---- jobs located in each ring (LODES) ---------------------------------------------
+
+from apps.area import jobs as lodes
+
+NORWALK = (41.126611, -73.388299)
+GEO_FIX = Path('tests/fixtures/real/ring_demographics/norwalk_444_westport_5mi.geography.json')
+
+
+def norwalk_blocks():
+    from apps.demographics import geography
+    capture = geography.GeographyCapture.from_payload(GEO_FIX.read_bytes(), datetime.now(timezone.utc))
+    return geography.parse_geography(capture)[0]
+
+
+def test_real_lodes_ring_jobs_norwalk():
+    wac = lodes.parse_wac(raw('ct_wac_S000_JT00_2024.norwalk5mi.csv.gz'))
+    prior = lodes.parse_wac(raw('ct_wac_S000_JT00_2023.norwalk5mi.csv.gz'))
+    blocks = norwalk_blocks()
+    now, before = lodes.ring_jobs(blocks, wac, NORWALK, (1, 3, 5)), lodes.ring_jobs(blocks, prior, NORWALK, (1, 3, 5))
+    # Verified 2026-11-19 against the live files: 5,453 / 45,424 / 68,013 jobs in 2024.
+    assert [now[r]['total'] for r in (1, 3, 5)] == [5453, 45424, 68013]
+    assert now[3]['retail'] == 5729 and now[3]['food_service'] == 4021
+    trend = lodes.with_trend(now[3], before[3])
+    assert trend['prior_total'] == 44253 and trend['change_pct'] == pytest.approx(0.0265, abs=1e-3)
+
+
+def test_jobs_trend_needs_one_thousand_jobs_and_bad_files_fail_closed():
+    small = {'total': 900, 'retail': 1, 'food_service': 1, 'workplace_blocks': 3}
+    assert lodes.with_trend(small, {**small, 'total': 950})['change_reason'] == 'NOT_ENOUGH_DATA'
+    assert lodes.with_trend(small, None)['change_pct'] is None
+    with pytest.raises(SourceError):
+        lodes.parse_wac(b'not gzip')
+    import gzip as gz
+    with pytest.raises(SourceError):
+        lodes.parse_wac(gz.compress(b'w_geocode,C000\n123,4\n'))
+
+
+class LodesOpener(FixtureOpener):
+    def open(self, request, timeout=None):
+        url = request.full_url
+        if 'lehd.ces.census.gov' in url:
+            self.calls.append(request.get_method() + ' ' + url)
+            year = url.rsplit('_', 1)[1][:4]
+            path = FIX / f'ct_wac_S000_JT00_{year}.norwalk5mi.csv.gz'
+            if not path.exists():
+                raise HTTPError(url, 404, 'Not Found', Message(), None)
+            return Response(b'' if request.get_method() == 'HEAD' else path.read_bytes())
+        return super().open(request, timeout)
+
+
+@pytest.mark.django_db
+def test_jobs_section_reuses_ring_geography_and_lodes_snapshots(tmp_path, client, settings):
+    from apps.area.service import compute_area
+    from apps.demographics import geography
+    from apps.sources.storage import LocalArtifactStore
+    location = setup(tmp_path, client, *NORWALK, settings)
+    store = LocalArtifactStore(tmp_path / 'artifacts')
+    geography.publish_capture(geography.GeographyCapture.from_payload(GEO_FIX.read_bytes(),
+        datetime(2026, 11, 19, tzinfo=timezone.utc)), store)
+    opener = LodesOpener('norwalk')
+    row = compute_area(location.pk, sections=('jobs',), opener=opener, store=store)[0]
+    assert row.status == 'available' and row.data['year'] == 2024 and row.data['prior_year'] == 2023
+    assert [r['total'] for r in row.data['rings']] == [5453, 45424, 68013]
+    assert {s['id'] for s in row.sources} == {'SRC-04', 'SRC-05'}
+    assert sum(1 for c in opener.calls if c.startswith('GET') and 'lehd' in c) == 2   # 2024 and 2023
+    again = LodesOpener('norwalk')
+    compute_area(location.pk, sections=('jobs',), opener=again, store=store)
+    assert not any(c.startswith('GET') for c in again.calls if 'lehd' in c)  # year checks only, no re-downloads

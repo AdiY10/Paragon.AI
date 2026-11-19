@@ -8,7 +8,7 @@ class AreaSection(models.Model):
 
     Valid while ``analysis_version`` matches the location; recomputation adds a row.
     """
-    SECTIONS = [('economy', 'Economy'), ('traffic', 'Traffic'), ('hazards', 'Hazards'), ('businesses', 'Businesses')]
+    SECTIONS = [('economy', 'Economy'), ('traffic', 'Traffic'), ('hazards', 'Hazards'), ('businesses', 'Businesses'), ('jobs', 'Jobs')]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     location = models.ForeignKey('locations.Location', on_delete=models.PROTECT, related_name='area_sections')
     revision = models.ForeignKey('locations.LocationRevision', on_delete=models.PROTECT, related_name='+')
