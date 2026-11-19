@@ -5,6 +5,7 @@ from apps.accounts import password_access
 from apps.sources.views import source_list
 from apps.operations import views as operations
 from apps.locations import views as locations
+from apps.demographics import views as demographics
 
 urlpatterns = [
     path('health/', views.health, name='health'),
@@ -24,6 +25,7 @@ urlpatterns = [
     path('api/locations/<uuid:location_id>/pin/', locations.pin),
     path('api/locations/<uuid:location_id>/confirm/', locations.confirm),
     path('api/locations/<uuid:location_id>/history/', locations.history),
+    path('api/locations/<uuid:location_id>/demographics/', demographics.demographics),
     path('api/sources/', source_list),
     path('api/session/', views.session, name='session'),
     path('', views.application, name='application'),
