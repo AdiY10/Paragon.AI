@@ -22,6 +22,10 @@ BASE = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb'
 BLOCKS_URL = f'{BASE}/tigerWMS_Census2020/MapServer/10/query'
 BG2020_URL = f'{BASE}/tigerWMS_Census2020/MapServer/8/query'
 ACS_BG_URL = f'{BASE}/tigerWMS_ACS{{year}}/MapServer/10/query'
+# 2010 blocks and block groups: the geography of the ACS 2015-2019 trend baseline.
+BLOCKS_2010_URL = f'{BASE}/tigerWMS_Census2010/MapServer/18/query'
+BG2010_URL = f'{BASE}/tigerWMS_Census2010/MapServer/16/query'
+DECENNIAL = {2020: (BLOCKS_URL, BG2020_URL), 2010: (BLOCKS_2010_URL, BG2010_URL)}
 MAX_BYTES = 64 * 1024 * 1024
 PAGE = 50_000
 # Blocks are selected by intersection; internal points can sit slightly outside
@@ -76,36 +80,41 @@ class GeographyCapture:
     bg_totals: list
     acs_block_groups: list
     retrieved_at: datetime
+    decennial: int = 2020
 
     def payload(self):
         return json.dumps({'lat': self.lat, 'lon': self.lon, 'radius_miles': self.radius_miles,
             'acs_year': self.acs_year, 'blocks': self.blocks, 'bg_totals': self.bg_totals,
-            'acs_block_groups': self.acs_block_groups}, sort_keys=True, separators=(',', ':')).encode()
+            'acs_block_groups': self.acs_block_groups, 'decennial': self.decennial}, sort_keys=True, separators=(',', ':')).encode()
 
     @classmethod
     def from_payload(cls, raw, retrieved_at):
         d = json.loads(raw)
         return cls(d['lat'], d['lon'], d['radius_miles'], d['acs_year'], d['blocks'],
-            d['bg_totals'], d['acs_block_groups'], retrieved_at)
+            d['bg_totals'], d['acs_block_groups'], retrieved_at, d.get('decennial', 2020))
 
 
-def fetch_geography(lat, lon, radius_miles, *, acs_year, opener=None, timeout=60):
+def fetch_geography(lat, lon, radius_miles, *, acs_year, decennial=2020, opener=None, timeout=60):
+    if decennial not in DECENNIAL:
+        raise GeographyError('Unsupported decennial geography')
+    blocks_url, bg_url = DECENNIAL[decennial]
     if not (math.isfinite(lat) and math.isfinite(lon) and abs(lat) <= 90 and abs(lon) <= 180):
         raise GeographyError('Invalid pin')
     search = radius_miles + SEARCH_MARGIN_MILES
-    blocks = _paged(BLOCKS_URL, {**_near(lat, lon, search),
+    blocks = _paged(blocks_url, {**_near(lat, lon, search),
         'outFields': 'GEOID,POP100,AREALAND,INTPTLAT,INTPTLON'}, opener, timeout)
     bgs = sorted({b['GEOID'][:12] for b in blocks})
     totals = []
     for i in range(0, len(bgs), 200):
         chunk = bgs[i:i + 200]
         where = 'GEOID IN (' + ','.join(f"'{g}'" for g in chunk) + ')'
-        totals.extend(_paged(BG2020_URL, {'where': where, 'outFields': 'GEOID,POP100,AREALAND',
+        totals.extend(_paged(bg_url, {'where': where, 'outFields': 'GEOID,POP100,AREALAND',
             'returnGeometry': 'false', 'f': 'json'}, opener, timeout))
-    acs_bgs = _paged(ACS_BG_URL.format(year=acs_year), {**_near(lat, lon, search),
-        'outFields': 'GEOID'}, opener, timeout)
+    # ACS 2015-2019 uses 2010 block groups unchanged, so no code mapping is needed.
+    acs_bgs = [] if decennial == 2010 else _paged(ACS_BG_URL.format(year=acs_year),
+        {**_near(lat, lon, search), 'outFields': 'GEOID'}, opener, timeout)
     return GeographyCapture(lat, lon, radius_miles, acs_year, blocks, totals, acs_bgs,
-        datetime.now(timezone.utc))
+        datetime.now(timezone.utc), decennial)
 
 
 def parse_geography(capture):
@@ -126,6 +135,8 @@ def parse_geography(capture):
     missing = {b.block_group for b in blocks} - set(totals)
     if missing:
         raise GeographyError(f'Missing 2020 block-group totals for {len(missing)} block groups')
+    if capture.decennial == 2010:
+        return blocks, totals, {bg: bg for bg in {b.block_group for b in blocks}}, set()
     acs = {a['GEOID'] for a in capture.acs_block_groups}
     by_suffix = {}
     for geoid in acs:
@@ -143,20 +154,21 @@ def parse_geography(capture):
     return blocks, totals, mapping, unresolved
 
 
-def scope_for(lat, lon, radius_miles):
-    return f'blocks2020:{lat:.6f},{lon:.6f}:r{radius_miles:g}'
+def scope_for(lat, lon, radius_miles, decennial=2020):
+    return f'blocks{decennial}:{lat:.6f},{lon:.6f}:r{radius_miles:g}'
 
 
 def publish_capture(capture, store):
     payload = capture.payload()
-    return publish_snapshot(source_id='SRC-04', scope=scope_for(capture.lat, capture.lon, capture.radius_miles),
-        release=f'Census2020+ACS{capture.acs_year}', data_period='2020 Census blocks',
-        source_url=BLOCKS_URL, adapter_version=ADAPTER_VERSION, stream=io.BytesIO(payload),
+    return publish_snapshot(source_id='SRC-04',
+        scope=scope_for(capture.lat, capture.lon, capture.radius_miles, capture.decennial),
+        release=f'Census{capture.decennial}+ACS{capture.acs_year}', data_period=f'{capture.decennial} Census blocks',
+        source_url=DECENNIAL[capture.decennial][0], adapter_version=ADAPTER_VERSION, stream=io.BytesIO(payload),
         store=store, retrieved_at=capture.retrieved_at,
         validation=ValidationReport(True, True, {'fields': ['GEOID', 'POP100', 'AREALAND', 'INTPTLAT', 'INTPTLON']},
             len(capture.blocks)),
         context={'lat': capture.lat, 'lon': capture.lon, 'radius_miles': capture.radius_miles,
-            'acs_year': capture.acs_year})
+            'acs_year': capture.acs_year, 'decennial': capture.decennial})
 
 
 def load_capture(snapshot, store):

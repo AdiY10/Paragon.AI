@@ -206,7 +206,7 @@ def placed(tmp_path, client):
     return setup_location(tmp_path, client, with_acs=True)
 
 
-def setup_location(tmp_path, client, *, with_acs):
+def setup_location(tmp_path, client, *, with_acs, with_baseline=False):
     from apps.sources.catalog import sync_catalog
     from apps.sources.storage import LocalArtifactStore
     from apps.locations.service import change_pin
@@ -225,6 +225,16 @@ def setup_location(tmp_path, client, *, with_acs):
         (FIX / 'norwalk_444_westport_5mi.geography.json').read_bytes(), datetime(2026, 11, 19, tzinfo=timezone.utc))
     geography.publish_capture(capture, store)
     rows = json.loads((FIX / 'norwalk_acs2024_rows.json').read_text())['rows']
+    if with_baseline:
+        from apps.demographics import cpi
+        base_capture = geography.GeographyCapture.from_payload(
+            (FIX / 'norwalk_444_westport_5mi.geography2010.json').read_bytes(), datetime(2026, 11, 19, tzinfo=timezone.utc))
+        geography.publish_capture(base_capture, store)
+        legacy = legacy_extract()
+        acs.publish_extract(acs.AcsExtract(2019, '09', legacy.rows, (acs.LEGACY_BASE + 'Connecticut_Tracts_Block_Groups_Only.zip',),
+            datetime(2026, 11, 19, tzinfo=timezone.utc)), store)
+        values = cpi.parse((FIX / 'bls_cpi_u_2019_2024.json').read_bytes(), (2019, 2024))
+        cpi.publish(values, datetime(2026, 11, 19, tzinfo=timezone.utc), store)
     if with_acs:
       acs.publish_extract(acs.AcsExtract(2024, '09', rows, (acs.BASE_URL.format(year=2024, table='b01003'),),
         datetime(2026, 11, 19, tzinfo=timezone.utc)), store)
@@ -292,3 +302,110 @@ def test_unplaced_and_anonymous_requests(client, placed):
     location, *_ = placed
     client.logout()
     assert client.get(f'/api/locations/{location.pk}/demographics/').status_code == 403
+
+
+# ---- 2015-2019 baseline and trends -------------------------------------------
+
+LEGACY = FIX / 'acs2019_ct'
+
+
+def legacy_extract():
+    geo = (LEGACY / 'g20195ct.csv').read_text(encoding='latin-1')
+    seqs = {seq: tuple((LEGACY / f'{k}20195ct{seq}000.txt').read_text(encoding='latin-1') for k in 'em')
+        for seq in {v[0] for v in acs.LEGACY_LAYOUT.values()}}
+    return acs.parse_legacy('09', geo, seqs)
+
+
+def test_legacy_layout_matches_official_lookup():
+    acs.check_legacy_layout(open(FIX / 'ACS_5yr_Seq_Table_Number_Lookup.2019.slice.txt', encoding='latin-1'))
+    import copy
+    saved = copy.deepcopy(acs.LEGACY_LAYOUT)
+    try:
+        acs.LEGACY_LAYOUT['B19025'] = ('0058', 196, 1)
+        with pytest.raises(acs.AcsError):
+            acs.check_legacy_layout(open(FIX / 'ACS_5yr_Seq_Table_Number_Lookup.2019.slice.txt', encoding='latin-1'))
+    finally:
+        acs.LEGACY_LAYOUT.clear(); acs.LEGACY_LAYOUT.update(saved)
+
+
+def test_legacy_sequence_files_parse_real_connecticut_block_groups():
+    ex = legacy_extract()
+    row = ex.rows['090010435001']
+    assert ex.year == 2019 and len(ex.rows) == 124
+    assert (row['B01003_001_E'], row['B01003_001_M']) == (645, 159)
+    assert row['B11001_001_E'] == 286 and row['B19025_001_E'] == 27_918_400
+    assert all(k in row for k in ('B19001_017_E', 'B15003_025_M'))
+
+
+def test_legacy_parser_rejects_malformed_sequences():
+    geo = (LEGACY / 'g20195ct.csv').read_text(encoding='latin-1')
+    seqs = {seq: ('ACSSF,2019e5,ct,000,9999,0000001,1', '') for seq in {v[0] for v in acs.LEGACY_LAYOUT.values()}}
+    with pytest.raises(acs.AcsError):
+        acs.parse_legacy('09', geo, seqs)
+    with pytest.raises(acs.AcsError):
+        acs.parse_legacy('09', 'ACSSF,CT,040,00,0000001', {})
+
+
+def test_cpi_parses_real_bls_annual_averages():
+    from apps.demographics import cpi
+    values = cpi.parse((FIX / 'bls_cpi_u_2019_2024.json').read_bytes(), (2019, 2024))
+    assert values == {'2019': 255.657, '2024': 313.689}
+    with pytest.raises(cpi.CpiError):
+        cpi.parse((FIX / 'bls_cpi_u_2019_2024.json').read_bytes(), (2018, 2024))
+
+
+def test_trend_significance_scaling_and_guards():
+    from apps.demographics.trends import trend
+    cur = {'value': 110.0, 'moe': 5.0, 'reliability': 'high'}
+    base = {'value': 100.0, 'moe': 5.0, 'reliability': 'high'}
+    t = trend('MET-06', cur, base, period='p')
+    assert t['value'] == pytest.approx(0.10) and t['difference_moe'] == pytest.approx(math.sqrt(50), abs=1e-3)
+    assert t['z'] == pytest.approx(10 / (math.sqrt(50) / 1.645), abs=1e-3) and t['significant'] is True
+    scaled = trend('MET-07', cur, base, scale=1.1, period='p')
+    assert scaled['value'] == pytest.approx(0) and scaled['significant'] is False
+    assert trend('MET-06', {**cur, 'reliability': 'very_low'}, base, period='p')['significant'] is False
+    assert trend('MET-06', {**cur, 'moe': None}, base, period='p')['significant'] is None
+    assert trend('MET-06', cur, {'value': 0, 'moe': 1}, period='p')['reason'] == 'NOT_ENOUGH_DATA'
+    assert trend('MET-06', {'value': None, 'reason': 'SUPPRESSED'}, base, period='p')['reason'] == 'SUPPRESSED'
+
+
+def test_norwalk_real_trend_reference():
+    from apps.demographics.trends import ring_trends
+    cur_cap = geography.GeographyCapture.from_payload(
+        (FIX / 'norwalk_444_westport_5mi.geography.json').read_bytes(), datetime.now(timezone.utc))
+    base_cap = geography.GeographyCapture.from_payload(
+        (FIX / 'norwalk_444_westport_5mi.geography2010.json').read_bytes(), datetime.now(timezone.utc))
+    rows = json.loads((FIX / 'norwalk_acs2024_rows.json').read_text())['rows']
+    cur = compute_rings(NORWALK, (1, 3, 5), *geography.parse_geography(cur_cap), rows)
+    base = compute_rings(NORWALK, (1, 3, 5), *geography.parse_geography(base_cap), legacy_extract().rows)
+    three = ring_trends(cur[1], base[1], 313.689 / 255.657, 'CPI-U')
+    # Verified 2026-11-19: 79,937 -> 85,544 (+7.0%, z≈2.04, significant at 90%).
+    assert base[1]['metrics']['population']['value'] == pytest.approx(79_937, rel=0.001)
+    assert three['population_change']['value'] == pytest.approx(0.070, abs=0.002)
+    assert three['population_change']['significant'] is True
+    assert three['real_mean_income_change']['significant'] is False
+
+
+@pytest.mark.django_db
+def test_service_stores_trends_with_baseline_provenance(tmp_path, client):
+    from apps.demographics.service import compute_for_location
+    location, store, _ = setup_location(tmp_path, client, with_acs=True, with_baseline=True)
+    result = compute_for_location(location.pk, store=store, opener=Offline())
+    assert result.baseline['acs_year'] == 2019 and result.baseline['cpi_ratio'] == pytest.approx(1.22699, abs=1e-4)
+    three = result.rings[1]
+    assert three['trends']['population_change']['significant'] is True
+    assert three['baseline']['acs_period'] == 'ACS 2015–2019 5-year'
+    body = client.get(f'/api/locations/{location.pk}/demographics/').json()
+    assert body['trend_baseline']['acs_year'] == 2019
+
+
+@pytest.mark.django_db
+def test_missing_baseline_keeps_current_metrics_and_explains_trends(placed):
+    from apps.demographics.service import compute_for_location
+    location, store, _ = placed
+    result = compute_for_location(location.pk, store=store, opener=Offline())
+    ring = result.rings[0]
+    assert ring['metrics']['population']['value'] > 0
+    assert ring['trends']['population_change']['value'] is None
+    assert ring['trends']['population_change']['reason'] == 'SOURCE_ERROR'
+    assert result.baseline == {}

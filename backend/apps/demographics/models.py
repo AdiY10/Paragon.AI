@@ -18,13 +18,16 @@ class RingDemographics(models.Model):
     data_period = models.CharField(max_length=64)
     geography_snapshot = models.ForeignKey('sources.SourceSnapshot', on_delete=models.PROTECT, related_name='+')
     acs_snapshot_ids = models.JSONField()
+    # Trend baseline inputs (ACS 2015-2019 on 2010 geography, CPI); empty when unavailable.
+    baseline = models.JSONField(default=dict)
+    inputs_sha256 = models.CharField(max_length=64)
     rings = models.JSONField()
     computed_at = models.DateTimeField(auto_now_add=True)
     objects = ImmutableQuerySet.as_manager()
 
     class Meta:
         ordering = ['-computed_at', 'id']
-        constraints = [models.UniqueConstraint(fields=['location', 'analysis_version', 'acs_year', 'geography_snapshot'],
+        constraints = [models.UniqueConstraint(fields=['location', 'analysis_version', 'acs_year', 'inputs_sha256'],
             name='ring_demographics_unique')]
 
     def save(self, *args, **kwargs):

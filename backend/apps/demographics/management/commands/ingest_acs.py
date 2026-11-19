@@ -18,7 +18,8 @@ NEIGHBOURS = {'CT':['NY','MA','RI'],'NY':['CT','NJ','PA','MA','VT'],'NJ':['NY','
 
 
 class Command(BaseCommand):
-    help = 'Ingest ACS 5-year block-group tables (keyless bulk files) for the given or portfolio states.'
+    help = ('Ingest ACS 5-year block-group tables (keyless bulk files) for the given or portfolio states. '
+            'Use --year 2024 for current values and --year 2019 for the trend baseline.')
 
     def add_arguments(self, parser):
         parser.add_argument('--states', help='Comma-separated postal codes; default: states of non-archived locations plus neighbours')

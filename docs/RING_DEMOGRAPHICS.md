@@ -1,4 +1,4 @@
-# Ring demographics (FR-09, MET-01 to MET-05)
+# Ring demographics and trends (FR-09, MET-01 to MET-07)
 
 Backend implementation of the trade-area ring demographics defined in `docs/04` §3.3 and §4.
 
@@ -19,9 +19,18 @@ Every value carries a 90% MOE (where computable), a reliability class (CV-based,
 
 **Connecticut:** 2020 blocks use legacy county codes; ACS 2022+ uses planning regions. Block groups are matched by tract and block-group number among ACS block groups intersecting the same search area. Any weighted block group that cannot be matched unambiguously withholds the ring with `GEOGRAPHY_CHANGED`.
 
+## Trends (MET-06, MET-07)
+Each ring also carries, when the baseline is available:
+- **Population change** (MET-06): ACS 2015–2019 → 2020–2024.
+- **Real mean household income change** (MET-07): the 2015–19 value and its MOE are scaled by CPI-U annual averages (2024: 313.689 / 2019: 255.657 = 1.2270, BLS series CUUR0000SA0) before comparing.
+
+Each vintage is apportioned with its own geography: 2010 blocks for 2015–19, 2020 blocks for 2020–24. Significance follows `docs/04` §4.1: `Z = |Δ| / sqrt(SE₁² + SE₂²)`, significant if Z > 1.645. Very-low-reliability inputs are never marked significant. If the baseline cannot be built (state not ingested, source outage), current metrics are still stored and the trends say why they are unavailable.
+
+The 2015–19 vintage predates the table-based files, so it comes from the per-state sequence-based summary zips. Only the 4 needed sequence files and the geography file are read, using HTTP range requests (about 7–10 s per state). The sequence layout is checked against Census's official lookup file in the tests.
+
 ## Data flow
-1. `python manage.py ingest_acs [--states CT,NY] [--year 2024]` streams the five national keyless bulk tables once and publishes one immutable SRC-03 snapshot per state. With no `--states`, it uses the states of non-archived locations plus neighbouring states, since rings can cross state lines.
-2. Computing a location fetches 2020 blocks, 2020 block-group totals and ACS block groups around the pin from TIGERweb. It publishes that capture as an SRC-04 snapshot (reused for the same pin and radius), computes all rings, and stores an immutable `RingDemographics` row keyed by the location's `analysis_version`.
+1. `python manage.py ingest_acs [--states CT,NY] [--year 2024]`, then the same with `--year 2019` for the trend baseline, streams the five national keyless bulk tables once and publishes one immutable SRC-03 snapshot per state. With no `--states`, it uses the states of non-archived locations plus neighbouring states, since rings can cross state lines.
+2. Computing a location fetches 2020 blocks (and, for the baseline, 2010 blocks), 2020 block-group totals and ACS block groups around the pin from TIGERweb. It publishes that capture as an SRC-04 snapshot (reused for the same pin and radius), computes all rings, and stores an immutable `RingDemographics` row keyed by the location's `analysis_version`.
 3. Moving the pin or changing the ring preset bumps `analysis_version`, so the old result is reported as `STALE`, never silently reused.
 
 Entry points:
@@ -46,10 +55,20 @@ Ring population against Paragon's own listing figures (Esri 2021, paragonct.com)
 
 Differences are mostly within ±10%, which is expected given different vintages (2021 vs 2020–24) and methods. The Symmes Gate 1-mile ring (+27%) is the outlier and should be checked against a corrected pin.
 
-Tests: `backend/tests/test_ring_demographics.py` (29 tests: math, real ACS table slices, recorded real Norwalk geography and ACS rows, reference tolerances, stale and missing-data behaviour, auth). All tests run offline.
+Trend check on real data (3-mile ring unless noted; "sig" = significant at 90%):
+
+| Property | Population 2015–19 → 2020–24 | Real mean HH income |
+|---|---|---|
+| Staples Plaza, Norwalk CT | 79,937 → 85,544, +7.0% (sig) | +1.1% (not sig) |
+| Kingston Marketplace NY | 25,972 → 25,102, −3.4% (not sig) | +8.8% (not sig); 10 mi +8.2% (sig) |
+| Golden Mile Home Depot, Frederick MD | 70,425 → 79,075, +12.3% (sig); 5 mi +16.3% (sig) | +4.0% (not sig) |
+| Cypress Lake, Fort Myers FL | 65,157 → 67,312, +3.3% (not sig); 5 mi +6.8% (sig) | 5 mi +7.9% (sig) |
+| Cottman Plaza, Philadelphia PA | 335,840 → 331,629, −1.3% (not sig) | +3.6% (not sig) |
+
+Tests: `backend/tests/test_ring_demographics.py` (37 tests: math, real ACS table slices, recorded real Norwalk geography and ACS rows, reference tolerances, stale and missing-data behaviour, auth). All tests run offline, including real 2010 geography, 2019 sequence-file slices and BLS CPI responses.
 
 ## Not done yet
-- **Trends** (MET-06, MET-07; SIG-01, SIG-02) need the 2015–2019 vintage, which predates the table-based summary files, plus 2010 blocks. This is the next data step.
+- **Signals** SIG-01 and SIG-02 (`docs/04` §5.2) should be raised from these trends once the signal engine exists.
 - **UI:** this adds no screen. The profile page needs to render `GET …/demographics/`.
 - **Portfolio percentiles** (MET-20) build on these results.
 - Not yet run on the real PostGIS test database or in a deployed environment.

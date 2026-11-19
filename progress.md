@@ -45,5 +45,5 @@ Backend for FR-09 / MET-01..05 is implemented in `backend/apps/demographics/`: k
 (`ingest_acs`), TIGERweb 2020 block-weighted ring apportionment with CT planning-region matching, immutable
 `RingDemographics` results keyed by `analysis_version`, a `compute_ring_demographics` job and command, and
 `GET/POST /api/locations/<id>/demographics/`. Verified against 9 public listings in 9 states (see
-docs/RING_DEMOGRAPHICS.md). Not yet done: 2015–19 trends, UI rendering, percentiles, PostGIS-suite run.
+docs/RING_DEMOGRAPHICS.md). Trends MET-06/07 (2015–19 → 2020–24, CPI-adjusted, significance-tested) added. Not yet done: UI rendering, percentiles, SIG-01/02, PostGIS-suite run.
 Coordinate before building the geography/profile slice so the work is not duplicated.
