@@ -40,6 +40,7 @@ import {
 import PinEditor from "./PinEditor";
 import GeocodeDialog from "./GeocodeDialog";
 import TradeArea from "./TradeArea";
+import AreaSections from "./AreaSections";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
 import type { Audit, Location, Page, Session, Source } from "./types";
 import "./styles.css";
@@ -1033,17 +1034,18 @@ function LocationPage({ id }: { id: string }) {
         </section>
       </div>
       <TradeArea location={item} />
+      <AreaSections location={item} />
       <section className="panel">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">MORE AREA EVIDENCE</span>
-            <h2>Economy, businesses, traffic and hazards</h2>
+            <span className="eyebrow">COMING NEXT</span>
+            <h2>Nearby businesses and jobs in each ring</h2>
           </div>
           <Database size={22} />
         </div>
         <p className="muted">
-          These sections have not completed their required checks for this
-          property yet. Missing data is not a zero or a clear risk assessment.
+          These sections have not completed their required checks yet. Missing
+          data is not a zero or a clear risk assessment.
         </p>
         <a className="text-button" href="#/sources">
           Review sources and coverage <ArrowRight size={16} />

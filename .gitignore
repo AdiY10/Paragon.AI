@@ -25,3 +25,7 @@ var/
 backend/static/ui/
 frontend/coverage/
 frontend/test-results/
+
+# iCloud/Finder sync duplicates (e.g. "acs 2.py") — never commit
+* 2.*
+* 2

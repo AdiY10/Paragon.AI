@@ -1,0 +1,230 @@
+"""Economy, traffic and hazard sections: parsers on recorded real responses, service, API, job."""
+from datetime import date, datetime, timezone
+from email.message import Message
+import io
+import json
+from pathlib import Path
+from urllib.error import HTTPError
+from urllib.parse import parse_qs, urlsplit
+import pytest
+from apps.area import economy as econ, traffic_hazards as th
+from apps.area.http import SourceError
+
+FIX = Path('tests/fixtures/real/area')
+KINGSTON = (41.9651857, -73.9889473)
+CYPRESS = (26.546031, -81.876662)
+BPS = {'2609': 'cur_ytd', '2512': 'last_dec', '2509': 'prev_ytd', '2412': 'prev_dec', '2409': 'prev2_ytd'}
+
+
+def raw(name):
+    return (FIX / name).read_bytes()
+
+
+class FixedDate(date):
+    @classmethod
+    def today(cls):
+        return cls(2026, 11, 19)
+
+
+@pytest.fixture(autouse=True)
+def frozen_today(monkeypatch):
+    monkeypatch.setattr(econ, 'date', FixedDate)
+    monkeypatch.setattr(th, 'date', FixedDate)
+    import apps.area.http as http
+    monkeypatch.setattr(http.time, 'sleep', lambda s: None)
+
+
+class Response(io.BytesIO):
+    status = 200
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+
+
+class FixtureOpener:
+    """Serves recorded real responses for one site; anything unrecorded is a 404."""
+    def __init__(self, site):
+        self.site, self.calls = site, []
+
+    def open(self, request, timeout=None):
+        url = request.full_url
+        self.calls.append(url)
+        parts = urlsplit(url)
+        q = parse_qs(parts.query)
+        if 'MapServer/82' in url:
+            return Response(raw(f'{self.site}.county.json'))
+        if 'cew/data/api/2026/1/area/36111.csv' in url:
+            return Response(raw('ulster.qcew.csv'))
+        if 'publicAPI' in url:
+            return Response(raw(f'{self.site}.laus.json'))
+        if '/econ/bps/County/co' in url:
+            key = BPS.get(parts.path.rsplit('co', 1)[1][:4])
+            if key:
+                return Response(raw(f'bps_{key}.txt'))
+        if 'HPMS_FULL_' in url:
+            year = url.split('HPMS_FULL_')[1].split('/')[0].split('_')[1]
+            path = FIX / f'{self.site}.hpms{year}.json'
+            if path.exists():
+                return Response(path.read_bytes())
+        if 'NFHL' in url:
+            xmin, _, xmax, _ = map(float, q['geometry'][0].split(','))
+            metres = 100 if (xmax - xmin) > 0.001 else 30
+            return Response(raw(f'{self.site}.nfhl{metres}m.json'))
+        if 'National_Risk_Index' in url:
+            return Response(raw(f'{self.site}.nri.json'))
+        raise HTTPError(url, 404, 'Not Found', Message(), None)
+
+
+# ---- parsers on real responses ------------------------------------------------
+
+def test_county_resolves_connecticut_planning_region():
+    assert econ.parse_county(raw('norwalk.county.json')) == {'fips': '09190', 'name': 'Western Connecticut Planning Region'}
+
+
+def test_qcew_real_ulster_county_2026_q1():
+    out = econ.parse_qcew(raw('ulster.qcew.csv'), '36111')
+    assert out['10']['value'] == 47301 and out['10']['yoy_pct'] == pytest.approx(0.048)
+    assert out['44-45']['value'] == 8358 and out['44-45']['establishments'] > 0
+
+
+def test_qcew_suppression_is_not_zero():
+    text = raw('ulster.qcew.csv').decode()
+    header, *rows = text.splitlines()
+    cols = header.replace('"', '').split(',')
+    idx = cols.index('disclosure_code')
+    patched = [header]
+    for row in rows:
+        cells = row.split(',')
+        if cells[1] == '"5"' and cells[2] == '"44-45"':
+            cells[idx] = '"N"'
+        patched.append(','.join(cells))
+    out = econ.parse_qcew('\n'.join(patched).encode(), '36111')
+    assert out['44-45'] == {'label': 'Retail trade', 'value': None, 'reason': 'SUPPRESSED'}
+
+
+def test_quarter_discovery_order():
+    assert list(econ.quarters_back(date(2026, 11, 19), 3)) == [(2026, 3), (2026, 2), (2026, 1)]
+    assert list(econ.quarters_back(date(2026, 2, 1), 2)) == [(2025, 4), (2025, 3)]
+
+
+def test_laus_real_rate_and_year_over_year_change():
+    out = econ.parse_laus(raw('kingston.laus.json'), '36111')
+    assert out['period'] == '2026-09' and out['rate'] == pytest.approx(0.038)
+    assert out['preliminary'] is True and out['seasonally_adjusted'] is False
+    assert out['change_pts'] == pytest.approx(out['rate'] * 100 - out['prior_rate'] * 100, abs=1e-9)
+
+
+def test_bps_trailing_twelve_months_from_year_to_date_files():
+    files = {k: raw(f'bps_{k}.txt') for k in BPS.values()}
+    assert econ.bps_months(202609) == {'cur_ytd': (2026, 9), 'last_dec': (2025, 12), 'prev_ytd': (2025, 9),
+        'prev_dec': (2024, 12), 'prev2_ytd': (2024, 9)}
+    out = econ.bps_trailing(files, '36111')
+    assert (out['value'], out['prior']) == (739, 421)
+    assert econ.bps_trailing(files, '99999')['reason'] == 'NOT_COVERED'
+
+
+def test_hpms_field_aliases_across_years_and_traffic_change():
+    current = th.parse_hpms(raw('kingston.hpms2025.json'))
+    prior = th.parse_hpms(raw('kingston.hpms2024.json'))
+    road = th.primary_roads(current)[0]
+    assert th.road_label(road) == 'Ulster Ave US 9W' and road['aadt'] == 22422 and road['year'] == 2025
+    change = th.traffic_change(road, prior)
+    assert change['prior_aadt'] == 22523 and change['change_pct'] == pytest.approx(-0.00448, abs=1e-4)
+    assert th.traffic_change({**road, 'route_id': 'other'}, prior)['reason'] == 'GEOGRAPHY_CHANGED'
+
+
+def test_flood_and_nri_real_cypress_lake():
+    flood = th.parse_flood(raw('cypress.nfhl30m.json'))
+    assert flood['zone'] == 'AE' and flood['sfha'] is True and flood['bfe_ft'] == 9.0 and flood['risk'] == 'high'
+    nri = th.parse_nri(raw('cypress.nri.json'))
+    assert nri['version'] == 'December 2025' and nri['top_hazards'][0] == {'hazard': 'Hurricane', 'rating': 'Very High'}
+    assert th.parse_flood(b'{"features":[]}') == {'zone': None, 'reason': 'NOT_COVERED'}
+    with pytest.raises(SourceError):
+        th.parse_nri(b'{"error":{"code":400}}')
+
+
+# ---- service, API and job ---------------------------------------------------------
+
+def setup(tmp_path, client, lat, lon, settings):
+    from django.contrib.auth import get_user_model
+    from apps.accounts.models import Membership
+    from apps.sources.catalog import sync_catalog
+    from apps.locations.service import change_pin
+    sync_catalog()
+    settings.SOURCE_ARTIFACT_ROOT = tmp_path / 'artifacts'
+    user = get_user_model().objects.create_user(username='m@example.org', email='m@example.org')
+    Membership.objects.create(email='m@example.org', user=user, role='member')
+    client.force_login(user)
+    created = client.post('/api/locations/', {'name': 'Site', 'address': '1 Main St'}, content_type='application/json').json()
+    return change_pin(location_id=created['id'], expected_version=created['version'], lat=lat, lon=lon, actor=user)
+
+
+@pytest.mark.django_db
+def test_service_computes_all_sections_from_real_responses_and_reuses_snapshots(tmp_path, client, settings):
+    from apps.area.service import compute_area
+    from apps.sources.models import SourceSnapshot
+    location = setup(tmp_path, client, *KINGSTON, settings)
+    opener = FixtureOpener('kingston')
+    rows = {r.section: r for r in compute_area(location.pk, opener=opener)}
+    assert {k: r.status for k, r in rows.items()} == {'economy': 'available', 'traffic': 'available', 'hazards': 'available'}
+    econ_data = rows['economy'].data
+    assert econ_data['county']['name'] == 'Ulster County' and econ_data['employment']['period'] == '2026 Q1'
+    assert econ_data['permits']['value'] == 739 and econ_data['permits']['period'] == '12 months to 2026-09'
+    assert rows['traffic'].data['roads'][0]['aadt'] == 22422
+    assert {s['id'] for s in rows['economy'].sources} >= {'SRC-04', 'SRC-06', 'SRC-07', 'SRC-09'}
+    published = SourceSnapshot.objects.count()
+    again = FixtureOpener('kingston')
+    compute_area(location.pk, opener=again)
+    assert again.calls == [] and SourceSnapshot.objects.count() == published
+    body = client.get(f'/api/locations/{location.pk}/area/').json()
+    assert body['sections']['hazards']['status'] == 'available'
+
+
+@pytest.mark.django_db
+def test_flood_zone_raises_a_concern(tmp_path, client, settings):
+    from apps.area.service import compute_area
+    location = setup(tmp_path, client, *CYPRESS, settings)
+    hazards = {r.section: r for r in compute_area(location.pk, sections=('hazards',), opener=FixtureOpener('cypress'))}['hazards']
+    assert hazards.data['concerns'][0].startswith('Pin is in FEMA zone AE')
+
+
+@pytest.mark.django_db
+def test_one_failing_source_does_not_blank_other_sections(tmp_path, client, settings):
+    from apps.area.service import compute_area
+
+    class NoFlood(FixtureOpener):
+        def open(self, request, timeout=None):
+            if 'NFHL' in request.full_url:
+                raise OSError('connection reset')
+            return super().open(request, timeout)
+    location = setup(tmp_path, client, *KINGSTON, settings)
+    rows = {r.section: r for r in compute_area(location.pk, opener=NoFlood('kingston'))}
+    assert rows['economy'].status == 'available' and rows['traffic'].status == 'available'
+    assert rows['hazards'].data['flood_at_pin'] == {'value': None, 'reason': 'SOURCE_ERROR'}
+    assert rows['hazards'].data['nri']['rating'] == 'Relatively Moderate'
+
+
+@pytest.mark.django_db
+def test_api_requires_pin_auth_and_marks_stale_after_pin_move(tmp_path, client, settings):
+    from apps.area.service import compute_area
+    from apps.locations.service import change_pin
+    location = setup(tmp_path, client, *KINGSTON, settings)
+    url = f'/api/locations/{location.pk}/area/'
+    assert client.get(url).json()['sections']['economy']['reason'] == 'NOT_COMPUTED'
+    compute_area(location.pk, opener=FixtureOpener('kingston'))
+    location.refresh_from_db()
+    change_pin(location_id=location.pk, expected_version=location.version, lat=41.97, lon=-73.99, actor=None)
+    assert client.get(url).json()['sections']['traffic']['reason'] == 'STALE'
+    client.logout()
+    assert client.get(url).status_code == 403
+
+
+@pytest.mark.django_db
+def test_post_enqueues_one_job_per_analysis_version(tmp_path, client, settings):
+    from apps.operations.models import JobRun
+    location = setup(tmp_path, client, *KINGSTON, settings)
+    url = f'/api/locations/{location.pk}/area/'
+    first, second = client.post(url), client.post(url)
+    assert first.status_code == 202 and first.json()['job_id'] == second.json()['job_id']
+    assert JobRun.objects.get(kind='compute_area_profile').parameters['analysis_version'] == location.analysis_version

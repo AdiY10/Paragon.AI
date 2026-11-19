@@ -47,3 +47,10 @@ Backend for FR-09 / MET-01..05 is implemented in `backend/apps/demographics/`: k
 `GET/POST /api/locations/<id>/demographics/`. Verified against 9 public listings in 9 states (see
 docs/RING_DEMOGRAPHICS.md). Trends MET-06/07 (2015–19 → 2020–24, CPI-adjusted, significance-tested) added. Property-page UI section added and browser-checked at 1280/375 px. Not yet done: percentiles, SIG-01/02, PostGIS-suite run, browser smoke script coverage.
 Coordinate before building the geography/profile slice so the work is not duplicated.
+
+## Area profile (branch feat/area-economy-traffic-hazards, Adi's session 2026-11-19)
+Economy (QCEW, LAUS, BPS), traffic (HPMS, newest year auto-detected, prior-year change) and hazards (FEMA NFHL
+envelope queries, NRI) are implemented in `backend/apps/area/` with immutable `AreaSection` results, snapshot
+caching, a `compute_area_profile` job/command, `GET/POST /api/locations/<id>/area/`, and property-page panels.
+See docs/AREA_PROFILE.md. Not done: signals from these values, nearby businesses, LODES ring jobs.
+Note: this checkout is in an iCloud-synced folder that creates "file 2.py" duplicates; `.gitignore` now excludes them.
