@@ -46,9 +46,45 @@ def compute_area_profile(context,parameters):
             retryable=exc.code!='NOT_PROVIDED') from None
     return JobResult(records=len(rows))
 
+def _refresh(fn):
+    def handler(context,parameters):
+        result=fn(context)
+        return JobResult(records=result[0])
+    return handler
+
+
+def bls_bps_check(context,parameters):
+    from apps.area.refresh import refresh_economy
+    return _refresh(refresh_economy)(context,parameters)
+
+
+def overture_check(context,parameters):
+    from apps.area.refresh import refresh_businesses
+    from apps.area.http import SourceError
+    from .contracts import JobFailure
+    try:
+        return _refresh(refresh_businesses)(context,parameters)
+    except SourceError as exc:
+        raise JobFailure('SOURCE_ERROR' if exc.code not in JobFailure.CODES else exc.code) from None
+
+
+def flood_recheck(context,parameters):
+    from apps.area.refresh import refresh_hazards
+    return _refresh(refresh_hazards)(context,parameters)
+
+
+def annual_sources_check(context,parameters):
+    from apps.area.refresh import refresh_annual
+    return _refresh(refresh_annual)(context,parameters)
+
 # Only code-defined handlers are executable. No API accepts arbitrary Python paths.
 REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance',1800),
     'compute_ring_demographics':JobSpec(compute_ring_demographics,'paragon-maintenance',900,
         frozenset({'location_id','analysis_version'})),
     'compute_area_profile':JobSpec(compute_area_profile,'paragon-maintenance',900,
-        frozenset({'location_id','analysis_version'}))}
+        frozenset({'location_id','analysis_version'})),
+    # Scheduled refreshes (config/schedules.yaml); long-running, one location at a time.
+    'bls_bps_check':JobSpec(bls_bps_check,'paragon-maintenance',3600),
+    'overture_check':JobSpec(overture_check,'paragon-maintenance',7200),
+    'flood_recheck':JobSpec(flood_recheck,'paragon-maintenance',3600),
+    'annual_sources_check':JobSpec(annual_sources_check,'paragon-maintenance',7200)}
