@@ -102,3 +102,11 @@ advance analysis once, preserve the original source address and immutable pin hi
 and audit the reason. Ring and address changes together advance one generation.
 Unchanged values and notes-only edits preserve their existing pin. Mark edited
 addresses explicitly in provenance rather than attributing them to the old listing.
+
+## D-031 — Versioned tenant claims with unknown anchors and explicit review
+
+Keep brand/occupant records separate from legal-filer mappings. Default anchor to
+unknown and confirmation to false. Deduplicate cautiously within each property,
+retain immutable audit history, use idempotent creation keys, and lock parent
+locations to coordinate roster/pin/attribute changes. Archive the former active
+roster when its address changes, so tenant exposure cannot silently move elsewhere.

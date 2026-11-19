@@ -150,3 +150,12 @@ combined address/ring changes, unchanged-address/notes preservation, and rollbac
 of invalid edits. Frontend production build checks the explicit user-edited-address
 provenance label. Temporary-Site address editing remains disabled until its adapter
 and UI gain the same safeguards.
+
+## Tenant domain (2026-11-18)
+
+217 tests pass on real PostgreSQL/PostGIS. New coverage verifies unconfirmed/unknown
+creation, attributed immutable history, creation replay after edits, changed-payload
+rejection, cautious brand normalization, explicit confirmation, rename invalidation,
+archive/restore, duplicate conflicts, unsupported mapping/source fields, owned-only
+mutations, address-change retirement/rollback, and competing idempotent creation.
+This domain increment does not yet claim a published tenant UI or SEC coverage.

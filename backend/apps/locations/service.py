@@ -57,6 +57,8 @@ def update_location(*,location_id,expected_version,attributes,actor):
     if address_changed or ring_changed:location.analysis_version+=1
     after=dict(attributes)
     if address_changed:
+        from .tenants import archive_for_address_change
+        archive_for_address_change(location,actor)
         location.current_revision=LocationRevision.objects.create(location=location,
             number=previous_revision.number+1,lat=None,lon=None,method='unplaced',
             matched_address='',confirmed=False,actor=actor,
