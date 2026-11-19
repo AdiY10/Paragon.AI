@@ -1717,3 +1717,122 @@ th {
   grid-template-columns: 115px minmax(0, 1fr);
 }
 .confirm-box p,.search-results small{color:#53634f}
+/* Trade-area ring demographics */
+.trade-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.trade-empty {
+  margin-top: 12px;
+}
+.trade-empty .button {
+  margin-top: 6px;
+}
+.ring-table {
+  min-width: 520px;
+}
+.ring-table thead th {
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ring-table thead th:first-child {
+  text-align: left;
+}
+.ring-table tbody th {
+  color: var(--pine);
+  font-size: 13px;
+  font-weight: 600;
+  width: 34%;
+}
+.ring-table th small,
+.ring-table td small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.ring-table td {
+  text-align: right;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+.ring-table td strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--pine);
+}
+.ring-table td .badge {
+  margin-top: 5px;
+}
+.ring-table td.unavailable strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ring-table .trend-rows tr:first-child th {
+  padding-top: 22px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #65775c;
+}
+.ring-table td.trend.flat strong {
+  color: #5d6b59;
+}
+.ring-table td.trend.up strong {
+  color: #2f6a3a;
+}
+.ring-table td.trend.down strong {
+  color: #8b3a26;
+}
+.trade-area .text-button {
+  margin-top: 14px;
+}
+.evidence-list {
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.evidence-list a {
+  text-decoration: underline;
+}
+/* Phones: keep every ring visible without sideways scrolling. */
+@media (max-width: 650px) {
+  .ring-table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .ring-table th,
+  .ring-table td {
+    padding: 11px 3px;
+  }
+  .ring-table tbody th {
+    width: 31%;
+    font-size: 12px;
+    hyphens: auto;
+  }
+  .ring-table tbody th small {
+    display: none;
+  }
+  .ring-table td strong {
+    font-size: 13px;
+  }
+  .ring-table td small {
+    font-size: 10px;
+  }
+  .ring-table thead th {
+    font-size: 9px;
+    letter-spacing: 0.02em;
+  }
+}

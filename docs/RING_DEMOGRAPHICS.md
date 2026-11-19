@@ -28,6 +28,14 @@ Each vintage is apportioned with its own geography: 2010 blocks for 2015–19, 2
 
 The 2015–19 vintage predates the table-based files, so it comes from the per-state sequence-based summary zips. Only the 4 needed sequence files and the geography file are read, using HTTP range requests (about 7–10 s per state). The sequence layout is checked against Census's official lookup file in the tests.
 
+## On screen
+The property page has a **"Who lives around this property"** section (`frontend/src/TradeArea.tsx`):
+- **Table:** a ring-by-ring table with ± margins of error and low-reliability flags. Missing values show their reason in words, never 0.
+- **Trends:** a "Change, 2015–2019 → 2020–2024" block. Arrows and colour appear only for statistically significant changes.
+- **Evidence drawer** ("How these numbers are calculated"): the pin used, data period, CPI ratio, block groups and blocks per ring, source links and caveats.
+- **No result yet:** a **Calculate** button (or **Recalculate for the new pin** after a pin move) queues the background job and polls until the result appears. This needs the job worker running.
+- **Phones:** checked in a browser at 1280 px and 375 px. All three rings fit on a phone without sideways scrolling.
+
 ## Data flow
 1. `python manage.py ingest_acs [--states CT,NY] [--year 2024]`, then the same with `--year 2019` for the trend baseline, streams the five national keyless bulk tables once and publishes one immutable SRC-03 snapshot per state. With no `--states`, it uses the states of non-archived locations plus neighbouring states, since rings can cross state lines.
 2. Computing a location fetches 2020 blocks (and, for the baseline, 2010 blocks), 2020 block-group totals and ACS block groups around the pin from TIGERweb. It publishes that capture as an SRC-04 snapshot (reused for the same pin and radius), computes all rings, and stores an immutable `RingDemographics` row keyed by the location's `analysis_version`.
@@ -69,6 +77,5 @@ Tests: `backend/tests/test_ring_demographics.py` (37 tests: math, real ACS table
 
 ## Not done yet
 - **Signals** SIG-01 and SIG-02 (`docs/04` §5.2) should be raised from these trends once the signal engine exists.
-- **UI:** this adds no screen. The profile page needs to render `GET …/demographics/`.
 - **Portfolio percentiles** (MET-20) build on these results.
 - Not yet run on the real PostGIS test database or in a deployed environment.

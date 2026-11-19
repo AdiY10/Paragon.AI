@@ -409,3 +409,35 @@ def test_missing_baseline_keeps_current_metrics_and_explains_trends(placed):
     assert ring['trends']['population_change']['value'] is None
     assert ring['trends']['population_change']['reason'] == 'SOURCE_ERROR'
     assert result.baseline == {}
+
+
+@pytest.mark.django_db
+def test_post_enqueues_one_job_per_analysis_version_and_worker_computes(tmp_path, client, settings):
+    from apps.operations.models import JobRun
+    from apps.operations.runner import execute_job
+    from apps.demographics.models import RingDemographics
+    location, store, _ = setup_location(tmp_path, client, with_acs=True, with_baseline=True)
+    settings.SOURCE_ARTIFACT_ROOT = tmp_path / 'artifacts'
+    url = f'/api/locations/{location.pk}/demographics/'
+    first, second = client.post(url), client.post(url)
+    assert first.status_code == second.status_code == 202
+    assert first.json()['job_id'] == second.json()['job_id'] and second.json()['created'] is False
+    job = JobRun.objects.get(kind='compute_ring_demographics')
+    assert job.parameters == {'location_id': str(location.pk), 'analysis_version': location.analysis_version}
+    execute_job(str(job.pk))
+    job.refresh_from_db()
+    assert job.status == JobRun.Status.SUCCEEDED and RingDemographics.objects.count() == 1
+    assert client.get(url).json()['status'] == 'available'
+
+
+@pytest.mark.django_db
+def test_post_requires_a_placed_pin(client, tmp_path):
+    from django.contrib.auth import get_user_model
+    from apps.accounts.models import Membership
+    user = get_user_model().objects.create_user(username='m@example.org', email='m@example.org')
+    Membership.objects.create(email='m@example.org', user=user, role='member')
+    client.force_login(user)
+    created = client.post('/api/locations/', {'name': 'Unplaced', 'address': '1 Main St, Anytown, CT'},
+        content_type='application/json').json()
+    assert client.post(f"/api/locations/{created['id']}/demographics/").status_code == 400
+    assert client.get(f"/api/locations/{created['id']}/demographics/").json()['reason'] == 'NOT_PROVIDED'
