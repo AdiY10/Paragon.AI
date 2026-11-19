@@ -2,7 +2,7 @@
 
 ## Current priority: regular host, password access, and Site data migration
 
-- PRs #1–#33 merged; password access and complete workspace migration are in main. Commits and PRs disclose Codex assistance.
+- PRs #1–#34 merged; password access and complete workspace migration are in main. Commits and PRs disclose Codex assistance.
 - Canonical backend: invite-only auth; source registry/artifacts/snapshots/checks; durable jobs, schedules, recovery; versioned locations, public seed, Census previews/acceptance, manual pins, and address-change invalidation.
 - Tenant domain now has explicit review, unknown anchor flags, version conflicts, idempotent creation, archive/history, and retirement on address changes. Seed/API/UI are next; no SEC mappings are guessed.
 - Validation: 217 tests pass against PostgreSQL 17/PostGIS 3.6. Latest published Site has 15 frontend/adapter tests plus real Workers/D1/browser verification. Production backend build/static/private-route smoke and real Census reference flows passed in prior increments.
@@ -12,7 +12,7 @@
 
 https://paragon-radar-workspace.amitsch5.chatgpt.site
 
-The user changed its audience to public. The application still requires ChatGPT sign-in and isolates each visitor's records. It supports persistent portfolio/notes/pins, source-backed Census suggestions and source checks, responsive maps, and schema-2 migration export. Full trade-area analysis, scheduled ingestion, weekly signals, screening/comparison, and tenant UI remain incomplete. Preserve the public audience on subsequent publication.
+The user changed its audience to public. The application still requires ChatGPT sign-in and isolates each visitor's records. It supports persistent portfolio/notes/pins, source-backed Census suggestions and source checks, responsive maps, and schema-3 migration export with explicit location links. Full trade-area analysis, scheduled ingestion, weekly signals, screening/comparison, and tenant UI remain incomplete. Preserve the public audience on subsequent publication.
 
 ## Next
 

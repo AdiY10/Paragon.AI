@@ -181,3 +181,12 @@ and HttpOnly, APIs deny anonymous access, logout works, notes/sessions survive p
 restart, and archived export bytes match their original SHA-256. No auth bypass is
 used. The socket simulates a trusted HTTPS ingress; external TLS, real Render mounts,
 Docker image execution, and final production cutover remain unverified.
+
+## Site migration contract (2026-11-19)
+
+The schema-3 export passes a disposable actual Worker/D1 test: anonymous denial,
+36 real seed properties, a test-only note/manual pin, both audit events and pin
+relationships, and other-owner isolation. The generated export then passes the
+Django disposable-database migration smoke with 36 properties, 37 total revisions,
+and two audits. All 15 Site tests and the production build pass. No production
+workspace data was modified by these tests.

@@ -1,11 +1,11 @@
-# Temporary private OpenAI Site
+# Temporary OpenAI Site — retained during migration
 
 Live URL: https://paragon-radar-workspace.amitsch5.chatgpt.site
 
-The Sites plugin confirmed successful private publication and the Census update on 2026-11-18. The Site
-is owner-only and uses ChatGPT sign-in; no separate Render account, OIDC client,
-or paid hosting signup is required to use this temporary version. Open it with
-the same ChatGPT account that owns the Site. Sharing has not been enabled.
+The owner changed the Site audience to **public**. ChatGPT sign-in remains required,
+and every visitor has a separate workspace. Preserve that audience on publication.
+Adi's priority is to move to a regular password-protected host so ChatGPT is no
+longer required; the current Site remains available until that migration is verified.
 
 ## Available now
 
@@ -20,7 +20,7 @@ the same ChatGPT account that owns the Site. Sharing has not been enabled.
   sources. No fresh checks are claimed for the unimplemented background adapters.
 - **Export workspace** downloads a private, schema-versioned JSON containing saved
   records, pin revisions, audit history, raw Census responses/hashes, and lookup/check history
-  for the later move (export schema version 2).
+  for the later move (export schema version 3, with workspace identity and explicit location links).
 
 The Site is a working limited workspace, not completed Release 1. PostGIS spatial
 aggregation, scheduled source ingestion, tenant SEC checks, weekly signals, screening,
@@ -34,7 +34,7 @@ bootstrap data, React UI, and verification scripts. The canonical backend/fronte
 remain in `backend/` and `frontend/`; do not replace them with this adapter. The
 hosted checkout is `/data/tml/code/as/vlm/paragon-radar-site`; its source was pushed
 through the Sites helper and published at commit
-`15f361441b7d5b6b164229c52253baa89cb45d9d` (Census update).
+`e947755079faa91b1afc0d28353161a3f4958ec9` (schema-3 migration export).
 
 The tracked manifest preserves the existing Site identity. Reuse it for updates;
 do not create a replacement Site. Source credentials remain session-only and are
@@ -49,19 +49,25 @@ competing version updates, account isolation, 375/768/1280 overflow and automate
 A/AA rules, actual map-worker/pin loading, persisted edits after reload, manual pin
 revisions, complete export, live Census match/ambiguity/no-match, cache age/replay,
 source-field spoof rejection, and cross-user acceptance denial. Native Sites publication returned `succeeded` and
-the live URL. Real owner sign-in/interaction must still be checked by opening the
-private link; no interactive owner session was impersonated for production testing.
+the live URL. Real visitor sign-in/interaction must still be checked by opening the
+live link; no interactive owner session was impersonated for production testing.
 
-## Move later
+## Migration status
 
-1. Download and securely retain **Export workspace** before moving.
-2. Deploy the canonical app and configure the destination identity provider.
-3. Implement/test a transactional Django importer for the export schema, mapping
-   Site user identity explicitly to the destination account. The importer does
-   not exist yet; changing a URL alone will not move saved edits.
-4. Validate counts, notes, source context, pin revisions, confirmation, and history
-   against the export, then run destination login and source acceptance checks.
-5. Keep this Site available until migration is verified.
+The Django transactional importer is implemented and tested. It validates complete
+portfolios, retains original private export bytes/checksums, imports notes/pins/audits,
+revalidates Census evidence, and refuses conflicting destination edits. Imported
+actor metadata grants no account access. Follow [WORKSPACE_MIGRATION.md](WORKSPACE_MIGRATION.md).
 
-No real business metrics or completed jobs were manufactured to bridge the runtime
-limitations. No external paid resources were provisioned.
+The 2026-11-19 private capture has 36 unchanged properties and no audit/lookup history.
+A schema-3 Worker/D1 test creates a note/manual pin and exports their history, checks
+owner isolation, then imports that actual export through the Django smoke check.
+This verifies the migration contract without modifying production business data.
+
+The costed regular-host blueprint and named password login are ready. Hosting account
+connection, paid-resource approval, actual image/HTTPS verification, fresh export
+comparison, private credential delivery, and production cutover remain open. Do not
+retire this Site until the replacement works and the owner confirms migrated data.
+
+No business metrics or completed jobs were manufactured. No external paid resources
+were provisioned. Export files remain private and are never committed.
