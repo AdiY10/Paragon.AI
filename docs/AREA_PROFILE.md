@@ -1,4 +1,4 @@
-# Area profile: economy, traffic, hazards and nearby businesses (FR-11 to FR-15)
+# Area profile: economy, jobs, traffic, hazards and nearby businesses (FR-10 to FR-15)
 
 Backend `backend/apps/area/`, screen `frontend/src/AreaSections.tsx`. Each section is computed independently and stored as an immutable `AreaSection` row keyed by the location's `analysis_version`. One failing source never blanks the others: a failed part is stored with its reason code (`docs/04` §7).
 
@@ -12,6 +12,10 @@ Backend `backend/apps/area/`, screen `frontend/src/AreaSections.tsx`. Each secti
 | | MET-18 National Risk Index tract rating, percentile and top 3 hazards | FEMA NRI tracts (December 2025) |
 
 | Businesses | MET-15 retail and service businesses by group within 1 and 3 mi; MET-16 anchors and national chains with distance, nearest supermarket chain; possible closures (SIG-09 evidence) and new key businesses (SIG-10 evidence) between the two newest monthly releases | Overture Maps Places (GeoParquet; CDLA-Permissive-2.0, Apache-2.0, CC0) |
+
+| Jobs | MET-08 jobs located in each ring (all, retail NAICS 44–45, accommodation and food NAICS 72); MET-09 change vs the prior year, shown only when both years have 1,000+ jobs | LEHD LODES 8 workplace (WAC) files per state, newest year detected (2024; 2023 for change) |
+
+**Jobs method** (`backend/apps/area/jobs.py`): 2020 census blocks whose internal point falls inside the ring (the same TIGERweb capture the demographics use) are joined to LODES by block GEOID. Connecticut LODES keeps legacy county codes, as the 2020 blocks do, so they join directly. Block values carry Census noise and are only shown as ring totals. Each state-year file is stored once as a snapshot. Real check: Staples Plaza 5,453 / 45,424 / 68,013 jobs within 1/3/5 mi in 2024 (3 mi +2.6% vs 2023); Kingston 3,946 / 19,131 / 26,451; Cypress Lake 8,981 / 51,281 / 93,449.
 
 **Businesses method** (`backend/apps/area/businesses.py`, `docs/04` §3.7, §5.2, §5.3):
 - **Category groups:** Overture `basic_category` values are mapped to 11 retail-relevant groups. Supermarkets are filed under the broad `food_and_beverage_store`, so **anchors are identified from a curated brand list** (grocery chains plus big boxes and pharmacies), with whole-word prefix matching ("Lowe's Home Improvement" → lowes). Unbranded plazas or clinics in key categories are counted but not listed as anchors.
@@ -50,6 +54,5 @@ Tests: `backend/tests/test_area_profile.py` (13 tests). They replay recorded rea
 
 ## Not done yet
 - Signals SIG-03 to SIG-05, SIG-07, SIG-08 and SIG-11 from these values (needs the signal engine).
-- Jobs located in each ring (LODES).
 - Map markers for nearby businesses; Overture brand coverage is partial, so the anchor list depends on the curated brand list.
 - Place-level (city/town) building permits; county only for now.

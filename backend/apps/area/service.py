@@ -21,11 +21,12 @@ from . import economy as econ
 from . import traffic_hazards as th
 from . import businesses as biz
 from . import overture
+from . import jobs as lodes
 from .http import SourceError
 from .models import AreaSection
 
 ADAPTER = 'area-v1'
-SECTIONS = ('economy', 'traffic', 'hazards', 'businesses')
+SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
     'SRC-04': ('U.S. Census Bureau, TIGERweb counties', 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html'),
     'SRC-06': ('U.S. Bureau of Labor Statistics, Quarterly Census of Employment and Wages', 'https://www.bls.gov/cew/'),
@@ -34,6 +35,8 @@ SOURCE_META = {
     'SRC-10': ('FHWA Highway Performance Monitoring System (USDOT)', 'https://www.fhwa.dot.gov/policyinformation/hpms.cfm'),
     'SRC-11': ('FEMA National Flood Hazard Layer', 'https://www.fema.gov/flood-maps/national-flood-hazard-layer'),
     'SRC-12': ('FEMA National Risk Index', 'https://hazards.fema.gov/nri/'),
+    'SRC-05': ('U.S. Census Bureau, LEHD Origin-Destination Employment Statistics (LODES 8)',
+        'https://lehd.ces.census.gov/data/#lodes'),
     'SRC-13': ('Overture Maps Places (© Overture Maps Foundation; CDLA-Permissive-2.0, Apache-2.0, CC0)',
         'https://docs.overturemaps.org/attribution/'),
 }
@@ -280,8 +283,48 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     return data, True
 
 
+RING_RADII = {'1/3/5': (1, 3, 5), '3/5/10': (3, 5, 10)}
+
+
+def jobs_section(run, lat, lon, *, location=None):
+    from apps.demographics import geography
+    from apps.demographics.service import _geography, DemographicsUnavailable
+    radii = RING_RADII[location.ring_preset if location else '1/3/5']
+    try:
+        geo_snap, capture = _geography(lat, lon, max(radii), 2024, run.store, run.opener)
+    except DemographicsUnavailable as exc:
+        raise SourceError(exc.code if exc.code in ('SOURCE_ERROR', 'NOT_COVERED') else 'SOURCE_ERROR') from None
+    blocks, *_ = geography.parse_geography(capture)
+    run.snapshots.append(str(geo_snap.pk))
+    run.sources.setdefault('SRC-04', {'id': 'SRC-04', 'name': 'U.S. Census Bureau, 2020 Census blocks (TIGERweb)',
+        'url': 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html',
+        'period': '2020 Census blocks', 'retrieved_at': geo_snap.retrieved_at.isoformat()})
+    states = sorted({b.geoid[:2] for b in blocks})
+    year = min(lodes.latest_year(st, opener=run.opener) for st in states)
+
+    def wac(year):
+        combined = {}
+        for st in states:
+            def fetch(st=st):
+                raw, url = lodes.fetch_wac(st, year, opener=run.opener)
+                return raw, url, str(year), f'LODES {year} (workplace jobs)'
+            raw, _ = run.cached('SRC-05', f'lodes:wac:{st}:{year}', None, fetch)
+            combined.update(lodes.parse_wac(raw))
+        return combined
+
+    current = lodes.ring_jobs(blocks, wac(year), (lat, lon), radii)
+    try:
+        prior = lodes.ring_jobs(blocks, wac(year - 1), (lat, lon), radii)
+    except SourceError:
+        prior = None
+    rings = [{'radius_miles': r, **lodes.with_trend(current[r], prior[r] if prior else None)} for r in radii]
+    return {'year': year, 'prior_year': year - 1 if prior else None, 'rings': rings,
+        'note': 'Jobs by workplace location (all job types). Block-level values carry Census noise; '
+            'shown only as ring totals.'}, any(r['total'] > 0 for r in rings)
+
+
 BUILDERS = {'economy': economy_section, 'traffic': traffic_section, 'hazards': hazards_section,
-    'businesses': businesses_section}
+    'businesses': businesses_section, 'jobs': jobs_section}
 
 
 def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, capturer=None):
@@ -297,6 +340,8 @@ def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, cap
         try:
             if name == 'businesses':
                 data, ok = businesses_section(run, revision.lat, revision.lon, location=location, capturer=capturer)
+            elif name == 'jobs':
+                data, ok = jobs_section(run, revision.lat, revision.lon, location=location)
             else:
                 data, ok = BUILDERS[name](run, revision.lat, revision.lon)
         except SourceError as exc:

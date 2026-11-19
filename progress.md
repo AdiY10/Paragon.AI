@@ -60,3 +60,8 @@ Overture business landscape and month-to-month changes are a fourth area section
 2026-09-23.1, 2026-10-21.0 and 2026-11-18.0 releases were taken for all 35 pinned seed properties on 2026-11-19
 (105 archives, held locally in var/overture-archive on Adi's machine; import with import_overture_captures).
 New or moved pins are captured on demand with DuckDB inside the compute_area_profile job.
+
+## Ring jobs (branch feat/ring-jobs, Adi's session 2026-11-19)
+Jobs located in each ring (LODES 2024 vs 2023; all, retail, food service) is a fifth area section ('jobs'),
+reusing the demographics' 2020 block capture. All planned property-profile data sections now exist;
+remaining Release 1 data work is the signal engine / weekly brief, tenants + SEC watch, percentiles, screen/compare.

@@ -1035,22 +1035,6 @@ function LocationPage({ id }: { id: string }) {
       </div>
       <TradeArea location={item} />
       <AreaSections location={item} />
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">COMING NEXT</span>
-            <h2>Jobs located in each ring</h2>
-          </div>
-          <Database size={22} />
-        </div>
-        <p className="muted">
-          This section has not completed its required checks yet. Missing
-          data is not a zero or a clear risk assessment.
-        </p>
-        <a className="text-button" href="#/sources">
-          Review sources and coverage <ArrowRight size={16} />
-        </a>
-      </section>
       {item.notes && (
         <section className="panel notes">
           <h2>Team notes</h2>

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Briefcase, Car, RefreshCw, ShieldAlert, Store } from "lucide-react";
+import { Briefcase, Building, Car, RefreshCw, ShieldAlert, Store } from "lucide-react";
 import { api, dateLabel } from "./api";
 import type { Location } from "./types";
 import { reasonText } from "./demographics";
@@ -20,6 +20,7 @@ import {
   type Businesses,
   type Economy,
   type Hazards,
+  type Jobs,
   type Section,
   type SourceRef,
   type Traffic,
@@ -95,6 +96,7 @@ export default function AreaSections({ location }: { location: Location }) {
     <>
       {action && <section className="panel">{action}</section>}
       <EconomyPanel section={sections.economy} />
+      <JobsPanel section={sections.jobs} />
       <div className="location-columns">
         <TrafficPanel section={sections.traffic} />
         <HazardsPanel section={sections.hazards} />
@@ -468,4 +470,70 @@ function Bars({ counts }: { counts: Record<string, number> }) {
 
 function plural(n: number, one: string, many = one + "s") {
   return `${n} ${n === 1 ? one : many}`;
+}
+
+function JobsPanel({ section }: { section: Section<Jobs> }) {
+  const d = section.data;
+  return (
+    <Panel eyebrow="DAYTIME POPULATION" title="Jobs located near the site" icon={<Building size={22} />} section={section}>
+      {d && d.rings && (
+        <>
+          <p className="trade-meta">
+            <span className="badge">Estimate</span>
+            <span>
+              LODES {d.year}: jobs by where people work, summed over each ring. Workers drive weekday
+              lunch, convenience and service trips.
+            </span>
+          </p>
+          <div className="table-wrap">
+            <table className="ring-table">
+              <caption className="sr-only">Jobs located in each ring, {d.year}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Within</th>
+                  {d.rings.map((r) => (
+                    <th scope="col" key={r.radius_miles}>
+                      {r.radius_miles} {r.radius_miles === 1 ? "mile" : "miles"}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {([
+                  ["total", "All jobs", "Everyone working in the ring"],
+                  ["retail", "Retail jobs", "NAICS 44–45"],
+                  ["food_service", "Accommodation and food service jobs", "NAICS 72"],
+                ] as const).map(([key, label, hint]) => (
+                  <tr key={key}>
+                    <th scope="row">
+                      {label}
+                      <small>{hint}</small>
+                    </th>
+                    {d.rings.map((r) => (
+                      <td key={r.radius_miles}>
+                        <strong>{count(r[key])}</strong>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr>
+                  <th scope="row">
+                    Change in all jobs
+                    <small>{d.prior_year ? `${d.prior_year} → ${d.year}` : "Prior year unavailable"}</small>
+                  </th>
+                  {d.rings.map((r) => (
+                    <td key={r.radius_miles} className="trend flat">
+                      <strong>{r.change_pct != null ? signedPct(r.change_pct) : "Not shown"}</strong>
+                      {r.change_pct == null && <small>Needs 1,000+ jobs both years</small>}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="small muted">{d.note}</p>
+        </>
+      )}
+    </Panel>
+  );
 }
