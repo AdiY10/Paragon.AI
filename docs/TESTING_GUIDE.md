@@ -60,3 +60,5 @@ Record the environment/commit, browser, action, and observed result when reporti
 an issue. Keep private addresses and notes out of public issue reports. Production
 acceptance still requires a real deployed URL, actual source jobs, reference checks,
 owner access, backups, and the remaining requirements in docs/07.
+
+Migration operators: follow [WORKSPACE_MIGRATION.md](WORKSPACE_MIGRATION.md) for private export validation, import, and cutover checks. The current local snapshot is verified; no new public host has been issued yet.

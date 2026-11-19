@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q,F
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.pagination import PageNumberPagination
@@ -80,11 +80,11 @@ def confirm(request,location_id):
 @api_view(['GET'])
 def history(request,location_id):
     item=get_object_or_404(Location,pk=location_id)
-    queryset=item.audit_events.select_related('actor').order_by('-created_at','-id')
+    local=item.audit_events.order_by().values('id','action','created_at','before','after',actor_email=F('actor__email'))
+    imported=item.imported_events.order_by().values('id','action','created_at','before','after','actor_email')
+    queryset=local.union(imported,all=True).order_by('-created_at','-id')
     paginator=PageNumberPagination();page=paginator.paginate_queryset(queryset,request)
-    return paginator.get_paginated_response([{'id':entry.id,'action':entry.action,
-        'actor':entry.actor.email if entry.actor else None,'created_at':entry.created_at,
-        'before':entry.before,'after':entry.after} for entry in page])
+    return paginator.get_paginated_response([{key:value for key,value in {**entry,'actor':entry['actor_email']}.items() if key!='actor_email'} for entry in page])
 
 
 @api_view(['POST'])
