@@ -1,3 +1,59 @@
+# Release 1 runbook (added 2026-11-19, batch D)
+
+**Status:** everything needed to run Release 1 on a regular host is in `main`, and the full local verification is in `docs/TEST_REPORT.md`. **Nothing has been provisioned.** Hosting needs Adi's decision and approval (below).
+
+## What runs
+`render.yaml` starts `python infra/start_all.py`. It prepares the release (migrations, source catalog), enables the implemented schedules, then supervises three processes in one container:
+- **Gunicorn** (web)
+- **django-q worker** (`qcluster`)
+- **Scheduler** (`run_scheduler --interval 30`)
+
+All three are needed because the private evidence disk attaches to one service only. If any process exits, the container exits and the host restarts it. `RUN_BACKGROUND_WORKERS=true` turns on the worker and scheduler.
+
+## Secrets and settings to add in the host
+| Variable | Needed for | Notes |
+|---|---|---|
+| `DJANGO_ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` | Web | The assigned hostname |
+| `ACCESS_BOOTSTRAP_EMAIL`, `ACCESS_BOOTSTRAP_PASSWORD` | First admin sign-in | Remove after the first login (see PASSWORD_ACCESS.md) |
+| `SEC_USER_AGENT` | Tenant watch | `"Paragon Radar <contact email>"`; required by SEC fair access. Without it, tenant watch reports NOT_CONFIGURED. |
+| `BLS_API_KEY` | Optional | Free BLS v2 key for higher rate limits (v1 keyless works for this portfolio size) |
+| `OVERTURE_MEMORY_LIMIT` | Overture captures | `256MB` on a 512 MB plan; raise on larger plans |
+
+## Memory note
+DuckDB Overture captures and the worker run beside the web process. On the 512 MB plan, keep `OVERTURE_MEMORY_LIMIT=256MB`. Captures still complete but are slower, and very dense areas (Manhattan: about 145,000 places within 3 miles) may need a 1 GB+ plan. Confirm current pricing before choosing a larger plan.
+
+## First-time data bootstrap (one command, re-runnable)
+```sh
+python backend/manage.py bootstrap_data --overture-archive /app/var/overture-archive
+```
+It runs, in order:
+1. sync catalog and schedules
+2. import the public seed (unconfirmed)
+3. import listing tenants (unconfirmed)
+4. ingest ACS 2024 for portfolio states and neighbours
+5. ingest the ACS 2019 baseline
+6. import archived Overture captures
+7. compute every section
+8. evaluate signals and generate the baseline brief
+
+Steps 4–7 take roughly 20–40 minutes on first run.
+
+**Overture history:** Adi's machine holds 105 archived captures (Sep, Oct and Nov 2026 releases for 35 properties; about 1.3 GB, in `var/overture-archive`). Copy them to the host's disk before running the bootstrap. Overture deletes older releases from its bucket after about two months, so this history cannot be re-downloaded. Without the archive, history starts from the newest release.
+
+## Ongoing schedules (US Eastern)
+| Schedule | When | Work |
+|---|---|---|
+| `sec_daily` | daily 06:00 | Tenant SEC filings |
+| `bls_bps_check` | weekly | Economy |
+| `overture_check` | weekly | Businesses, capturing every monitored pin |
+| `brief_weekly` | Monday 07:00 | This Week brief |
+| `annual_sources_check` | monthly | New ACS, LODES and HPMS years |
+| `flood_recheck` | monthly | FEMA flood zones and NRI |
+
+`maintenance_daily` and `backup_daily` have no handlers yet and stay visibly blocked. Use the host's database backups.
+
+---
+
 # Deferred regular-host deployment reference
 
 **User decision, 2026-11-19:** stay on the current OpenAI Site without external

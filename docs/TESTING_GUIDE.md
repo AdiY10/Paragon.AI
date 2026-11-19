@@ -1,3 +1,27 @@
+# Testing guide for Adi (Release 1, about 15 minutes)
+
+**Where:** once the host is set up (see `docs/DELIVERY_STATUS.md`), open its HTTPS URL, sign in with the password access you created, then follow these steps. Until then, the same steps work on a local preview: see "Local preview" at the end.
+
+1. **This Week (home).** You should see "Baseline: current conditions" with High items first: Cypress Lake and Saugatuck Restaurant in FEMA flood zone AE. Open **Evidence** on any item to see the rule, values, period and a source link. Unemployment in Western Connecticut appears once, listing the affected properties.
+2. **Portfolio.** Filter by **Attention = High**, then Watch. Cards show attention badges. Archive any property John no longer owns.
+3. **A property** (try Cypress Lake Shopping Center).
+   - **Summary:** "How this location compares" lists strengths and concerns against your other properties.
+   - **Who lives around this property:** 1/3/5-mile figures with ±, and trends marked significant or not.
+   - **Jobs, Economy, Traffic, Flood and hazards, Nearby businesses:** each with "Sources · checked [date]".
+   - **Tenants:** listing tenants are marked unverified. Confirm or archive them. Admins can map a public company to its SEC filer.
+4. **Southside Shopping Center → Tenants.** Rite Aid shows its 2023 bankruptcy filing as a past event, with a link to the SEC filing.
+5. **Screen.** Enter a real address (e.g. "7 Backus Avenue, Danbury, CT 06810"). Figures fill in within about a minute. Click **Save as candidate** to keep monitoring it.
+6. **Compare.** Click **Add to compare** on 2–4 properties or screens, then open Compare. The best and weakest values are tinted only where higher or lower is clearly better, and a portfolio median and range column appears on the right.
+7. **Data Sources.** Every source shows OK, Stale or Failing and when it was last checked.
+8. **Phone.** Repeat steps 1 and 3 on your phone. Nothing should scroll sideways.
+
+**What not to expect:** rents, vacancy, sales or property financials. These are out of scope, and the app never estimates them.
+
+## Local preview (developers)
+See `docs/DEPLOYMENT.md`, "First-time data bootstrap". Locally, run `bootstrap_data` against a SQLite settings module, then `python infra/start_all.py` with `RUN_BACKGROUND_WORKERS=true`.
+
+---
+
 # Access and workspace review
 
 Use the existing Site: https://paragon-radar-workspace.amitsch5.chatgpt.site

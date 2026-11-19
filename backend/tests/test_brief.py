@@ -73,3 +73,14 @@ def test_api_latest_history_and_admin_only_generate(client):
 def test_brief_weekly_is_registered():
     from apps.operations.registry import REGISTRY
     assert 'brief_weekly' in REGISTRY
+
+
+def test_county_level_signals_are_grouped_across_properties():
+    a, b = placed('Westport A', 41.1), placed('Westport B', 41.2)
+    for loc in (a, b):
+        section(loc, 'economy', economy(priv=0.0, retail=0.0, unemp=1.0, permits=0.0, units=0))
+        engine.evaluate(loc, today=TODAY)
+    brief = briefs.generate()
+    sig05 = [i for i in brief.items if i['rule_id'] == 'SIG-05']
+    assert len(sig05) == 1 and {l['name'] for l in sig05[0]['locations']} == {'Westport A', 'Westport B'}
+    assert brief.stats['properties_with_items'] == 2

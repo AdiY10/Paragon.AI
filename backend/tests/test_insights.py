@@ -75,3 +75,19 @@ def test_extract_reads_real_stored_sections(tmp_path, client, settings):
     assert values['permits_change']['value'] == pytest.approx((739 - 421) / 421)
     body = client.get(f'/api/locations/{location.pk}/summary/').json()
     assert body['benchmark_ready'] is False and any(x['key'] == 'aadt' and x['value'] == 22422 for x in body['metrics'])
+
+
+def test_every_rendered_number_has_source_and_period(tmp_path, client, settings):
+    """AC-25: no value without provenance, from real stored sections."""
+    from backend.tests.test_area_profile import setup, FixtureOpener, KINGSTON
+    from apps.area.service import compute_area
+    location = setup(tmp_path, client, *KINGSTON, settings)
+    compute_area(location.pk, sections=('economy', 'traffic', 'hazards'), opener=FixtureOpener('kingston'))
+    location.refresh_from_db()
+    body = client.get(f'/api/locations/{location.pk}/summary/').json()
+    shown = [m for m in body['metrics'] if m['value'] is not None]
+    assert shown and all(m['source'] and m['period'] for m in shown)
+    area = client.get(f'/api/locations/{location.pk}/area/').json()['sections']
+    for name, sec in area.items():
+        if sec['status'] in ('available', 'unavailable') and sec.get('sources'):
+            assert all(s['id'] and s['period'] and s['retrieved_at'] and s['url'].startswith('https://') for s in sec['sources'])

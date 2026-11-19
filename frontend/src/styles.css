@@ -716,7 +716,7 @@ main {
 .empty {
   text-align: center;
   padding: 40px 18px;
-  color: #6a7e69;
+  color: #53634f;
 }
 .empty svg {
   color: #8b9b7f;
@@ -1419,8 +1419,9 @@ th {
   text-align: left;
 }
 .map-marker {
-  height: 19px;
-  width: 19px;
+  /* WCAG 2.2 target size: at least 24 x 24 CSS pixels. */
+  height: 24px;
+  width: 24px;
   border: 3px solid #fffefa;
   background: #a07c3d;
   border-radius: 50%;
@@ -2131,6 +2132,9 @@ th {
 }
 .compare-table thead th a {
   text-decoration: underline;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
 }
 .compare-table .group-row {
   padding-top: 18px;
@@ -2189,6 +2193,14 @@ th {
   margin-left: auto;
   display: inline-flex;
   gap: 10px;
+}
+/* WCAG 2.2 target size for small inline actions */
+.tenant-actions .text-button,
+.tenant-list .text-button,
+.brief .text-button.small {
+  min-height: 24px;
+  min-width: 24px;
+  padding: 3px 6px;
 }
 .sec-line small {
   display: block;

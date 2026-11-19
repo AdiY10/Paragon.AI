@@ -53,7 +53,12 @@ def capture(lat, lon, release, radius=3.0):
     con = duckdb.connect(config={'extension_directory': str(ext)})
     try:
         con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
-        con.execute("SET s3_region='us-west-2'; SET memory_limit='1GB'; SET threads=2;")
+        # Small hosts: OVERTURE_MEMORY_LIMIT (e.g. 256MB) keeps DuckDB inside the container's RAM.
+        import os
+        limit = os.environ.get('OVERTURE_MEMORY_LIMIT', '1GB')
+        if not re.fullmatch(r'\d+(MB|GB)', limit):
+            limit = '1GB'
+        con.execute(f"SET s3_region='us-west-2'; SET memory_limit='{limit}'; SET threads=2;")
         delta = (radius + 0.05) / 69.0
         dx = delta / max(0.01, math.cos(math.radians(lat)))
         rows = con.execute('''SELECT id, names.primary AS name, basic_category, brand.names.primary AS brand,

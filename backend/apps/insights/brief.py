@@ -38,9 +38,10 @@ def generate(*, kind='weekly', now=None):
         still_high = s.severity == 'High' and not new and not changed
         if new or changed or still_high:
             items.append({**serialize(s), 'flag': 'new' if new else 'changed' if changed else 'still_active'})
+    items = group_county_items(items)
     main = [i for i in items if i['severity'] in ('High', 'Watch')]
     fyi = [i for i in items if i['severity'] == 'FYI']
-    properties = len({i['location']['id'] for i in main})
+    properties = len({loc['id'] for i in main for loc in i['locations']})
     owned = active.values('location').distinct().count()
     if baseline:
         title = 'Baseline: current conditions'
@@ -54,6 +55,24 @@ def generate(*, kind='weekly', now=None):
         items=main, fyi=fyi, sources_updated=_sources_updated(since),
         stats={'attention_items': len(main), 'fyi_items': len(fyi), 'properties_with_items': properties,
             'properties_with_active_signals': owned})
+
+
+COUNTY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'}
+
+
+def group_county_items(items):
+    """County-level signals repeat for every property in the county; show them once, listing the properties."""
+    out, seen = [], {}
+    for item in items:
+        item = {**item, 'locations': [item['location']]}
+        key = (item['rule_id'], item['title']) if item['rule_id'] in COUNTY_RULES else None
+        if key and key in seen:
+            seen[key]['locations'].append(item['location'])
+            continue
+        if key:
+            seen[key] = item
+        out.append(item)
+    return out
 
 
 def serialize_brief(b):

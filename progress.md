@@ -65,3 +65,12 @@ New or moved pins are captured on demand with DuckDB inside the compute_area_pro
 Jobs located in each ring (LODES 2024 vs 2023; all, retail, food service) is a fifth area section ('jobs'),
 reusing the demographics' 2020 block capture. All planned property-profile data sections now exist;
 remaining Release 1 data work is the signal engine / weekly brief, tenants + SEC watch, percentiles, screen/compare.
+
+## Batches A–D complete (Adi's session 2026-11-19; PRs #43–#50)
+T1 source health · T2 scheduled refreshes · T3 percentiles + summary · T4 signal engine · T5 This Week brief +
+attention · T6 Screen · T7 Compare · T8 tenant API/UI over the existing domain + listing import · T9 SEC tenant
+watch · T10 hardening (axe 0 violations, perf, data-integrity, all 35 properties computed, worker verified) ·
+T11 single-container web+worker+scheduler (`infra/start_all.py`), `bootstrap_data`, runbook.
+See docs/DELIVERY_STATUS.md for what is waiting on Adi (hosting approval, SEC_USER_AGENT, bootstrap login,
+Overture archive upload) and docs/TEST_REPORT.md for evidence. Amit's agent: reconcile the tenant stash with
+apps/insights/tenant_views.py and import_listing_tenants instead of duplicating them.
