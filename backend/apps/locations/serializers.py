@@ -21,7 +21,7 @@ class LocationSerializer(serializers.ModelSerializer):
         model=Location
         fields=['id','seed_id','name','address','city','state','status','asset_type','ring_preset',
             'gla_sqft','notes','confirmed','confirmed_at','origin','source_url','source_context',
-            'version','analysis_version','current_revision','created_at','updated_at','attention']
+            'version','analysis_version','current_revision','created_at','updated_at','attention','screening']
     def get_attention(self,obj):
         # FR-20: highest active signal severity (High, Watch) or Clear.
         from apps.insights.signals import attention

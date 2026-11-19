@@ -39,6 +39,7 @@ export interface Location {
   created_at: string;
   updated_at: string;
   attention?: "High" | "Watch" | "Clear";
+  screening?: boolean;
 }
 export interface Page<T> {
   count: number;

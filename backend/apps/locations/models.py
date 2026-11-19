@@ -32,6 +32,8 @@ class Location(models.Model):
     confirmed=models.BooleanField(default=False)
     confirmed_at=models.DateTimeField(null=True,blank=True)
     confirmed_by=models.ForeignKey(settings.AUTH_USER_MODEL,null=True,blank=True,on_delete=models.SET_NULL,related_name='+')
+    # FR-25: an unsaved acquisition screen; not monitored, not in briefs, expires after 30 days.
+    screening=models.BooleanField(default=False)
     origin=models.CharField(max_length=16,choices=[('public_seed','Public seed'),('user','User-provided')],default='user')
     source_url=models.URLField(max_length=2048,blank=True)
     source_context=models.JSONField(default=dict,blank=True)

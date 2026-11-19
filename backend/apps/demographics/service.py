@@ -12,6 +12,7 @@ from .trends import ring_trends, unavailable
 from .models import RingDemographics
 
 DEFAULT_ACS_YEAR = 2024
+AUTO_INGEST = True  # tests turn this off; jobs ingest a missing state's ACS rows on demand
 BASELINE_ACS_YEAR = acs.LEGACY_YEAR
 RADII = {'1/3/5': (1, 3, 5), '3/5/10': (3, 5, 10)}
 
@@ -68,6 +69,13 @@ def _vintage_rings(lat, lon, radii, year, decennial, store, opener):
     rows, acs_ids = {}, []
     for state in sorted({b.geoid[:2] for b in blocks}):
         snapshot = _latest('SRC-03', acs.scope_for(year, state))
+        if snapshot is None and AUTO_INGEST:
+            # Screens can be anywhere in the US: ingest a missing state on demand (keyless bulk files).
+            try:
+                ingest_acs([state], year=year, store=store)
+            except (acs.AcsError, OSError):
+                pass
+            snapshot = _latest('SRC-03', acs.scope_for(year, state))
         if snapshot is None:
             raise DemographicsUnavailable('NOT_COVERED',
                 f'ACS {acs.vintage_period(year)} data for state {state} has not been ingested yet.')

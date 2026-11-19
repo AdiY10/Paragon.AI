@@ -28,7 +28,7 @@ import {
 const POLL_MS = 4000;
 const POLL_LIMIT_MS = 180_000;
 
-export default function TradeArea({ location }: { location: Location }) {
+export default function TradeArea({ location, autoStart = false }: { location: Location; autoStart?: boolean }) {
   const [pollingSince, setPollingSince] = useState<number | null>(null);
   const query = useQuery({
     queryKey: ["demographics", location.id, location.analysis_version],
@@ -57,6 +57,12 @@ export default function TradeArea({ location }: { location: Location }) {
   }, [data?.status, timedOut]);
 
   const placed = location.current_revision.lat !== null;
+  const notComputed = data?.status === "unavailable" && data.reason === "NOT_COMPUTED";
+  useEffect(() => {
+    // Screens load progressively: start the calculation as soon as the page opens.
+    if (autoStart && placed && notComputed && pollingSince === null && !compute.isPending) compute.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, placed, notComputed]);
   const computing = pollingSince !== null || compute.isPending;
 
   return (

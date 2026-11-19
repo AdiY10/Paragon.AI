@@ -55,3 +55,18 @@
 - **UI:**
   - The home page shows the brief, with an evidence drawer per item, past briefs, and the admin "Generate brief now" button.
   - Portfolio cards show a High or Watch attention badge, can be filtered by attention, and sort by attention first.
+
+## Screen and Compare (T6, T7; FR-25, FR-27)
+**Screen** (`#/screen`):
+- Enter any US address. `POST /api/screens/` creates an **unsaved screen**: a candidate with `screening=true`.
+- The address is geocoded with the Census geocoder. An exact match is pinned automatically and the demographics and area jobs are queued. An ambiguous or missing match leaves the pin to the user (Find address pin, or Correct / confirm pin).
+- The property page loads progressively and starts calculations automatically for screens.
+- Unsaved screens are not monitored, not in the portfolio list and not in briefs. `POST /api/screens/<id>/save/` makes one a monitored candidate. Unsaved screens older than 30 days are archived.
+- For addresses in states not yet ingested, the background job ingests that state's ACS rows on demand.
+- `POST /api/locations/<id>/compute/` queues everything for any placed location.
+
+**Compare** (`#/compare`):
+- Pick 2–4 locations. The selection is kept in this browser, and "Add to compare" is available on every property page.
+- `GET /api/compare/?ids=a,b,c` returns every comparable measure per location, with period and source, the portfolio median and range, the flood zone, attention level and top signals.
+- Strongest and weakest are highlighted only for directional measures (lower is better for unemployment change).
+- Print-friendly via the browser's print or save-as-PDF.
