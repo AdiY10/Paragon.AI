@@ -242,22 +242,35 @@ export async function handleAPI(request, env, identity) {
       ].map((table) =>
         statement(
           db,
-          `SELECT document FROM ${table} WHERE owner_id=?`,
+          `SELECT ${table === "records" ? "document" : "location_id,document"} FROM ${table} WHERE owner_id=?`,
           owner,
         ).all(),
       ),
     );
     return {
-      schema_version: 2,
+      schema_version: 3,
+      workspace_id: owner,
       exported_at: new Date().toISOString(),
       origin: "Paragon Radar temporary Sites workspace",
       source_commit: bootstrap.source_commit,
       locations: records.results.map(publicRecord),
-      audits: audits.results.map(publicRecord),
-      revisions: revisions.results.map(publicRecord),
+      audits: audits.results.map((row) => ({
+        ...publicRecord(row),
+        location_id: row.location_id,
+      })),
+      revisions: revisions.results.map((row) => ({
+        ...publicRecord(row),
+        location_id: row.location_id,
+      })),
       sources: await sourceList(db, owner),
-      geocode_lookups: geocodes.results.map(publicRecord),
-      source_checks: checks.results.map(publicRecord),
+      geocode_lookups: geocodes.results.map((row) => ({
+        ...publicRecord(row),
+        location_id: row.location_id,
+      })),
+      source_checks: checks.results.map((row) => ({
+        ...publicRecord(row),
+        location_id: row.location_id,
+      })),
     };
   }
   if (

@@ -1,10 +1,10 @@
-# Paragon Radar temporary private Site
+# Paragon Radar temporary Site
 
 This repository adapts the verified React interface from AdiY10/Paragon.AI commit
 3becd634333db5a7ba89618fc2ee28d9856662f0 for OpenAI Sites. The canonical Python/Django/
 PostGIS implementation remains intact in that GitHub repository.
 
-Sites owns ChatGPT sign-in and owner-private access. The Worker additionally rejects
+The owner selected a public Site audience. ChatGPT sign-in remains required; each visitor has an isolated workspace. The Worker additionally rejects
 requests without the authenticated Site user headers. Records are namespaced by the
 stable Site user ID, with persistent D1 storage and version-checked atomic writes.
 Mutations require same-origin JSON requests; raw addresses never enter search URLs.
@@ -33,6 +33,7 @@ npm ci
 npm run build
 npm test
 CHROMIUM_PATH=/path/to/chromium node scripts/browser-qa.mjs
+node scripts/export-smoke.mjs
 ```
 
 The build emits a self-contained ESM Worker and local JS/CSS/map-worker assets in
@@ -76,3 +77,9 @@ Fifteen frontend/adapter tests and the actual local Workers/D1 browser workflow
 verify real Census match, ambiguity, no match, cache age, acceptance replay,
 provenance-field rejection, and cross-user denial. Production owner interaction is
 not impersonated by those local tests.
+
+Migration export schema 3 retains workspace identity and explicit location IDs on
+pins, audits, Census captures, and source checks. The dedicated export smoke uses a
+disposable Worker/D1 database and checks relationship preservation and owner isolation.
+Keep exports private. The canonical Django importer validates and retains the full
+original export before applying it; follow its WORKSPACE_MIGRATION guide.
