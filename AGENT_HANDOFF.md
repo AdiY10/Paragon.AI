@@ -6,7 +6,21 @@
 
 ---
 
-## 0. PRIORITY TASK FROM ADI (added 2026-11-18): move off OpenAI Sites, with password access
+## Current hosting decision — user override, 2026-11-19
+
+The user explicitly instructed: **“No, stay in the current site without hosting.”**
+Continue development and publication on the existing OpenAI Site:
+https://paragon-radar-workspace.amitsch5.chatgpt.site
+
+This supersedes the regular-host migration priority below. Do not provision Render,
+create paid resources, retire the current Site, or treat external hosting/OIDC
+credentials as blockers for continued Site feature work. Preserve the existing
+public audience, ChatGPT sign-in, per-user data isolation, and saved records.
+Retain the tested Django/password/migration implementation for a possible later move;
+it is deferred, not a current prerequisite. Continue meaningful, tested feature PRs
+and document runtime limitations honestly. Full Release 1 acceptance is still required.
+
+## 0. Earlier migration request — deferred by the user decision above
 
 Adi cannot use the temporary workspace on OpenAI Sites (`*.chatgpt.site`), because it is tied to Amit's ChatGPT account. Do this **next**, before further feature work:
 

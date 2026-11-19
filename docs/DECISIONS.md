@@ -1,5 +1,18 @@
 # Engineering decisions
 
+## 2026-11-19 — Keep the current OpenAI Site
+
+The user declined the proposed external hosting budget and explicitly requested
+staying on the current Site. This instruction supersedes AGENT_HANDOFF's earlier
+migration priority. Continue implementing compatible workflows in the existing
+Worker/D1 application and preserve its public audience and per-user isolation.
+No Render connection, hosting purchase, password account, or external OIDC client
+is needed to continue. Retain portable backend and migration work for later use.
+PostGIS-dependent calculations and background processing need supported Site
+implementations and real validation; this decision does not waive their requirements.
+Resume tenant roster seed/API/UI work, with actual dated source claims, explicit
+review, unknown anchor flags, and no guessed SEC mappings.
+
 ## 2026-11-17 — implementation baseline
 Follow docs/IMPLEMENTATION_PLAN.md, subject to AGENT_HANDOFF.md and the original acceptance criteria. Preserve public Overture history before interface development. Store large source captures outside Git, with record-level attribution and checksums. Seed coordinates remain explicitly unconfirmed public references. A missing seed pin is reported, never guessed.
 
