@@ -166,7 +166,8 @@ def test_service_computes_all_sections_from_real_responses_and_reuses_snapshots(
     from apps.sources.models import SourceSnapshot
     location = setup(tmp_path, client, *KINGSTON, settings)
     opener = FixtureOpener('kingston')
-    rows = {r.section: r for r in compute_area(location.pk, opener=opener)}
+    three = ('economy', 'traffic', 'hazards')
+    rows = {r.section: r for r in compute_area(location.pk, sections=three, opener=opener)}
     assert {k: r.status for k, r in rows.items()} == {'economy': 'available', 'traffic': 'available', 'hazards': 'available'}
     econ_data = rows['economy'].data
     assert econ_data['county']['name'] == 'Ulster County' and econ_data['employment']['period'] == '2026 Q1'
@@ -175,7 +176,7 @@ def test_service_computes_all_sections_from_real_responses_and_reuses_snapshots(
     assert {s['id'] for s in rows['economy'].sources} >= {'SRC-04', 'SRC-06', 'SRC-07', 'SRC-09'}
     published = SourceSnapshot.objects.count()
     again = FixtureOpener('kingston')
-    compute_area(location.pk, opener=again)
+    compute_area(location.pk, sections=three, opener=again)
     assert again.calls == [] and SourceSnapshot.objects.count() == published
     body = client.get(f'/api/locations/{location.pk}/area/').json()
     assert body['sections']['hazards']['status'] == 'available'
@@ -199,7 +200,8 @@ def test_one_failing_source_does_not_blank_other_sections(tmp_path, client, sett
                 raise OSError('connection reset')
             return super().open(request, timeout)
     location = setup(tmp_path, client, *KINGSTON, settings)
-    rows = {r.section: r for r in compute_area(location.pk, opener=NoFlood('kingston'))}
+    rows = {r.section: r for r in compute_area(location.pk, sections=('economy', 'traffic', 'hazards'),
+        opener=NoFlood('kingston'))}
     assert rows['economy'].status == 'available' and rows['traffic'].status == 'available'
     assert rows['hazards'].data['flood_at_pin'] == {'value': None, 'reason': 'SOURCE_ERROR'}
     assert rows['hazards'].data['nri']['rating'] == 'Relatively Moderate'
@@ -212,7 +214,7 @@ def test_api_requires_pin_auth_and_marks_stale_after_pin_move(tmp_path, client, 
     location = setup(tmp_path, client, *KINGSTON, settings)
     url = f'/api/locations/{location.pk}/area/'
     assert client.get(url).json()['sections']['economy']['reason'] == 'NOT_COMPUTED'
-    compute_area(location.pk, opener=FixtureOpener('kingston'))
+    compute_area(location.pk, sections=('traffic',), opener=FixtureOpener('kingston'))
     location.refresh_from_db()
     change_pin(location_id=location.pk, expected_version=location.version, lat=41.97, lon=-73.99, actor=None)
     assert client.get(url).json()['sections']['traffic']['reason'] == 'STALE'
@@ -228,3 +230,96 @@ def test_post_enqueues_one_job_per_analysis_version(tmp_path, client, settings):
     first, second = client.post(url), client.post(url)
     assert first.status_code == 202 and first.json()['job_id'] == second.json()['job_id']
     assert JobRun.objects.get(kind='compute_area_profile').parameters['analysis_version'] == location.analysis_version
+
+
+# ---- nearby businesses (Overture) -------------------------------------------------
+
+from apps.area import businesses as biz, overture
+
+KPIN = (41.965186, -73.988947)  # Kingston seed reference pin used by the archived captures
+
+
+def kingston(release):
+    return json.loads(raw(f'kingston.overture.{release}.0p6mi.json'))
+
+
+def test_brand_normalization_and_anchor_matching():
+    assert biz.normalize_brand("DICK'S Sporting Goods") == biz.normalize_brand("Dick's Sporting Goods") == 'dicks sporting goods'
+    assert biz.normalize_brand('Stop & Shop') == 'stop shop'
+    assert biz.brand_in("Lowe's Home Improvement", biz.ANCHOR_BRANDS)
+    assert not biz.brand_in('Lowell Pharmacy', biz.ANCHOR_BRANDS)
+    assert biz.normalize_brand(None) is None
+
+
+def test_real_regal_closure_is_a_watch_level_possible_closure():
+    found = biz.changes(kingston('2026-09-23.1'), kingston('2026-10-21.0'), KPIN)
+    regal = [c for c in found['closures'] if c['name'] == 'Regal Cinemas Hudson Valley Mall 12']
+    assert len(regal) == 1 and regal[0]['severity'] == 'Watch' and regal[0]['evidence'] == 'marked permanently closed'
+    assert regal[0]['distance_mi'] == pytest.approx(0.25, abs=0.05)
+
+
+def test_null_to_open_and_low_confidence_are_not_changes():
+    base = {'id': 'a', 'name': 'CVS Pharmacy', 'brand': 'CVS Pharmacy', 'basic_category': 'pharmacy_and_drug_store',
+        'lat': KPIN[0], 'lon': KPIN[1], 'sources': None}
+    assert biz.changes([{**base, 'operating_status': None, 'confidence': 0.9}],
+        [{**base, 'operating_status': 'open', 'confidence': 0.9}], KPIN) == {'closures': [], 'openings': []}
+    assert biz.changes([{**base, 'operating_status': 'open', 'confidence': 0.5}], [], KPIN)['closures'] == []
+    gone = biz.changes([{**base, 'operating_status': 'open', 'confidence': 0.9}], [], KPIN)['closures'][0]
+    assert gone['severity'] == 'FYI' and gone['evidence'] == 'no longer in the dataset'  # Watch, one level lower
+    mine = biz.changes([{**base, 'operating_status': 'open', 'confidence': 0.9}],
+        [{**base, 'operating_status': 'permanently_closed', 'confidence': 0.9}], KPIN, ['CVS'])['closures'][0]
+    assert mine['severity'] == 'High' and mine['tenant_match'] is True
+
+
+def test_landscape_counts_and_anchors_from_real_kingston_data():
+    out = biz.landscape(kingston('2026-11-18.0'), KPIN, radii=(0.5,))
+    assert out['retail_and_services_total']['0.5mi'] > 100
+    assert all(a['brand'] for a in out['anchors'])
+    assert out['anchors'] == sorted(out['anchors'], key=lambda a: a['distance_mi'])
+    assert 'Regal Cinemas Hudson Valley Mall 12' not in [a['name'] for a in out['anchors']]
+
+
+def test_broad_change_guard():
+    assert biz.broad_change([(100, 130)] * 4) is None
+    assert biz.broad_change([(100, 130)] * 3 + [(100, 100)] * 4) is True
+    assert biz.broad_change([(100, 101)] * 10) is False
+
+
+def test_release_listing_keeps_newest_per_month():
+    assert overture.parse_releases(raw('overture-releases.xml'))[-3:] == ['2026-09-23.1', '2026-10-21.0', '2026-11-18.0']
+
+
+class ListingOpener(FixtureOpener):
+    def open(self, request, timeout=None):
+        if 'overturemaps-us-west-2' in request.full_url:
+            return Response(raw('overture-releases.xml'))
+        return super().open(request, timeout)
+
+
+@pytest.mark.django_db
+def test_businesses_section_captures_missing_releases_once_and_diffs(tmp_path, client, settings):
+    from apps.area.service import compute_area
+    location = setup(tmp_path, client, *KPIN, settings)
+    calls = []
+
+    def capturer(lat, lon, release):
+        calls.append(release)
+        return json.dumps(kingston(release)).encode()
+    row = compute_area(location.pk, sections=('businesses',), opener=ListingOpener('kingston'), capturer=capturer)[0]
+    assert sorted(calls) == ['2026-10-21.0', '2026-11-18.0']
+    assert row.status == 'available' and row.data['release'] == '2026-11-18.0'
+    assert row.data['prior_release'] == '2026-10-21.0' and row.data['changes']['reason'] is None
+    assert any(s['id'] == 'SRC-13' for s in row.sources)
+    compute_area(location.pk, sections=('businesses',), opener=ListingOpener('kingston'), capturer=capturer)
+    assert len(calls) == 2  # stored captures are reused
+
+
+@pytest.mark.django_db
+def test_businesses_unavailable_when_capture_fails(tmp_path, client, settings):
+    from apps.area.service import compute_area
+    location = setup(tmp_path, client, *KPIN, settings)
+
+    def broken(lat, lon, release):
+        raise SourceError('SOURCE_ERROR', 'S3 unreachable')
+    row = compute_area(location.pk, sections=('businesses',), opener=ListingOpener('kingston'), capturer=broken)[0]
+    assert row.status == 'unavailable' and row.data == {'reason': 'SOURCE_ERROR'}

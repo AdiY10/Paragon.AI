@@ -54,3 +54,9 @@ envelope queries, NRI) are implemented in `backend/apps/area/` with immutable `A
 caching, a `compute_area_profile` job/command, `GET/POST /api/locations/<id>/area/`, and property-page panels.
 See docs/AREA_PROFILE.md. Not done: signals from these values, nearby businesses, LODES ring jobs.
 Note: this checkout is in an iCloud-synced folder that creates "file 2.py" duplicates; `.gitignore` now excludes them.
+
+## Nearby businesses (branch feat/nearby-businesses, Adi's session 2026-11-19)
+Overture business landscape and month-to-month changes are a fourth area section ('businesses'). Captures for the
+2026-09-23.1, 2026-10-21.0 and 2026-11-18.0 releases were taken for all 35 pinned seed properties on 2026-11-19
+(105 archives, held locally in var/overture-archive on Adi's machine; import with import_overture_captures).
+New or moved pins are captured on demand with DuckDB inside the compute_area_profile job.

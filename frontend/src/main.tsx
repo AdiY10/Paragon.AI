@@ -1039,12 +1039,12 @@ function LocationPage({ id }: { id: string }) {
         <div className="section-heading">
           <div>
             <span className="eyebrow">COMING NEXT</span>
-            <h2>Nearby businesses and jobs in each ring</h2>
+            <h2>Jobs located in each ring</h2>
           </div>
           <Database size={22} />
         </div>
         <p className="muted">
-          These sections have not completed their required checks yet. Missing
+          This section has not completed its required checks yet. Missing
           data is not a zero or a clear risk assessment.
         </p>
         <a className="text-button" href="#/sources">

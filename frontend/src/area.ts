@@ -93,12 +93,45 @@ export interface Hazards {
   concerns: string[];
   disclaimer: string;
 }
+export interface Place {
+  id: string;
+  name: string | null;
+  brand: string | null;
+  category: string | null;
+  group: string;
+  distance_mi: number;
+  status: string | null;
+  confidence: number | null;
+  grocery: boolean;
+  severity?: "High" | "Watch" | "FYI";
+  evidence?: string;
+  tenant_match?: boolean;
+}
+export interface Businesses {
+  release: string;
+  prior_release: string | null;
+  counts: Record<string, Record<string, number>>;
+  retail_and_services_total: Record<string, number>;
+  anchors: Place[];
+  nearest_supermarket: Place | null;
+  closed_within_1mi: number;
+  changes: {
+    closures: Place[];
+    openings: Place[];
+    total_closures?: number;
+    total_openings?: number;
+    broad_data_change?: boolean | null;
+    tenants_checked?: number;
+    reason: string | null;
+  };
+}
 export interface Area {
   placed: boolean;
   sections: {
     economy: Section<Economy>;
     traffic: Section<Traffic>;
     hazards: Section<Hazards>;
+    businesses: Section<Businesses>;
   };
 }
 
@@ -149,3 +182,11 @@ export function floodHeadline(f: Flood): string {
 
 export const floodTone = (f: Flood) =>
   f.sfha ? "red" : f.risk === "moderate" ? "amber" : "neutral";
+
+export const miles = (d: number) => `${d.toFixed(1)} mi`;
+export const placeName = (p: Place) => p.name ?? p.brand ?? "Unnamed place";
+export function releaseLabel(release: string | null | undefined) {
+  if (!release) return "";
+  const [y, m, d] = release.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
