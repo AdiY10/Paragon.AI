@@ -42,6 +42,36 @@ def reserve_attempt(email,ip):
     return 0
 
 
+LOCAL_HOSTS={'127.0.0.1','localhost'}
+
+
+def local_shared_password_enabled(request):
+    """Local-preview convenience only: a shared password for any email.
+
+    Active only when LOCAL_SHARED_PASSWORD is set (never in committed settings) AND the
+    request is addressed to this machine, so a deployed site can never accept it.
+    """
+    secret=getattr(settings,'LOCAL_SHARED_PASSWORD','') or ''
+    host=request.get_host().rsplit(':',1)[0].strip('[]')
+    return bool(secret) and host in LOCAL_HOSTS and request.META.get('REMOTE_ADDR') in ('127.0.0.1','::1')
+
+
+@sensitive_variables('password')
+def local_shared_login(request,email,password):
+    from django.contrib.auth import get_user_model
+    from django.utils.crypto import constant_time_compare
+    if not constant_time_compare(password,settings.LOCAL_SHARED_PASSWORD):return None
+    User=get_user_model()
+    user,_=User.objects.get_or_create(username=email,defaults={'email':email})
+    membership=Membership.objects.filter(email=email).first()
+    if membership is None:
+        membership=Membership.objects.create(email=email,user=user,role=Membership.Role.ADMIN)
+    elif membership.user_id is None:
+        membership.user=user;membership.save(update_fields=['user'])
+    if not membership.active or membership.user_id!=user.pk or not user.is_active:return None
+    return user,membership
+
+
 def return_path(value):
     return value if isinstance(value,str) and value.startswith('/') and not value.startswith('//') and '\\' not in value and not any(ord(c)<32 for c in value) else '/'
 
@@ -62,6 +92,12 @@ def sign_in(request):
         retry_after=reserve_attempt(email,request.META.get('REMOTE_ADDR',''))
         if retry_after:
             status=429;error='Too many sign-in attempts. Please try again later.'
+        elif form.is_valid() and local_shared_password_enabled(request) and \
+                (shared:=local_shared_login(request,email,form.cleaned_data['password'])):
+            user,membership=shared
+            login(request,user,backend='django.contrib.auth.backends.ModelBackend')
+            AccessAuditEvent.objects.create(actor=user,membership=membership,action='password_login',after={'method':'local_shared_password'})
+            return redirect(next_path)
         elif form.is_valid():
             membership=Membership.objects.select_related('user').filter(email=email,active=True).first()
             password=form.cleaned_data['password']
@@ -77,7 +113,7 @@ def sign_in(request):
         else:
             status=401;error='The email or password is incorrect, or access is unavailable.'
     response=render(request,'account/password_login.html',{'form':form,'error':error,'next':next_path,
-        'oidc_available':bool(settings.SOCIALACCOUNT_PROVIDERS)},status=status)
+        'oidc_available':bool(settings.SOCIALACCOUNT_PROVIDERS),'local_shared':local_shared_password_enabled(request)},status=status)
     if retry_after:response['Retry-After']=str(retry_after)
     return response
 
