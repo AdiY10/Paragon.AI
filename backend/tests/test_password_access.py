@@ -118,3 +118,35 @@ def test_concurrent_attempts_do_not_bypass_limit():
         finally:connections.close_all()
     with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(attempt,range(12)))
     assert results.count(0)==8
+
+
+# ---- local preview shared password (never active on a deployed host) -----------------
+
+import pytest as _pt
+
+
+@_pt.mark.django_db
+def test_local_shared_password_signs_in_any_email_on_localhost_only(client, settings):
+    settings.PASSWORD_ACCESS_ENABLED = True
+    settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'radar.example']
+    settings.LOCAL_SHARED_PASSWORD = 'Lilo123'
+    ok = client.post('/access/login/', {'email': 'anyone@example.org', 'password': 'Lilo123'},
+        HTTP_HOST='127.0.0.1:8765', REMOTE_ADDR='127.0.0.1')
+    assert ok.status_code == 302
+    client.logout()
+    wrong = client.post('/access/login/', {'email': 'anyone@example.org', 'password': 'nope'},
+        HTTP_HOST='127.0.0.1:8765', REMOTE_ADDR='127.0.0.1')
+    assert wrong.status_code == 401
+    remote = client.post('/access/login/', {'email': 'other@example.org', 'password': 'Lilo123'},
+        HTTP_HOST='radar.example', REMOTE_ADDR='203.0.113.9')
+    assert remote.status_code == 401
+
+
+@_pt.mark.django_db
+def test_shared_password_off_without_setting(client, settings):
+    settings.PASSWORD_ACCESS_ENABLED = True
+    settings.ALLOWED_HOSTS = ['127.0.0.1']
+    settings.LOCAL_SHARED_PASSWORD = ''
+    r = client.post('/access/login/', {'email': 'x@example.org', 'password': 'Lilo123'},
+        HTTP_HOST='127.0.0.1', REMOTE_ADDR='127.0.0.1')
+    assert r.status_code == 401
