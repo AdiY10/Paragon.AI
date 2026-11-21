@@ -27,6 +27,8 @@ from .http import SourceError
 from .models import AreaSection
 
 ADAPTER = 'area-v1'
+# Bump a section's logic version when its computation changes, so cached results are recomputed.
+SECTION_LOGIC = {'businesses': 4}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
@@ -392,7 +394,8 @@ def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, cap
         except SourceError as exc:
             data, ok = {'reason': exc.code}, False
         stale = sorted(k for k, v in run.sources.items() if v.get('stale'))
-        inputs = hashlib.sha256(json.dumps([name, run.snapshots, stale], sort_keys=True).encode()).hexdigest()
+        key = [name, run.snapshots, stale] + ([SECTION_LOGIC[name]] if name in SECTION_LOGIC else [])
+        inputs = hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
         with transaction.atomic():
             if Location.objects.select_for_update().get(pk=location.pk).analysis_version != version:
                 raise SourceError('STALE', 'Pin changed during computation')
