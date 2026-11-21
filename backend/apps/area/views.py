@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, throttle_classes
+from apps.accounts.permissions import ExpensiveThrottle
 from rest_framework.response import Response
 from apps.locations.models import Location
 from apps.operations.service import enqueue_job
@@ -7,6 +8,7 @@ from .service import serialize
 
 
 @api_view(['GET', 'POST'])
+@throttle_classes([ExpensiveThrottle])
 def area(request, location_id):
     location = get_object_or_404(Location.objects.select_related('current_revision'), pk=location_id)
     if request.method == 'POST':

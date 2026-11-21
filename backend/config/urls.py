@@ -12,6 +12,7 @@ from apps.insights import tenant_views as tenants
 
 urlpatterns = [
     path('health/', views.health, name='health'),
+    path('health/ready/', views.health_ready, name='health-ready'),
     path('access/login/', password_access.sign_in, name='password_login'),
     path('access/logout/', password_access.sign_out, name='password_logout'),
     path('accounts/', include('allauth.urls')),

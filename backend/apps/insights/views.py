@@ -1,5 +1,7 @@
+import uuid
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from apps.accounts.permissions import IsAdministrator, ExpensiveThrottle
 from rest_framework.response import Response
 from apps.locations.models import Location
 from .metrics import summary
@@ -30,7 +32,10 @@ def signal_list(request):
     if status != 'all':
         qs = qs.filter(status=status)
     if loc := request.query_params.get('location'):
-        qs = qs.filter(location_id=loc)
+        try:
+            qs = qs.filter(location_id=uuid.UUID(loc))
+        except ValueError:
+            return Response({'detail': 'location must be a location id'}, status=400)
     return Response({'results': [serialize(s) for s in sorted(qs, key=rank_key)][:500]})
 
 
@@ -70,16 +75,15 @@ def brief_detail(request, brief_id):
 
 
 @api_view(['POST'])
+@permission_classes([IsAdministrator])
 def brief_generate(request):
     """Admin: generate a brief now (in addition to Monday 07:00 US Eastern)."""
-    from apps.accounts.models import Membership
     from .brief import generate, serialize_brief
-    if not Membership.objects.filter(user=request.user, role='admin').exists():
-        return Response({'detail': 'Administrators only'}, status=403)
     return Response(serialize_brief(generate(kind='manual')), status=201)
 
 
 @api_view(['GET', 'POST'])
+@throttle_classes([ExpensiveThrottle])
 def screens(request):
     """GET recent unsaved screens; POST {address, name?} to screen a new address (FR-25)."""
     from apps.locations.serializers import LocationSerializer
@@ -107,6 +111,7 @@ def screen_save(request, location_id):
 
 
 @api_view(['POST'])
+@throttle_classes([ExpensiveThrottle])
 def location_compute(request, location_id):
     """Queue demographics and all area sections for a placed location."""
     from .screens import start_computations

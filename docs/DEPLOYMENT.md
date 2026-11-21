@@ -146,8 +146,15 @@ logout denies API access, and password rotation/revocation takes effect. Verify
 restart persistence of database records, sessions, and private artifacts. Check
 rate limits and real ingress behavior; the local socket smoke cannot verify TLS.
 Render's ingress must sanitize the trusted forwarded-protocol header before
-`TRUST_PROXY_SSL_HEADER=true` is used. IP throttling deliberately ignores arbitrary
-forwarded-IP headers and can share an ingress-IP budget.
+`TRUST_PROXY_SSL_HEADER=true` is used. Sign-in throttling uses `REMOTE_ADDR` unless
+`TRUSTED_PROXY_COUNT` is set to the number of reverse proxies that append to
+`X-Forwarded-For` (Caddy on the droplet: `1`); entries left of those hops are ignored.
+
+Security settings (R2 item 2): sessions expire after 12 hours idle and 14 days in total;
+`EXPENSIVE_RATE` (default `120/hour`) caps per-user screens, recomputes and SEC searches;
+`/health/ready/` checks the database. `LOCAL_PREVIEW` and `LOCAL_SHARED_PASSWORD` are
+local-preview-only: production settings refuse to start if either is set, and the shared
+password is refused for any request carrying a forwarding header.
 
 Current evidence: 253 backend tests pass on PostgreSQL 17/PostGIS 3.6; the manifest
 passes Render's official schema. Password browser QA and a private 36-record import

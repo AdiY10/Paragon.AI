@@ -2,7 +2,8 @@
 from datetime import datetime, timezone
 import io
 import json
-from urllib.request import Request, build_opener
+from urllib.request import Request
+from apps.area.http import default_opener
 from apps.sources.snapshots import publish_snapshot, ValidationReport
 
 SERIES = 'CUUR0000SA0'
@@ -35,7 +36,7 @@ def fetch(years, *, opener=None, timeout=30):
         'annualaverage': True}).encode()
     request = Request(URL, data=body, headers={'Content-Type': 'application/json',
         'User-Agent': 'ParagonRadar/0.1 (+https://github.com/AdiY10/Paragon.AI)'})
-    with (opener or build_opener()).open(request, timeout=timeout) as response:
+    with (opener or default_opener()).open(request, timeout=timeout) as response:
         raw = response.read(1_048_576)
     return parse(raw, years), datetime.now(timezone.utc)
 

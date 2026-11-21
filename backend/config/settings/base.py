@@ -60,7 +60,12 @@ AUTH_PASSWORD_VALIDATORS = [
 LOGIN_REDIRECT_URL = '/'
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
+SESSION_COOKIE_AGE = 60 * 60 * 12  # idle timeout; refreshed on every request
+SESSION_ABSOLUTE_SECONDS = 60 * 60 * 24 * 14
+# Number of trusted reverse proxies in front of the app (Caddy on the droplet = 1). 0 = use REMOTE_ADDR.
+TRUSTED_PROXY_COUNT = int(os.environ.get('TRUSTED_PROXY_COUNT', '0'))
+LOCAL_PREVIEW = False
+LOCAL_SHARED_PASSWORD = ''
 SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = 'DENY'
@@ -70,6 +75,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
+    'DEFAULT_THROTTLE_RATES': {'expensive': os.environ.get('EXPENSIVE_RATE', '120/hour')},
 }
 SPECTACULAR_SETTINGS = {'TITLE': 'Paragon Radar API', 'VERSION': '0.1.0', 'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAdminUser']}
 

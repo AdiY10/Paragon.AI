@@ -42,6 +42,24 @@ def reserve_attempt(email,ip):
     return 0
 
 
+def release_account_attempt(email):
+    """A successful sign-in clears the account bucket, so typos before it don't add up; the IP bucket stays."""
+    key=salted_hmac('password-login','account:'+email.lower(),algorithm='sha256').hexdigest()
+    LoginThrottle.objects.filter(pk=key).update(attempts=0)
+
+
+def client_ip(request):
+    """The client address as seen by the outermost trusted proxy (TRUSTED_PROXY_COUNT), else REMOTE_ADDR.
+
+    X-Forwarded-For entries left of the trusted hops are client-controlled and ignored.
+    """
+    hops=getattr(settings,'TRUSTED_PROXY_COUNT',0)
+    if hops>0:
+        chain=[p.strip() for p in request.META.get('HTTP_X_FORWARDED_FOR','').split(',') if p.strip()]
+        if len(chain)>=hops:return chain[-hops]
+    return request.META.get('REMOTE_ADDR','')
+
+
 LOCAL_HOSTS={'127.0.0.1','localhost'}
 
 
@@ -52,8 +70,11 @@ def local_shared_password_enabled(request):
     request is addressed to this machine, so a deployed site can never accept it.
     """
     secret=getattr(settings,'LOCAL_SHARED_PASSWORD','') or ''
+    if not (secret and getattr(settings,'LOCAL_PREVIEW',False)):return False
+    # A same-machine reverse proxy also connects from 127.0.0.1, so any forwarding header disqualifies.
+    if any(k in request.META for k in ('HTTP_X_FORWARDED_FOR','HTTP_X_REAL_IP','HTTP_FORWARDED')):return False
     host=request.get_host().rsplit(':',1)[0].strip('[]')
-    return bool(secret) and host in LOCAL_HOSTS and request.META.get('REMOTE_ADDR') in ('127.0.0.1','::1')
+    return host in LOCAL_HOSTS and request.META.get('REMOTE_ADDR') in ('127.0.0.1','::1')
 
 
 @sensitive_variables('password')
@@ -65,7 +86,7 @@ def local_shared_login(request,email,password):
     user,_=User.objects.get_or_create(username=email,defaults={'email':email})
     membership=Membership.objects.filter(email=email).first()
     if membership is None:
-        membership=Membership.objects.create(email=email,user=user,role=Membership.Role.ADMIN)
+        membership=Membership.objects.create(email=email,user=user,role=Membership.Role.MEMBER)
     elif membership.user_id is None:
         membership.user=user;membership.save(update_fields=['user'])
     if not membership.active or membership.user_id!=user.pk or not user.is_active:return None
@@ -89,14 +110,13 @@ def sign_in(request):
     status=200;retry_after=0;error=''
     if request.method=='POST':
         email=request.POST.get('email','')[:254].strip().lower()
-        retry_after=reserve_attempt(email,request.META.get('REMOTE_ADDR',''))
+        retry_after=reserve_attempt(email,client_ip(request))
         if retry_after:
             status=429;error='Too many sign-in attempts. Please try again later.'
         elif form.is_valid() and local_shared_password_enabled(request) and \
                 (shared:=local_shared_login(request,email,form.cleaned_data['password'])):
             user,membership=shared
-            login(request,user,backend='django.contrib.auth.backends.ModelBackend')
-            AccessAuditEvent.objects.create(actor=user,membership=membership,action='password_login',after={'method':'local_shared_password'})
+            _signed_in(request,user,membership,'local_shared_password',email)
             return redirect(next_path)
         elif form.is_valid():
             membership=Membership.objects.select_related('user').filter(email=email,active=True).first()
@@ -106,9 +126,10 @@ def sign_in(request):
             username=membership.user.get_username() if membership and membership.user else '__unavailable_password_account__'
             user=authenticate(request,username=username,password=password,backend='django.contrib.auth.backends.ModelBackend')
             if user and membership and membership.user_id==user.pk and user.is_active:
-                login(request,user,backend='django.contrib.auth.backends.ModelBackend')
-                AccessAuditEvent.objects.create(actor=user,membership=membership,action='password_login',after={'method':'password'})
+                _signed_in(request,user,membership,'password',email)
                 return redirect(next_path)
+            if membership:
+                AccessAuditEvent.objects.create(actor=None,membership=membership,action='password_login_failed')
             status=401;error='The email or password is incorrect, or access is unavailable.'
         else:
             status=401;error='The email or password is incorrect, or access is unavailable.'
@@ -118,8 +139,18 @@ def sign_in(request):
     return response
 
 
+def _signed_in(request,user,membership,method,email):
+    login(request,user,backend='django.contrib.auth.backends.ModelBackend')
+    request.session['signed_in_at']=int(timezone.now().timestamp())
+    release_account_attempt(email)
+    AccessAuditEvent.objects.create(actor=user,membership=membership,action='password_login',after={'method':method})
+
+
 @never_cache
 @require_POST
 def sign_out(request):
+    membership=getattr(request,'membership',None)
+    if membership:
+        AccessAuditEvent.objects.create(actor=request.user,membership=membership,action='logout')
     logout(request)
     return redirect(settings.LOGIN_URL)
