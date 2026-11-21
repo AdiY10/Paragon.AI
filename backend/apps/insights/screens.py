@@ -72,8 +72,8 @@ def expire_screens(now=None):
 def compare(ids):
     """Rows of comparable measures for 2-4 locations plus portfolio median and range."""
     from .metrics import METRICS, extract, benchmarks
-    from .signals import attention, active_for
-    locations = list(Location.objects.filter(pk__in=ids).select_related('current_revision'))
+    from .signals import cached_attention, active_for
+    locations = list(Location.objects.filter(pk__in=ids).select_related('current_revision', 'metrics_snapshot'))
     order = {str(i): n for n, i in enumerate(ids)}
     locations.sort(key=lambda l: order.get(str(l.pk), 99))
     values = {str(l.pk): extract(l) for l in locations}
@@ -96,7 +96,7 @@ def compare(ids):
         hz = values[str(l.pk)].get('_hazards') or {}
         at = hz.get('flood_at_pin') or {}
         cols.append({'id': str(l.pk), 'name': l.name, 'city': l.city, 'state': l.state, 'status': l.status,
-            'screening': l.screening, 'ring_preset': l.ring_preset, 'attention': attention(l.pk),
+            'screening': l.screening, 'ring_preset': l.ring_preset, 'attention': cached_attention(l),
             'flood_zone': at.get('zone'), 'sfha': bool(at.get('in_sfha', at.get('sfha'))),
             'nri_rating': (hz.get('nri') or {}).get('rating'),
             'signals': [{'title': s['title'], 'severity': s['severity']} for s in active_for(l)][:5]})

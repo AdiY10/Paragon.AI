@@ -30,8 +30,34 @@ def _ring(rings, radius=3):
     return next((r for r in rings or [] if r.get('radius_miles') == radius), None)
 
 
-def extract(location):
+def refresh_snapshot(location):
+    """Rebuild the LocationMetrics row for one location (after evaluation or review)."""
+    from .models import LocationMetrics
+    from .signals import attention
+    values = extract(location, fresh=True)
+    row, _ = LocationMetrics.objects.update_or_create(location=location, defaults={
+        'analysis_version': location.analysis_version, 'values': values, 'attention': attention(location.pk)})
+    return row
+
+
+def snapshots(locations):
+    """{location id: LocationMetrics} for current rows, rebuilding missing or outdated ones."""
+    from .models import LocationMetrics
+    locations = list(locations)
+    rows = {r.location_id: r for r in LocationMetrics.objects.filter(location__in=locations)}
+    out = {}
+    for loc in locations:
+        row = rows.get(loc.pk)
+        if row is None or row.analysis_version != loc.analysis_version:
+            row = refresh_snapshot(loc)
+        out[loc.pk] = row
+    return out
+
+
+def extract(location, fresh=False):
     """Comparable metric values for one location, each with its source period. Missing keys = unavailable."""
+    if not fresh:
+        return snapshots([location])[location.pk].values
     from apps.demographics.service import current_result
     from apps.area.models import AreaSection
     out = {}
@@ -96,14 +122,15 @@ def portfolio_values(exclude_id=None):
     from apps.demographics.vintage import current_acs_year
     year = current_acs_year()
     values = {}
+    rows = snapshots(loc for loc in owned if loc.pk != exclude_id)
     for loc in owned:
         if loc.pk == exclude_id:
             continue
-        for key, item in extract(loc).items():
+        for key, item in rows[loc.pk].values.items():
             # Percentiles compare one ACS vintage only; a property still on the old one is left out.
             if key in METRICS and item.get('vintage', year) == year:
                 values.setdefault(key, []).append(item['value'])
-    return values, owned.count() - (1 if exclude_id and owned.filter(pk=exclude_id).exists() else 0)
+    return values, sum(1 for loc in owned if loc.pk != exclude_id)
 
 
 def benchmarks():

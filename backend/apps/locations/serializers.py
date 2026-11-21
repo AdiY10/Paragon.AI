@@ -24,8 +24,8 @@ class LocationSerializer(serializers.ModelSerializer):
             'version','analysis_version','current_revision','created_at','updated_at','attention','screening']
     def get_attention(self,obj):
         # FR-20: highest active signal severity (High, Watch) or Clear.
-        from apps.insights.signals import attention
-        return attention(obj.pk)
+        from apps.insights.signals import cached_attention
+        return cached_attention(obj)
 
 class CreateSerializer(StrictInputMixin,serializers.Serializer):
     name=serializers.CharField(max_length=200)

@@ -297,7 +297,11 @@ def safe_evaluate(location_id):
     import logging
     from apps.locations.models import Location
     try:
-        return evaluate(Location.objects.get(pk=location_id))
+        location = Location.objects.select_related('current_revision').get(pk=location_id)
+        result = evaluate(location)
+        from .metrics import refresh_snapshot
+        refresh_snapshot(location)
+        return result
     except Exception:
         logging.getLogger(__name__).exception('signal evaluation failed for location %s', location_id)
         return None
@@ -323,6 +327,18 @@ def rank_key(s):
 
 
 COUNTY_ONLY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'}
+
+
+def cached_attention(location):
+    """Attention from the LocationMetrics snapshot when current (no extra query if prefetched)."""
+    from django.core.exceptions import ObjectDoesNotExist
+    try:
+        row = location.metrics_snapshot
+    except ObjectDoesNotExist:
+        row = None
+    if row is not None and row.analysis_version == location.analysis_version:
+        return row.attention
+    return attention(location.pk)
 
 
 def attention(location_id):
