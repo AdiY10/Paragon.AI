@@ -114,6 +114,13 @@ def maintenance_daily(context,parameters):
     done+=JobRun.objects.filter(status__in=['succeeded','failed'],finished_at__lt=now-timedelta(days=180)).delete()[0]
     done+=AlertEvent.objects.filter(resolved_at__lt=now-timedelta(days=90)).delete()[0]
     done+=LoginThrottle.objects.filter(window_start__lt=now-timedelta(days=1)).delete()[0]
+    # Raw Overture captures: keep the two newest releases; older ones live on in compact form.
+    from django.conf import settings
+    from apps.area import overture_store
+    from apps.area.models import OvertureCapture
+    from apps.sources.storage import LocalArtifactStore
+    keep=sorted(set(OvertureCapture.objects.values_list('release',flat=True)))[-2:]
+    done+=overture_store.prune_raw(LocalArtifactStore(settings.SOURCE_ARTIFACT_ROOT),keep)
     return JobResult(records=done)
 
 FOREGROUND='paragon-foreground'

@@ -14,7 +14,7 @@ from .http import fetch, SourceError
 
 BUCKET = 'https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/'
 RELEASE = re.compile(r'^\d{4}-\d{2}-\d{2}\.\d+$')
-COLUMNS = ['id', 'name', 'basic_category', 'brand', 'operating_status', 'confidence', 'sources', 'lat', 'lon']
+COLUMNS = ['id', 'name', 'basic_category', 'brand', 'brand_wikidata', 'operating_status', 'confidence', 'lat', 'lon']
 
 
 def parse_releases(xml):
@@ -43,40 +43,65 @@ def source_url(release):
     return f's3://overturemaps-us-west-2/release/{release}/theme=places/type=place/*'
 
 
-def capture(lat, lon, release, radius=3.0):
-    """Read places within ``radius`` miles from the public GeoParquet release (DuckDB, ~10-60 s)."""
+def _box(lat, lon, radius):
+    delta = (radius + 0.05) / 69.0
+    dx = delta / max(0.01, math.cos(math.radians(lat)))
+    return lon - dx, lon + dx, lat - delta, lat + delta
+
+
+def _connect(duckdb):
+    import os
+    ext = Path(settings.SOURCE_ARTIFACT_ROOT).parent / 'duckdb-extensions'
+    ext.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect(config={'extension_directory': str(ext)})
+    con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
+    # Small hosts: OVERTURE_MEMORY_LIMIT (e.g. 256MB) keeps DuckDB inside the container's RAM.
+    limit = os.environ.get('OVERTURE_MEMORY_LIMIT', '1GB')
+    if not re.fullmatch(r'\d+(MB|GB)', limit):
+        limit = '1GB'
+    con.execute(f"SET s3_region='us-west-2'; SET memory_limit='{limit}'; SET threads=2;")
+    return con
+
+
+SELECT = """SELECT id, names.primary AS name, basic_category, brand.names.primary AS brand,
+    brand.wikidata AS brand_wikidata, operating_status, confidence, ST_Y(geometry) AS lat, ST_X(geometry) AS lon
+    FROM read_parquet(?) WHERE """
+
+
+def capture_many(pins, release, radius=3.0):
+    """One DuckDB session and one scan for several pins: {(lat, lon): JSON bytes}.
+
+    Only the fields the product uses are read (no per-record ``sources``), which keeps
+    memory small on a 2 GB server.
+    """
     import duckdb
     if not RELEASE.fullmatch(release):
         raise SourceError('SCHEMA_ERROR', 'invalid release')
-    ext = Path(settings.SOURCE_ARTIFACT_ROOT).parent / 'duckdb-extensions'
-    ext.mkdir(parents=True, exist_ok=True)
+    pins = list(pins)
+    if not pins:
+        return {}
+    boxes = [_box(lat, lon, radius) for lat, lon in pins]
+    where = ' OR '.join('(bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?)' for _ in boxes)
+    params = [source_url(release)] + [v for b in boxes for v in b]
     from .locks import overture_capture_lock
     with overture_capture_lock():
-        rows = _scan(duckdb, ext, lat, lon, release, radius)
+        try:
+            con = _connect(duckdb)
+            try:
+                rows = con.execute(SELECT + where, params).fetchall()
+            finally:
+                con.close()
+        except Exception as exc:
+            raise SourceError('SOURCE_ERROR', type(exc).__name__) from None
     records = [dict(zip(COLUMNS, r)) for r in rows]
-    records = [r for r in records if haversine_miles(lat, lon, r['lat'], r['lon']) <= radius]
-    records.sort(key=lambda r: r['id'])
-    return json.dumps(records, sort_keys=True, default=str).encode()
+    out = {}
+    for lat, lon in pins:
+        mine = [r for r in records if haversine_miles(lat, lon, r['lat'], r['lon']) <= radius]
+        mine.sort(key=lambda r: r['id'])
+        out[(lat, lon)] = json.dumps(mine, sort_keys=True, default=str).encode()
+    return out
 
 
-def _scan(duckdb, ext, lat, lon, release, radius):
-    con = duckdb.connect(config={'extension_directory': str(ext)})
-    try:
-        con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
-        # Small hosts: OVERTURE_MEMORY_LIMIT (e.g. 256MB) keeps DuckDB inside the container's RAM.
-        import os
-        limit = os.environ.get('OVERTURE_MEMORY_LIMIT', '1GB')
-        if not re.fullmatch(r'\d+(MB|GB)', limit):
-            limit = '1GB'
-        con.execute(f"SET s3_region='us-west-2'; SET memory_limit='{limit}'; SET threads=2;")
-        delta = (radius + 0.05) / 69.0
-        dx = delta / max(0.01, math.cos(math.radians(lat)))
-        rows = con.execute('''SELECT id, names.primary AS name, basic_category, brand.names.primary AS brand,
-            operating_status, confidence, sources, ST_Y(geometry) AS lat, ST_X(geometry) AS lon
-            FROM read_parquet(?) WHERE bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?''',
-            [source_url(release), lon - dx, lon + dx, lat - delta, lat + delta]).fetchall()
-    except Exception as exc:
-        raise SourceError('SOURCE_ERROR', type(exc).__name__) from None
-    finally:
-        con.close()
-    return rows
+def capture(lat, lon, release, radius=3.0):
+    """Read places within ``radius`` miles from the public GeoParquet release (DuckDB, ~10-60 s)."""
+    return capture_many([(lat, lon)], release, radius)[(lat, lon)]

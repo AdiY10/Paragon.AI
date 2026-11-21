@@ -88,8 +88,20 @@ def test_overture_check_records_release_health(monkeypatch):
     locations()
     monkeypatch.setattr(refresh.overture, 'available_releases', lambda opener=None: ['2026-10-21.0', '2026-11-18.0'])
     monkeypatch.setattr('apps.area.service.compute_area', lambda *a, **k: [])
-    out = refresh.refresh_businesses(Ctx())
+    import json as _json
+    from apps.area.models import OvertureCapture, OvertureReleasePair
+    calls = []
+
+    def capturer(lat, lon, release):
+        calls.append(release)
+        return _json.dumps([{'id': 'a', 'name': 'Regal', 'brand': 'Regal', 'basic_category': 'movie_theater',
+            'confidence': 0.9, 'operating_status': 'open', 'lat': lat, 'lon': lon, 'sources': [{'x': 1}]}]).encode()
+    out = refresh.refresh_businesses(Ctx(), capturer=capturer)
     assert (out.done, out.failed, out.info['release']) == (2, 0, '2026-11-18.0')
+    assert len(calls) == 4 and OvertureCapture.objects.count() == 4
+    assert OvertureReleasePair.objects.get().cohort_size == 2
+    refresh.refresh_businesses(Ctx(), capturer=capturer)
+    assert len(calls) == 4  # already captured: no new scans
     assert SourceHealth.objects.get(source_id='SRC-13', scope='releases').last_success_at is not None
 
 
