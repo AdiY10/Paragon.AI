@@ -2648,3 +2648,32 @@ small,
     align-items: flex-start;
   }
 }
+
+/* ---- R2.23 accessibility ---- */
+.skip-map {
+  position: absolute;
+  left: -9999px;
+}
+.skip-map:focus,
+.skip-map:focus-visible {
+  position: static;
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: var(--pine);
+  color: #fff;
+  border-radius: 6px;
+}
+.map-after:focus {
+  outline: none;
+}
+#main:focus {
+  outline: none;
+}
+button,
+.button,
+.text-button,
+.icon-button,
+select {
+  min-height: 24px;
+}

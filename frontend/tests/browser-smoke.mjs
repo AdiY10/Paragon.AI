@@ -55,7 +55,7 @@ try {
     )
       throw new Error(`Horizontal overflow at ${width}`);
     const result = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
       .analyze();
     if (result.violations.length)
       throw new Error(
@@ -105,7 +105,7 @@ try {
   if (await page.locator(".map-status").count())
     throw new Error("Live map did not load normally");
   const mapA11y = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
   if (mapA11y.violations.length)
     throw new Error(
@@ -138,6 +138,18 @@ try {
   const name = await property.locator("h3").innerText();
   await property.click();
   await page.getByRole("heading", { name, exact: true }).waitFor();
+  await page.getByLabel("Key facts").waitFor();
+  await page.getByRole("navigation", { name: "Sections on this page" }).waitFor();
+  // Property pages at phone width: no overflow and no WCAG 2.2 AA violations (R2.23).
+  await page.setViewportSize({ width: 375, height: 1000 });
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
+    throw new Error("Property page overflows at 375");
+  const propertyA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  if (propertyA11y.violations.length)
+    throw new Error(`Property page a11y at 375: ${propertyA11y.violations.map((v) => v.id).join(", ")}`);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  // The record, map pin and history live in the closed "Property record and map pin" section.
+  await page.getByText("Property record and map pin", { exact: true }).click();
   await page.locator(".location-map[data-ready=true]").waitFor();
   await page.locator(".map-marker").first().waitFor();
   await page.locator(".location-map[data-rings='3']").waitFor();
@@ -163,7 +175,7 @@ try {
     })
     .waitFor();
   await page
-    .getByRole("button", { name: "Confirm record", exact: true })
+    .getByRole("button", { name: "Yes, confirm", exact: true })
     .click();
   await page.getByText("Record confirmed.", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Correct / confirm pin" }).click();
@@ -360,7 +372,7 @@ try {
         throw new Error("Census dialog overflows on phone");
       if(output)await page.screenshot({path:`${output}/census-review-375.png`,fullPage:false});
       const scan = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
         .analyze();
       if (scan.violations.length)
         throw new Error(

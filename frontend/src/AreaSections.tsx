@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ComputeStatus, POLL_MS, SectionState, useComputeJob } from "./useComputeJob";
 import { Briefcase, Building, Car, ShieldAlert, Store } from "lucide-react";
-import { api, dateLabel } from "./api";
+import { api, checkedLabel, dateLabel } from "./api";
 import type { Location } from "./types";
 import { reasonText } from "./demographics";
 import {
@@ -149,7 +149,7 @@ function Sources({ sources, computedAt }: { sources: SourceRef[]; computedAt?: s
   return (
     <details className="area-sources">
       <summary>
-        Sources · checked {dateLabel(computedAt)}
+        Sources · {checkedLabel(computedAt)}
       </summary>
       <ul className="evidence-list">
         {sources.map((s) => (
@@ -157,7 +157,7 @@ function Sources({ sources, computedAt }: { sources: SourceRef[]; computedAt?: s
             <a href={s.url} target="_blank" rel="noreferrer">
               {s.name}
             </a>{" "}
-            · {monthLabel(s.period)} · checked {dateLabel(s.checked_at ?? s.retrieved_at)}
+            · {monthLabel(s.period)} · {checkedLabel(s.checked_at ?? s.retrieved_at)}
             {s.stale && <span className="badge amber"> Stale</span>}
           </li>
         ))}

@@ -69,6 +69,9 @@ export async function allLocations(): Promise<Location[]> {
   if (path) throw new Error("Portfolio pagination did not complete");
   return records;
 }
+/** "checked Nov 21, 2026" or "not checked yet" (never "checked Not checked"). */
+export const checkedLabel = (value: string | null | undefined) =>
+  value ? `checked ${dateLabel(value)}` : "not checked yet";
 export const dateLabel = (value: string | null | undefined) =>
   value
     ? new Intl.DateTimeFormat("en-US", {

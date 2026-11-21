@@ -146,7 +146,10 @@ export default function LocationMap({
         map.fitBounds(bounds, { padding: 65, maxZoom: 12, duration: 0 });
       else
         map.jumpTo({ zoom: editPin ? 17 : previewOnly ? 16 : rings ? 10 : 13 });
-      map.on("error", () => setTilesFailed(true));
+      // One missing tile is normal; only a basemap that never loads is worth a message.
+      map.on("error", () => {
+        if (!map?.loaded()) setTilesFailed(true);
+      });
       map.on("load", () => {
         if (host.current) host.current.dataset.ready = "true";
         if (!rings || !map) return;
@@ -213,6 +216,17 @@ export default function LocationMap({
     );
   return (
     <div className="map-wrapper">
+      <a
+        className="skip-map"
+        href="#after-map"
+        onClick={(e) => {
+          // Keyboard users can jump past the interactive map instead of tabbing through it.
+          e.preventDefault();
+          (e.currentTarget.parentElement?.querySelector(".map-after") as HTMLElement | null)?.focus();
+        }}
+      >
+        Skip map
+      </a>
       <div
         ref={host}
         className="location-map"
@@ -234,6 +248,7 @@ export default function LocationMap({
       ) : !config?.tile_url ? (
         <p className="map-status">Basemap disabled. Coordinate overlay only.</p>
       ) : null}
+      <span className="map-after" tabIndex={-1} />
       <div className="map-caption">
         <span>
           {pinned.length} placed · {locations.length - pinned.length} missing
