@@ -13,7 +13,6 @@ import logging
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from apps.demographics.rings import haversine_miles
 from apps.locations.models import Location
 from apps.sources.models import SourceHealth, SourceSnapshot
 from apps.sources.snapshots import publish_snapshot, ValidationReport
@@ -28,7 +27,7 @@ from .models import AreaSection
 
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
-SECTION_LOGIC = {'businesses': 6, 'hazards': 3}
+SECTION_LOGIC = {'businesses': 7, 'hazards': 3}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
@@ -248,81 +247,42 @@ def hazards_section(run, lat, lon):
     return data, any(v.get('reason') is None for v in (at_pin, nearby, data['nri']))
 
 
-def _overture_snapshot(lat, lon, release):
-    """A stored capture for exactly this pin and release (archived seed import or app capture)."""
-    for snap in SourceSnapshot.objects.filter(source_id='SRC-13', release=release).order_by('-retrieved_at'):
-        c = (snap.context or {}).get('coordinates') or {}
-        if round(c.get('lat', 999), 6) == round(lat, 6) and round(c.get('lon', 999), 6) == round(lon, 6) \
-                and snap.context.get('radius_miles') == 3:
-            return snap
-    return None
-
-
-_COHORT = {}
-
-
-def _records(store, snap):
-    with store.open_verified(snap.artifact_key) as handle:
-        return json.loads(handle.read())
-
-
-def _one_mile_count(records, lat, lon):
-    return sum(1 for r in records if biz.countable(r) and biz.CATEGORY_GROUP.get(r.get('basic_category'))
-        and haversine_miles(lat, lon, r['lat'], r['lon']) <= 1)
-
-
-def _cohort_guard(run, prior, latest):
-    """docs/04 §5.3: is this release pair a broad data change across monitored pins?"""
-    key = (prior, latest)
-    if key not in _COHORT:
-        pairs = []
-        latest_snaps = {}
-        for snap in SourceSnapshot.objects.filter(source_id='SRC-13', release=latest):
-            c = snap.context.get('coordinates') or {}
-            latest_snaps[(round(c.get('lat', 0), 6), round(c.get('lon', 0), 6))] = snap
-        for snap in SourceSnapshot.objects.filter(source_id='SRC-13', release=prior):
-            c = snap.context.get('coordinates') or {}
-            pin = (round(c.get('lat', 0), 6), round(c.get('lon', 0), 6))
-            if pin in latest_snaps:
-                pairs.append((_one_mile_count(_records(run.store, snap), *pin),
-                    _one_mile_count(_records(run.store, latest_snaps[pin]), *pin)))
-        _COHORT[key] = (biz.broad_change(pairs), len(pairs))
-    return _COHORT[key]
-
-
 def businesses_section(run, lat, lon, *, location=None, capturer=None):
+    from . import overture_store as ostore
     capturer = capturer or overture.capture
     try:
         releases = overture.available_releases(opener=run.opener)
     except SourceError as exc:
         log.warning('Overture release listing unavailable (%s); using stored releases', exc.code)
-        stored = sorted(set(SourceSnapshot.objects.filter(source_id='SRC-13').values_list('release', flat=True)))
-        releases = stored
+        releases = sorted(set(ostore.OvertureCapture.objects.values_list('release', flat=True)) |
+            set(SourceSnapshot.objects.filter(source_id='SRC-13').values_list('release', flat=True)))
     if not releases:
         raise SourceError('NOT_COVERED', 'no Overture release available')
     latest, prior = releases[-1], (releases[-2] if len(releases) > 1 else None)
 
     def load(release, required):
-        snap = _overture_snapshot(lat, lon, release)
-        if snap is None:
+        capture = ostore.get_capture(lat, lon, release, run.store)
+        if capture is None:
             try:
                 payload = capturer(lat, lon, release)
             except SourceError:
                 if required:
                     raise
                 return None
+            records = ostore.compact(json.loads(payload))
             snap, _ = publish_snapshot(source_id='SRC-13', scope=f'pin:{_pin_key(lat, lon)}', release=release,
                 data_period=f'Overture {release}', source_url=overture.source_url(release), adapter_version=ADAPTER,
-                stream=io.BytesIO(payload), store=run.store,
-                validation=ValidationReport(True, True, {'columns': overture.COLUMNS}, len(json.loads(payload))),
+                stream=io.BytesIO(ostore.encode(records)), store=run.store,
+                validation=ValidationReport(True, True, {'columns': list(ostore.FIELDS), 'format': 'jsonl.gz'},
+                    len(records)),
                 context={'coordinates': {'lat': round(lat, 6), 'lon': round(lon, 6)}, 'radius_miles': 3,
-                    'attribution_url': 'https://docs.overturemaps.org/attribution/'})
-        records = _records(run.store, snap)
-        run.snapshots.append(str(snap.pk))
+                    'format': 'compact', 'attribution_url': 'https://docs.overturemaps.org/attribution/'})
+            capture = ostore.store_capture(lat, lon, release, records, run.store, raw_snapshot=snap)
+        run.snapshots.append(str(capture.raw_snapshot_id or capture.pk))
         name, link = SOURCE_META['SRC-13']
         run.sources.setdefault('SRC-13' + release, {'id': 'SRC-13', 'name': name, 'url': link,
-            'period': f'Overture release {release}', 'retrieved_at': snap.retrieved_at.isoformat()})
-        return records
+            'period': f'Overture release {release}', 'retrieved_at': capture.created_at.isoformat()})
+        return ostore.load(capture, run.store)
 
     current = load(latest, True)
     previous = load(prior, False) if prior else None
@@ -334,14 +294,16 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     # Tenant matching happens when alerts are evaluated (signals.candidates), so editing the
     # tenant list never invalidates this section.
     found = biz.changes(previous, current, (lat, lon))
-    broad, cohort_size = _cohort_guard(run, prior, latest)
+    guard = ostore.pair(prior, latest)
+    broad = bool(guard.broad_change)
     if broad:
         found['openings'] = []
         for c in found['closures']:
             c['severity'] = 'FYI'
     data['changes'] = {**found, 'closures': found['closures'][:20], 'openings': found['openings'][:20],
         'total_closures': len(found['closures']), 'total_openings': len(found['openings']),
-        'broad_data_change': broad, 'cohort_size': cohort_size, 'reason': None}
+        'broad_data_change': broad, 'cohort_size': guard.cohort_size, 'brand_drops': guard.brand_drops,
+        'reason': None}
     return data, True
 
 

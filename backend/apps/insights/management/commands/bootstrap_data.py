@@ -34,6 +34,7 @@ class Command(BaseCommand):
             step('6/8 Archived Overture captures')
             call_command('import_overture_captures', directory=options['overture_archive'],
                 store_root=Path(settings.SOURCE_ARTIFACT_ROOT))
+            call_command('compact_overture')
         else:
             step('6/8 No Overture archive given; captures will be taken on demand (history starts now)')
         if not options['skip_compute']:

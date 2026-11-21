@@ -5,6 +5,7 @@ run that finds no newer source period stores nothing new. Per-location failures 
 counted and skipped; one bad location never stops the batch.
 """
 from dataclasses import dataclass, field
+import json
 import logging
 from django.conf import settings
 from apps.locations.models import Location
@@ -73,6 +74,33 @@ def refresh_businesses(context, *, opener=None, **kwargs):
     except SourceError as exc:
         note_check('SRC-13', 'releases', error=exc.code)
         raise
+    # Capture every pin that lacks the newest (and prior) release, a few pins per DuckDB scan,
+    # then compute the portfolio release-pair guard once, before any property is diffed.
+    from django.conf import settings as dj
+    from apps.sources.storage import LocalArtifactStore
+    from . import overture_store as ostore
+    store = LocalArtifactStore(dj.SOURCE_ARTIFACT_ROOT)
+    capturer = kwargs.get('capturer')
+    targets = [r for r in releases[-2:]]
+    for release in targets:
+        missing = []
+        for location in monitored():
+            rev = location.current_revision
+            if ostore.get_capture(rev.lat, rev.lon, release, store) is None:
+                missing.append((rev.lat, rev.lon))
+        for i in range(0, len(missing), 8):
+            context.heartbeat()
+            chunk = missing[i:i + 8]
+            try:
+                payloads = ({p: capturer(*p, release) for p in chunk} if capturer
+                    else overture.capture_many(chunk, release))
+            except SourceError as exc:
+                log.warning('Overture capture failed for %s pins (%s)', len(chunk), exc.code)
+                continue
+            for (lat, lon), payload in payloads.items():
+                ostore.store_capture(lat, lon, release, json.loads(payload), store)
+    if len(releases) > 1:
+        ostore.pair(releases[-2], releases[-1], recompute=True)
     out = _each(context, ('businesses',), opener=opener, **kwargs)
     out.info['release'] = releases[-1]
     return out
