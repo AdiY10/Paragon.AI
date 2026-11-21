@@ -50,6 +50,6 @@
 - **Overture data:** coarse categories; anchors depend on a curated brand list. Monthly diffs show "possible" closures that need verifying.
 - **County figures:** economy figures are county-level (Connecticut planning regions), not neighborhood-level.
 - **Trends:** compare 2015–19 with the current ACS vintage. When the 2021–25 vintage is published (expected December 2026), `annual_sources_check` ingests it for every portfolio state and switches all properties together (`demographics/vintage.py`); percentiles never mix vintages.
-- **Tenant edits:** each edit advances the property's analysis version (existing tenant-domain behaviour), so sections recompute from cache. This is cheap, but Amit's agent may want to revisit it.
+- **Tenant edits:** since R2.10 they bump the record version only; data sections stay valid and only tenant-dependent alerts are re-evaluated. SEC filer mappings apply to the same brand at every property.
 - **Not built (P1):** email digest, FEMA flood overlay on the map, CSV export.
 - **Coordination:** Amit's agent has unpushed tenant API and seed work in a local stash. It should reconcile with `apps/insights/tenant_views.py` and `import_listing_tenants` rather than duplicate them.

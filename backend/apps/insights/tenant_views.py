@@ -20,11 +20,9 @@ def _payload(t):
 
 
 def _after_change(location_id, user):
-    # Tenant edits advance the location's analysis version (apps.locations.tenants._touch); recompute from cache.
-    from .screens import start_computations
-    loc = Location.objects.select_related('current_revision').get(pk=location_id)
-    if loc.current_revision and loc.current_revision.lat is not None:
-        start_computations(loc, user)
+    # Tenant edits leave every data section valid; only alerts that depend on tenants change.
+    from .signals import safe_evaluate
+    safe_evaluate(location_id)
 
 
 def _call(fn, location_id, user):
@@ -95,7 +93,14 @@ def tenant_filer(request, location_id, tenant_id):
     name = str(request.data.get('company_name', '')).strip()[:200]
     if not cik.isdigit() or len(cik) > 10 or not name:
         return Response({'detail': 'A numeric CIK and the company name are required'}, status=400)
-    TenantFiler.objects.update_or_create(tenant=tenant, defaults={'cik': str(int(cik)), 'company_name': name,
-        'mapped_by': request.user})
-    safe_evaluate(location_id)
+    # One mapping per brand: apply it to the same tenant at every other property that has none yet.
+    others = Tenant.objects.filter(normalized_key=tenant.normalized_key, archived=False).exclude(pk=tenant.pk)
+    touched = set()
+    for t in [tenant, *others]:
+        if t.pk == tenant.pk or not hasattr(t, 'sec_filer'):
+            TenantFiler.objects.update_or_create(tenant=t, defaults={'cik': str(int(cik)), 'company_name': name,
+                'mapped_by': request.user})
+            touched.add(t.location_id)
+    for loc_id in touched:
+        safe_evaluate(loc_id)
     return Response(_payload(Tenant.objects.select_related('sec_filer').get(pk=tenant.pk)), status=201)

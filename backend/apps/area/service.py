@@ -28,7 +28,7 @@ from .models import AreaSection
 
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
-SECTION_LOGIC = {'businesses': 4, 'hazards': 3}
+SECTION_LOGIC = {'businesses': 5, 'hazards': 3}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
@@ -328,10 +328,9 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     if previous is None:
         data['changes'] = {'closures': [], 'openings': [], 'reason': 'NOT_ENOUGH_DATA'}
         return data, True
-    tenants = []
-    if location is not None:
-        tenants = list(location.tenants.filter(archived=False).values_list('name', flat=True))
-    found = biz.changes(previous, current, (lat, lon), tenants)
+    # Tenant matching happens when alerts are evaluated (signals.candidates), so editing the
+    # tenant list never invalidates this section.
+    found = biz.changes(previous, current, (lat, lon))
     broad, cohort_size = _cohort_guard(run, prior, latest)
     if broad:
         found['openings'] = []
@@ -339,7 +338,7 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
             c['severity'] = 'FYI'
     data['changes'] = {**found, 'closures': found['closures'][:20], 'openings': found['openings'][:20],
         'total_closures': len(found['closures']), 'total_openings': len(found['openings']),
-        'broad_data_change': broad, 'cohort_size': cohort_size, 'tenants_checked': len(tenants), 'reason': None}
+        'broad_data_change': broad, 'cohort_size': cohort_size, 'reason': None}
     return data, True
 
 
