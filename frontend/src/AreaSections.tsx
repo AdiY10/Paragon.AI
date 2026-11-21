@@ -101,13 +101,22 @@ export default function AreaSections({ location, autoStart = false }: { location
   return (
     <>
       {action && <section className="panel">{action}</section>}
-      <EconomyPanel section={sections.economy} />
-      <JobsPanel section={sections.jobs} />
-      <div className="location-columns">
-        <TrafficPanel section={sections.traffic} />
-        <HazardsPanel section={sections.hazards} />
+      {/* FR-08 order: economy and jobs, retail landscape, access and traffic, hazards */}
+      <div id="economy" className="page-section" tabIndex={-1}>
+        <EconomyPanel section={sections.economy} />
+        <JobsPanel section={sections.jobs} />
       </div>
-      <BusinessesPanel section={sections.businesses} />
+      <div id="retail" className="page-section" tabIndex={-1}>
+        <BusinessesPanel section={sections.businesses} />
+      </div>
+      <div className="location-columns">
+        <div id="traffic" className="page-section" tabIndex={-1}>
+          <TrafficPanel section={sections.traffic} />
+        </div>
+        <div id="hazards" className="page-section" tabIndex={-1}>
+          <HazardsPanel section={sections.hazards} />
+        </div>
+      </div>
     </>
   );
 }

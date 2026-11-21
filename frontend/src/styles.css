@@ -2308,3 +2308,136 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- R2.18 property page: key facts, section nav, details ---- */
+.property-header {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin-bottom: 14px;
+}
+.attention-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+.attention-line .badge {
+  font-size: 13px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+.what-changed {
+  font-size: 14px;
+  color: var(--muted);
+}
+.what-changed a {
+  color: var(--pine);
+  text-decoration: underline;
+}
+.key-facts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+.key-facts dt {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.key-facts dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f332d;
+}
+.key-facts dd small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.confirm-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: #faf5e8;
+  border: 1px solid #e3d3a8;
+  font-size: 15px;
+}
+.confirm-strip .button {
+  margin-left: auto;
+}
+.section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 0;
+  margin-bottom: 14px;
+  background: #f6f5f0;
+  border-bottom: 1px solid var(--line);
+}
+.section-nav a {
+  white-space: nowrap;
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--pine);
+}
+.section-nav a:hover {
+  background: #e9ece4;
+}
+.page-section {
+  scroll-margin-top: 64px;
+}
+.page-section:focus {
+  outline: none;
+}
+.property-details {
+  margin-bottom: 25px;
+}
+.property-details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  margin-bottom: 14px;
+}
+.property-details > summary strong {
+  display: block;
+  font-size: 16px;
+}
+.property-details > summary small {
+  font-size: 13px;
+  color: var(--muted);
+}
+@media (max-width: 1100px) {
+  .key-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .key-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .key-facts dd {
+    font-size: 16px;
+  }
+}
+.facts .badge {
+  white-space: normal;
+  line-height: 1.35;
+}
