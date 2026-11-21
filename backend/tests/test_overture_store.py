@@ -49,3 +49,30 @@ def test_prune_keeps_compact_copy(tmp_path):
     assert cap.raw_snapshot_id == snap.pk
     assert ostore.prune_raw(store, ['r1', 'r2']) == 1
     assert not (tmp_path / snap.artifact_key).exists() and ostore.load(cap, store)[0]['id'] == 'a'
+
+
+def test_disappearance_alerts_only_after_two_releases(tmp_path, client, settings):
+    from backend.tests.test_signals import placed
+    from apps.area.service import compute_area
+    from apps.insights.models import Signal
+    settings.SOURCE_ARTIFACT_ROOT = tmp_path
+    store = LocalArtifactStore(tmp_path)
+    loc = placed('Mall', 41.0, -73.0)
+    regal = rec('regal', 'Regal', 41.003, -73.0, 'movie_theater')
+    keep = [rec(f'k{i}', None, 41.001, -73.0) for i in range(3)]
+    releases = ['2026-09-23.1', '2026-10-21.0', '2026-11-18.0']
+    from apps.area import overture
+
+    def run(upto, present):
+        for rel, has in zip(releases[:upto], present):
+            ostore.store_capture(41.0, -73.0, rel, keep + ([regal] if has else []), store)
+        import unittest.mock as um
+        with um.patch.object(overture, 'available_releases', lambda opener=None: releases[:upto]):
+            return compute_area(loc.pk, sections=('businesses',), store=store)[0]
+    row = run(2, [True, False])
+    assert row.data['changes']['closures'][0]['confirmed'] is False
+    assert not Signal.objects.filter(rule_id='SIG-09').exists()
+    row = run(3, [True, False, False])
+    c = row.data['changes']['closures'][0]
+    assert c['confirmed'] is True and c['evidence'] == 'missing from the last two releases'
+    assert Signal.objects.filter(rule_id='SIG-09', status='active').exists()

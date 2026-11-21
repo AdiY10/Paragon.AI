@@ -115,6 +115,7 @@ export interface Place {
   severity?: "High" | "Watch" | "FYI";
   evidence?: string;
   tenant_match?: boolean;
+  confirmed?: boolean;
 }
 export interface Businesses {
   release: string;

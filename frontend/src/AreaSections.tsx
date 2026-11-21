@@ -454,6 +454,7 @@ function Changes({ d }: { d: Businesses }) {
                 <strong>Possible closure: {placeName(p)}</strong>
                 <small>
                   {miles(p.distance_mi)} · {p.evidence}
+                  {p.confirmed === false ? " · not yet confirmed (needs a second release)" : ""}
                   {p.tenant_match ? " · matches a tenant at this property" : ""} · verify before acting
                 </small>
               </div>

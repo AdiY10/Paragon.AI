@@ -169,6 +169,8 @@ def candidates(location, t=None, today=None, evaluated=None):
         tenants = {normalize_brand(n) for n in location.tenants.filter(archived=False).values_list('name', flat=True)}
         tenants.discard(None)
         for c in ch.get('closures') or []:
+            if c.get('confirmed') is False:
+                continue  # an unconfirmed disappearance is shown on the property page, not alerted
             c = dict(c)
             label = c.get('brand') or c.get('name')
             c['tenant_match'] = bool(tenants) and brand_in(label, tenants)

@@ -27,7 +27,7 @@ from .models import AreaSection
 
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
-SECTION_LOGIC = {'businesses': 7, 'hazards': 3}
+SECTION_LOGIC = {'businesses': 8, 'hazards': 3}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
@@ -259,6 +259,7 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     if not releases:
         raise SourceError('NOT_COVERED', 'no Overture release available')
     latest, prior = releases[-1], (releases[-2] if len(releases) > 1 else None)
+    older = releases[-3] if len(releases) > 2 else None
 
     def load(release, required):
         capture = ostore.get_capture(lat, lon, release, run.store)
@@ -296,6 +297,35 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     found = biz.changes(previous, current, (lat, lon))
     guard = ostore.pair(prior, latest)
     broad = bool(guard.broad_change)
+    # Stage 2 (R2 item 15): a place that silently disappeared is "confirmed" only when it is
+    # still missing a release later; brand-wide drops (data changes) are never closures.
+    earlier = ostore.get_capture(lat, lon, older, run.store) if older else None
+    confirmed = []
+    if earlier is not None:
+        old_found = biz.changes(ostore.load(earlier, run.store), previous, (lat, lon))
+        still_gone = {r['id'] for r in current if biz.is_present(r)}
+        present_now = [r for r in current if biz.is_present(r)]
+        old_drops = set(ostore.pair(older, prior).brand_drops)
+        for c in old_found['closures']:
+            if c['evidence'] == 'no longer in the dataset' and c['id'] not in still_gone \
+                    and biz.normalize_brand(c.get('brand')) not in old_drops \
+                    and not biz.same_place_present({**c, 'brand': c.get('brand'), 'name': c.get('name')}, present_now):
+                confirmed.append({**c, 'evidence': 'missing from the last two releases', 'confirmed': True})
+    drops = set(guard.brand_drops)
+    closures = []
+    for c in found['closures']:
+        if c['evidence'] == 'no longer in the dataset':
+            if biz.normalize_brand(c.get('brand')) in drops:
+                continue  # the whole brand vanished from the data this month
+            c = {**c, 'confirmed': False}
+        else:
+            c = {**c, 'confirmed': True}
+        closures.append(c)
+    seen = {c['id'] for c in closures}
+    closures += [c for c in confirmed if c['id'] not in seen]
+    order = {'High': 0, 'Watch': 1, 'FYI': 2}
+    closures.sort(key=lambda c: (not c['confirmed'], order[c['severity']], c['distance_mi']))
+    found['closures'] = closures
     if broad:
         found['openings'] = []
         for c in found['closures']:
