@@ -46,6 +46,7 @@ import SummaryPanel from "./Summary";
 import PropertyHeader, { SectionNav } from "./PropertyHeader";
 import ThisWeek from "./ThisWeek";
 import AlertsPage from "./Alerts";
+import Onboarding from "./Onboarding";
 import { ComparePage, CompareButton, ScreenBanner, ScreenPage } from "./Acquisitions";
 import TenantsPanel from "./Tenants";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
@@ -335,7 +336,7 @@ function App() {
       : []),
   ];
   let body: ReactNode;
-  const needsPortfolio = route === "/" || route === "/portfolio" || route === "/screen";
+  const needsPortfolio = route === "/" || route === "/portfolio" || route === "/screen" || route === "/setup";
   if (needsPortfolio && portfolio.error) body = <ErrorNotice error={portfolio.error} />;
   else if (needsPortfolio && portfolio.isPending)
     body = (
@@ -363,6 +364,7 @@ function App() {
     );
   else if (route === "/compare") body = <ComparePage />;
   else if (route === "/alerts") body = <AlertsPage />;
+  else if (route === "/setup") body = <Onboarding locations={portfolio.data ?? []} />;
   else if (route === "/admin")
     body =
       session.data.role === "admin" ? (
@@ -485,7 +487,9 @@ function App() {
               <strong>
                 {route.startsWith("/locations/")
                   ? "Property profile"
-                  : (nav.find((item) => item[0] === route)?.[1] ?? "This Week")}
+                  : route === "/setup"
+                    ? "Confirm your portfolio"
+                    : (nav.find((item) => item[0] === route)?.[1] ?? "This Week")}
               </strong>
             </div>
             <form
@@ -620,8 +624,8 @@ function Overview({
             {unconfirmed > 0 && `${unconfirmed} properties still need you to confirm they are owned. `}
             {missing > 0 && `${missing} need a map pin before area data can be computed.`}
           </p>
-          <a className="text-button" href="#/portfolio?confirmed=no">
-            Review properties <ArrowRight size={15} />
+          <a className="button small-button" href="#/setup">
+            Confirm your portfolio <ArrowRight size={15} />
           </a>
         </section>
       )}
@@ -650,12 +654,32 @@ function PropertyCard({ location }: { location: Location }) {
       </span>
       <h3>{location.name}</h3>
       <p>{location.address}</p>
+      {location.key_numbers && Object.keys(location.key_numbers).length > 0 && (
+        <dl className="card-numbers">
+          {location.key_numbers.population != null && (
+            <div>
+              <dt>People, 3 mi</dt>
+              <dd>{Math.round(location.key_numbers.population).toLocaleString("en-US")}</dd>
+            </div>
+          )}
+          {location.key_numbers.median_household_income != null && (
+            <div>
+              <dt>Median income</dt>
+              <dd>${Math.round(location.key_numbers.median_household_income / 1000)}k</dd>
+            </div>
+          )}
+          {location.key_numbers.aadt != null && (
+            <div>
+              <dt>Traffic/day</dt>
+              <dd>{Math.round(location.key_numbers.aadt).toLocaleString("en-US")}</dd>
+            </div>
+          )}
+        </dl>
+      )}
       <div className="card-bottom">
         <span>
           <MapPin size={14} />
-          {location.current_revision.lat === null
-            ? "Pin needed"
-            : "Reference pin available"}
+          {location.current_revision.lat === null ? "Pin needed" : location.city ? `${location.city}, ${location.state}` : "Pin placed"}
         </span>
         <ArrowUpRight size={18} />
       </div>
@@ -676,6 +700,17 @@ function Portfolio({
     [attention, setAttention] = useState(params.get("attention") ?? ""),
     [onlyUnconfirmed] = useState(params.get("confirmed") === "no"),
     [showMap, setShowMap] = useState(!candidates);
+  React.useEffect(() => {
+    if (candidates) return;
+    const q = new URLSearchParams();
+    if (state) q.set("state", state);
+    if (status !== "owned") q.set("status", status);
+    if (type) q.set("type", type);
+    if (attention) q.set("attention", attention);
+    if (onlyUnconfirmed) q.set("confirmed", "no");
+    const next = "#/portfolio" + (q.toString() ? "?" + q.toString() : "");
+    if (window.location.hash !== next) window.history.replaceState(null, "", next);
+  }, [candidates, state, status, type, attention, onlyUnconfirmed]);
   const filtered = locations.filter(
     (item) =>
       (!state || item.state === state) &&
