@@ -222,3 +222,39 @@ def test_absolute_session_cap(client, settings):
     session.save()
     assert client.get('/api/locations/').status_code == 401
     assert settings.SESSION_COOKIE_AGE == 12 * 3600
+
+
+# ---- Email-only guest list --------------------------------------------------------------
+
+@_pt.mark.django_db
+def test_email_only_lets_listed_members_in_and_logs_it(client, settings):
+    settings.PASSWORD_ACCESS_ENABLED = True
+    settings.EMAIL_ONLY_ACCESS = True
+    Membership.objects.create(email='john@example.org', role='member')
+    ok = client.post('/access/login/', {'email': 'John@Example.org', 'password': ''})
+    assert ok.status_code == 302
+    assert AccessAuditEvent.objects.filter(action='password_login', after__method='email_only').count() == 1
+    assert client.get('/api/locations/').status_code == 200
+    assert Membership.objects.get(email='john@example.org').last_seen_at is not None
+    client.post('/access/logout/')
+    stranger = client.post('/access/login/', {'email': 'someone@example.org', 'password': ''})
+    assert stranger.status_code == 401 and b'does not have access' in stranger.content
+
+
+@_pt.mark.django_db
+def test_email_only_still_requires_the_admin_password(client, settings, password_mode):
+    settings.EMAIL_ONLY_ACCESS = True
+    user, membership = setup_account()
+    membership.role = 'admin'
+    membership.save()
+    r = client.post('/access/login/', {'email': membership.email, 'password': ''})
+    assert r.status_code == 401 and b'Administrators sign in with their password' in r.content
+    assert client.post('/access/login/', {'email': membership.email, 'password': PASSWORD}).status_code == 302
+    log = client.get('/api/admin/access-log/').json()
+    assert log['events'][0]['method'] == 'password' and log['people'][0]['email'] == membership.email
+
+
+@_pt.mark.django_db
+def test_email_only_is_off_by_default(client, password_mode):
+    Membership.objects.create(email='john@example.org', role='member')
+    assert client.post('/access/login/', {'email': 'john@example.org', 'password': ''}).status_code == 401

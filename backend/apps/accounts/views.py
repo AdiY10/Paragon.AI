@@ -65,3 +65,23 @@ def member_detail(request, member_id):
     if request.method == 'DELETE':
         return Response(status=204)
     return Response({'id': str(member.id), 'role': member.role, 'active': member.active})
+
+
+from rest_framework.decorators import api_view as _api_view, permission_classes as _perm
+from rest_framework.response import Response as _Response
+from .permissions import IsAdministrator as _IsAdministrator
+
+
+@_api_view(['GET'])
+@_perm([_IsAdministrator])
+def access_log(request):
+    """Admin: who is on the guest list, when each person was last active, and recent sign-ins."""
+    from .models import AccessAuditEvent, Membership
+    people = [{'email': m.email, 'role': m.role, 'active': m.active,
+        'last_seen_at': m.last_seen_at.isoformat() if m.last_seen_at else None}
+        for m in Membership.objects.order_by('-last_seen_at', 'email')]
+    events = [{'email': e.membership.email, 'action': e.action, 'method': (e.after or {}).get('method'),
+        'at': e.created_at.isoformat()}
+        for e in AccessAuditEvent.objects.filter(action__in=['password_login', 'password_login_failed', 'logout'])
+            .select_related('membership').order_by('-created_at')[:100]]
+    return _Response({'people': people, 'events': events})
