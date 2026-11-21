@@ -157,6 +157,9 @@ def summary(location, signals=()):
     signal_items = [{'text': f"{s['title']} ({s['severity']})", 'metric': 'signal', 'source': s.get('source'),
         'period': s.get('period'), 'weight': 300 if s['severity'] == 'High' else 150}
         for s in signals if s['severity'] in ('High', 'Watch')]
+    if any(s.get('rule_id') == 'SIG-11' and s['severity'] in ('High', 'Watch') for s in signals):
+        # The flood alert already says it; keep the hazard section's other concerns (NRI).
+        hazard_concerns = [c for c in hazard_concerns if c['source'] != 'SRC-11']
     concerns = sorted(signal_items + hazard_concerns + concerns, key=lambda c: -c['weight'])
     strengths.sort(key=lambda c: -c['weight'])
     return {'portfolio_size': n_owned, 'min_portfolio': MIN_PORTFOLIO,

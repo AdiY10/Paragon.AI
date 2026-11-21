@@ -76,15 +76,27 @@ def normalize_brand(name):
         return None
     text = unicodedata.normalize('NFKD', str(name)).encode('ascii', 'ignore').decode().casefold()
     text = text.replace('&', ' ').replace("'", '').replace('’', '')
+    text = re.sub(r'(?<=\b[a-z])\.(?=[a-z]\b)', '', text).replace('.', ' ')  # "T.J.Maxx" -> "tj maxx"
     text = re.sub(r'[^a-z0-9]+', ' ', text)
     text = re.sub(r'\b(inc|llc|co|corp|corporation|company|stores?)\b$', '', text.strip()).strip()
     return re.sub(r'\s+', ' ', text) or None
 
 
+# Words a brand's own store name may add ("Lowe's Home Improvement", "CVS Pharmacy #123").
+GENERIC_SUFFIX = re.compile(r'^((home improvement|pharmacy|supercenter|superstore|neighborhood market|market|'
+    r'supermarket|food|foods|grocery|store|stores|outlet|express|cinemas?|theatres?|theaters?|wholesale|'
+    r'club|plus|\d+|#\s*\d+)\s*)+$')
+
+
 def brand_in(name, brands):
-    """Exact or prefix match on whole words: "lowes home improvement" matches "lowes"."""
+    """Exact match, or a brand followed only by generic store words: "lowes home improvement" matches
+    "lowes", but "giant eagle" does not match "giant"."""
     b = normalize_brand(name)
-    return bool(b) and (b in brands or any(b.startswith(x + ' ') for x in brands))
+    if not b:
+        return False
+    if b.startswith('the ') and b[4:] in brands:
+        return True
+    return b in brands or any(b.startswith(x + ' ') and GENERIC_SUFFIX.match(b[len(x) + 1:]) for x in brands)
 
 
 def _distance(center, record):

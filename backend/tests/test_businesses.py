@@ -36,3 +36,10 @@ def test_disappearance_bars_differ_for_anchors_and_others():
     assert [c['id'] for c in closures] == ['r']
     prior[1]['confidence'] = 0.95
     assert {c['id'] for c in b.changes(prior, [], center)['closures']} == {'r', 's'}
+
+
+def test_brand_matching_handles_punctuation_and_rejects_longer_brands():
+    from apps.area.businesses import brand_in, ANCHOR_BRANDS, GROCERY_BRANDS
+    assert brand_in('T.J.Maxx', ANCHOR_BRANDS) and brand_in("Lowe's Home Improvement", ANCHOR_BRANDS)
+    assert brand_in('The Home Depot', ANCHOR_BRANDS) and brand_in('CVS Pharmacy #1234', ANCHOR_BRANDS)
+    assert brand_in('Giant', GROCERY_BRANDS) and not brand_in('Giant Eagle', GROCERY_BRANDS)
