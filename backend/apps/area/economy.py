@@ -78,7 +78,9 @@ def parse_qcew(raw, fips):
         out[code] = {'label': label, 'value': int(r['month3_emplvl']), 'establishments': int(r['qtrly_estabs']),
             'avg_weekly_wage': int(r['avg_wkly_wage']),
             'yoy_pct': None if change == '' else float(change) / 100,
-            'yoy_reason': None if change != '' else 'GEOGRAPHY_CHANGED', 'reason': None}
+            # A blank change: Connecticut's planning regions have no prior year; elsewhere it is just missing.
+            'yoy_reason': None if change != '' else ('GEOGRAPHY_CHANGED' if fips.startswith('09') else 'NOT_ENOUGH_DATA'),
+            'reason': None}
     return out
 
 

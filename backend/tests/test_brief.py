@@ -141,3 +141,17 @@ def test_unemployment_uses_three_month_average_relative_to_state():
     section(loc, 'economy', e)
     engine.evaluate(loc, today=TODAY)
     assert Signal.objects.get(rule_id='SIG-05').status == 'resolved'
+
+
+def test_sources_updated_reports_the_newest_period(tmp_path):
+    import io
+    from apps.sources.catalog import sync_catalog
+    from apps.sources.snapshots import publish_snapshot, ValidationReport
+    from apps.sources.storage import LocalArtifactStore
+    sync_catalog()
+    store = LocalArtifactStore(tmp_path)
+    for scope, period in (('laus:a', '2026-09'), ('laus:b', '2026-08')):  # older period written last
+        publish_snapshot(source_id='SRC-07', scope=scope, release=period, data_period=period, source_url='https://x.gov',
+            adapter_version='t', stream=io.BytesIO(period.encode()), store=store,
+            validation=ValidationReport(True, True, {'format': 'test'}, 1))
+    assert briefs._sources_updated(None)[0]['period'] == '2026-09'

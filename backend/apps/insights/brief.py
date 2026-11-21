@@ -18,7 +18,10 @@ def _sources_updated(since):
         qs = qs.filter(published_at__gt=since)
     latest = {}
     for snap in qs.order_by('published_at'):
-        latest[snap.source_id] = snap
+        # Per-scope sources publish many snapshots; report the newest data period, not the last one written.
+        cur = latest.get(snap.source_id)
+        if cur is None or (snap.data_period or '') >= (cur.data_period or ''):
+            latest[snap.source_id] = snap
     names = dict(SourceDefinition.objects.values_list('id', 'name'))
     return [{'id': sid, 'name': names.get(sid, sid), 'period': s.data_period, 'release': s.release,
         'published_at': s.published_at.isoformat()} for sid, s in sorted(latest.items())]

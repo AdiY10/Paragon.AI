@@ -219,7 +219,9 @@ function EconomyPanel({ section }: { section: Section<Economy> }) {
               value={count(d.employment.private?.value)}
               detail={
                 d.employment.private?.value != null
-                  ? `${signedPct(d.employment.private.yoy_pct, d.employment.private.yoy_reason)} vs a year earlier`
+                  ? d.employment.private.yoy_pct != null
+                    ? `${signedPct(d.employment.private.yoy_pct)} vs a year earlier`
+                    : `Change vs a year earlier: ${reasonText(d.employment.private.yoy_reason).toLowerCase()}`
                   : reasonText(d.employment.private?.reason ?? d.employment.reason)
               }
               note={d.employment.period}
@@ -229,7 +231,9 @@ function EconomyPanel({ section }: { section: Section<Economy> }) {
               value={count(d.employment.retail?.value)}
               detail={
                 d.employment.retail?.value != null
-                  ? `${signedPct(d.employment.retail.yoy_pct, d.employment.retail.yoy_reason)} vs a year earlier`
+                  ? d.employment.retail.yoy_pct != null
+                    ? `${signedPct(d.employment.retail.yoy_pct)} vs a year earlier`
+                    : `Change vs a year earlier: ${reasonText(d.employment.retail.yoy_reason).toLowerCase()}`
                   : reasonText(d.employment.retail?.reason ?? d.employment.reason)
               }
               note={

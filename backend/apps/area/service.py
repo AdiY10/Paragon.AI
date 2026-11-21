@@ -28,7 +28,7 @@ from .models import AreaSection
 
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
-SECTION_LOGIC = {'businesses': 5, 'hazards': 3}
+SECTION_LOGIC = {'businesses': 6, 'hazards': 3}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
