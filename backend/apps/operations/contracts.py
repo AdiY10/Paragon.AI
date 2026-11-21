@@ -1,8 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class JobResult:
+    """records: items processed; failed: items that failed; detail: up to 50 {item_id: error_code}."""
     records: int
+    failed: int = 0
+    detail: dict = field(default_factory=dict)
 
 class JobFailure(Exception):
     CODES={'TIMEOUT','HTTP_ERROR','SCHEMA_ERROR','NOT_CONFIGURED','STORAGE_ERROR','SOURCE_ERROR'}

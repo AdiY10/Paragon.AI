@@ -9,7 +9,8 @@ from .registry import REGISTRY
 from .service import enqueue_job
 
 FIELDS=['id','kind','scope','queue','status','attempts','max_attempts','created_at',
-    'started_at','finished_at','heartbeat_at','next_attempt_at','recovery_count','last_recovered_at','records','error_code','rerun_of_id']
+    'started_at','finished_at','heartbeat_at','next_attempt_at','recovery_count','last_recovered_at','records',
+    'failed_items','error_code','rerun_of_id']
 
 
 def payload(job):
@@ -72,3 +73,16 @@ def schedules(request):
             'blocked_reason':None if schedule.kind in REGISTRY else 'HANDLER_NOT_IMPLEMENTED'})
     state=SchedulerState.objects.filter(name='primary').first()
     return Response({'schedules':items,'last_tick_at':state.last_tick_at if state else None})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdministrator])
+def alerts(request):
+    """Open operational alerts first, then the 20 most recently resolved."""
+    from .models import AlertEvent
+    def row(a):
+        return {'key':a.key,'summary':a.summary,'count':a.count,'first_at':a.first_at,'last_at':a.last_at,
+            'notified_at':a.notified_at,'resolved_at':a.resolved_at}
+    open_=AlertEvent.objects.filter(resolved_at__isnull=True)
+    resolved=AlertEvent.objects.filter(resolved_at__isnull=False).order_by('-resolved_at')[:20]
+    return Response({'open':[row(a) for a in open_],'resolved':[row(a) for a in resolved]})

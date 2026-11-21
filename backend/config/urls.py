@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/admin/schedules/', operations.schedules),
     path('api/admin/jobs/', operations.jobs),
     path('api/admin/jobs/<uuid:job_id>/rerun/', operations.rerun),
+    path('api/admin/alerts/', operations.alerts),
     path('api/locations/', locations.locations),
     path('api/locations/search/', locations.search),
     path('api/locations/<uuid:location_id>/', locations.location_detail),

@@ -9,6 +9,7 @@ from datetime import timedelta
 import hashlib
 import io
 import json
+import logging
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -26,6 +27,7 @@ from .http import SourceError
 from .models import AreaSection
 
 ADAPTER = 'area-v1'
+log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
     'SRC-04': ('U.S. Census Bureau, TIGERweb counties', 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html'),
@@ -61,7 +63,7 @@ def note_check(source_id, scope, *, snapshot=None, error=None):
             record_check(source_id=source_id, scope=scope[:160], run_key=f'area:{uuid.uuid4()}', succeeded=False,
                 completed_at=timezone.now(), error_code=error)
     except Exception:  # health bookkeeping must never break a computation
-        pass
+        log.exception('source health bookkeeping failed for %s', source_id)
 
 
 class Run:
@@ -266,7 +268,8 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     capturer = capturer or overture.capture
     try:
         releases = overture.available_releases(opener=run.opener)
-    except SourceError:
+    except SourceError as exc:
+        log.warning('Overture release listing unavailable (%s); using stored releases', exc.code)
         stored = sorted(set(SourceSnapshot.objects.filter(source_id='SRC-13').values_list('release', flat=True)))
         releases = stored
     if not releases:

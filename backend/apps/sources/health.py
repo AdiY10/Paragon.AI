@@ -70,7 +70,24 @@ def record_check(*,source_id,scope,run_key,succeeded,completed_at=None,error_cod
     health.consecutive_failures=failures.count()
     health.error_code=failures.order_by("-completed_at","-id").first().error_code if health.consecutive_failures else ""
     health.save()
+    _source_alert(health)
     return health,True
+
+
+def _source_alert(health):
+    """docs/06 §4.2: alert administrators after two consecutive failures of a source scope."""
+    import hashlib
+    from apps.operations.alerts import raise_alert,resolve_alert
+    # Scopes can contain coordinates; key on a hash and never put the scope in the summary.
+    key=f'source:{health.source_id}:{hashlib.sha256(health.scope.encode()).hexdigest()[:12]}'
+    try:
+        if health.consecutive_failures>=2:
+            raise_alert(key,f'{health.source.name} failing ({health.consecutive_failures} checks in a row, {health.error_code})')
+        elif health.consecutive_failures==0:
+            resolve_alert(key)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('source alert bookkeeping failed')
 
 
 def health_payload(health, *, now=None):
