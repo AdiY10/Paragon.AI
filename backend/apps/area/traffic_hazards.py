@@ -1,4 +1,5 @@
 """Traffic counts (FHWA HPMS, SRC-10) and hazards (FEMA NFHL SRC-11, FEMA NRI SRC-12)."""
+import json
 from datetime import date
 import math
 from .http import fetch, arcgis_json, SourceError
@@ -106,12 +107,67 @@ def envelope(lat, lon, metres):
     return f'{lon - dlon},{lat - dlat},{lon + dlon},{lat + dlat}'
 
 
-def fetch_flood(lat, lon, metres, *, opener=None):
+def fetch_flood(lat, lon, metres, *, opener=None, geometry=False):
     # Point queries failed 5 of 7 times in verification; small envelopes succeed (docs/03 SRC-11).
-    return fetch(NFHL_URL, params={'geometry': envelope(lat, lon, metres), 'geometryType': 'esriGeometryEnvelope',
+    params = {'geometry': envelope(lat, lon, metres), 'geometryType': 'esriGeometryEnvelope',
         'inSR': 4326, 'spatialRel': 'esriSpatialRelIntersects',
-        'outFields': 'FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE,DFIRM_ID', 'returnGeometry': 'false', 'f': 'json'},
-        opener=opener, timeout=45, retries=3)
+        'outFields': 'FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE,DFIRM_ID', 'returnGeometry': 'false', 'f': 'json'}
+    if geometry:
+        # Only high-risk (SFHA) polygons, in lon/lat, to measure the distance from the pin.
+        params.update({'where': "SFHA_TF='T'", 'returnGeometry': 'true', 'outSR': 4326, 'geometryPrecision': 6})
+    return fetch(NFHL_URL, params=params, opener=opener, timeout=45, retries=3)
+
+
+def _local_xy(lat0, lon0, lat, lon):
+    k = 111_320
+    return (lon - lon0) * k * math.cos(math.radians(lat0)), (lat - lat0) * k
+
+
+def _segment_distance(ax, ay, bx, by):
+    """Distance from the origin to segment AB, in the same units."""
+    dx, dy = bx - ax, by - ay
+    length = dx * dx + dy * dy
+    t = 0 if length == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / length))
+    return math.hypot(ax + t * dx, ay + t * dy)
+
+
+def _contains_origin(rings):
+    """Even-odd rule over all rings, so holes (islands of lower risk) are excluded."""
+    inside = False
+    for ring in rings:
+        for (ax, ay), (bx, by) in zip(ring, ring[1:] + ring[:1]):
+            if (ay > 0) != (by > 0) and 0 < (bx - ax) * (0 - ay) / (by - ay) + ax:
+                inside = not inside
+    return inside
+
+
+def parse_flood_nearby(raw, lat, lon):
+    """High-risk (SFHA) flood zones around the pin: whether the pin is inside one and how far the nearest is."""
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        raise SourceError('SCHEMA_ERROR', 'not JSON') from None
+    if 'error' in data or not isinstance(data.get('features'), list):
+        raise SourceError('SOURCE_ERROR', 'ArcGIS query failed')
+    best = None
+    for f in data['features']:
+        a = f.get('attributes') or {}
+        if a.get('SFHA_TF') != 'T' or not a.get('FLD_ZONE'):
+            continue
+        rings = [[_local_xy(lat, lon, y, x) for x, y in ring] for ring in (f.get('geometry') or {}).get('rings') or []]
+        if rings:
+            inside = _contains_origin(rings)
+            dist = 0.0 if inside else min(_segment_distance(*p, *q) for r in rings for p, q in zip(r, r[1:] + r[:1]))
+        else:
+            inside, dist = False, None  # geometry missing: known nearby, distance unknown
+        zone = {'zone': a['FLD_ZONE'], 'sfha': True, 'inside': inside,
+            'distance_m': None if dist is None else round(dist), 'dfirm_id': a.get('DFIRM_ID'), 'reason': None}
+        key = (not inside, dist if dist is not None else 1e9)
+        if best is None or key < best[0]:
+            best = (key, zone)
+    if best is None:
+        return {'zone': None, 'sfha': False, 'inside': False, 'distance_m': None, 'reason': None}
+    return best[1]
 
 
 def zone_rank(z):
@@ -142,6 +198,8 @@ NRI_HAZARDS = {'CFLD': 'Coastal flooding', 'IFLD': 'Inland flooding', 'HRCN': 'H
     'SWND': 'Strong wind', 'WNTW': 'Winter weather', 'HAIL': 'Hail', 'HWAV': 'Heat wave', 'WFIR': 'Wildfire',
     'ERQK': 'Earthquake', 'LTNG': 'Lightning', 'ISTM': 'Ice storm', 'DRGT': 'Drought',
     'LNDS': 'Landslide', 'CWAV': 'Cold wave'}
+# Hazards that damage buildings and disrupt a center for weeks; lightning, heat or cold do not.
+PROPERTY_HAZARDS = {'Coastal flooding', 'Inland flooding', 'Hurricane', 'Wildfire', 'Earthquake', 'Landslide'}
 RATING_ORDER = ['Very Low', 'Relatively Low', 'Relatively Moderate', 'Relatively High', 'Very High']
 
 
@@ -160,7 +218,10 @@ def parse_nri(raw):
     hazards = [{'hazard': name, 'rating': a.get(f'{code}_RISKR')} for code, name in NRI_HAZARDS.items()
         if a.get(f'{code}_RISKR') in RATING_ORDER]
     hazards.sort(key=lambda h: -RATING_ORDER.index(h['rating']))
+    # Concern comes from specific hazards rated high, not the composite score (which is mostly
+    # population and building value, so dense areas rate "high" regardless of physical risk).
+    high = [h for h in hazards if h['rating'] in ('Relatively High', 'Very High') and h['hazard'] in PROPERTY_HAZARDS]
     return {'tract': a.get('TRACTFIPS'), 'rating': a.get('RISK_RATNG'),
         'percentile': None if a.get('RISK_SPCTL') is None else round(a['RISK_SPCTL'], 1),
         'version': a.get('NRI_VER'), 'top_hazards': hazards[:3], 'reason': None,
-        'concern': a.get('RISK_RATNG') in ('Relatively High', 'Very High')}
+        'high_hazards': [h['hazard'] for h in high], 'concern': bool(high)}

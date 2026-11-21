@@ -81,6 +81,9 @@ export interface Flood {
   risk?: "minimal" | "moderate" | "high" | "high_coastal";
   checked?: string;
   reason: string | null;
+  in_sfha?: boolean;
+  inside?: boolean;
+  distance_m?: number | null;
 }
 export interface Hazards {
   flood_at_pin: Flood;
@@ -196,13 +199,21 @@ export function monthLabel(text: string | undefined): string {
 
 export function floodHeadline(f: Flood): string {
   if (f.reason || !f.zone) return reasonText(f.reason ?? "NOT_COVERED");
-  if (f.sfha) return `Zone ${f.zone} · Special Flood Hazard Area`;
+  if (f.in_sfha === false && f.sfha) return `Zone ${f.zone} · edge of a high-risk zone (pin outside)`;
+  if (f.sfha) return `Zone ${f.zone} · high-risk flood zone (Special Flood Hazard Area)`;
   if (f.risk === "moderate") return `Zone ${f.zone} · moderate (0.2% annual chance)`;
   return `Zone ${f.zone} · minimal flood hazard`;
 }
 
 export const floodTone = (f: Flood) =>
-  f.sfha ? "red" : f.risk === "moderate" ? "amber" : "neutral";
+  (f.in_sfha ?? f.sfha) ? "red" : f.sfha || f.risk === "moderate" ? "amber" : "neutral";
+
+/** Nearest high-risk flood zone, for the hazards panel. */
+export function sfhaDistance(f: Flood): string | null {
+  if (f.reason || !f.sfha) return null;
+  if (f.inside) return "Pin is inside";
+  return f.distance_m != null ? `About ${f.distance_m} m from the pin` : "Within about 150 m";
+}
 
 export const miles = (d: number) => `${d.toFixed(1)} mi`;
 export const placeName = (p: Place) => p.name ?? p.brand ?? "Unnamed place";

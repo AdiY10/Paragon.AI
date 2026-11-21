@@ -8,6 +8,7 @@ import {
   count,
   floodHeadline,
   floodTone,
+  sfhaDistance,
   money,
   monthLabel,
   pct,
@@ -324,14 +325,11 @@ function HazardsPanel({ section }: { section: Section<Hazards> }) {
               <span className={`badge ${floodTone(d.flood_at_pin)}`}>{floodHeadline(d.flood_at_pin)}</span>
               {d.flood_at_pin.bfe_ft != null && <small> Base flood elevation {d.flood_at_pin.bfe_ft} ft</small>}
             </dd>
-            {d.flood_nearby.zone && d.flood_nearby.zone !== d.flood_at_pin.zone && (
-              <>
-                <dt>Within ~100 m</dt>
-                <dd>
-                  <span className={`badge ${floodTone(d.flood_nearby)}`}>{floodHeadline(d.flood_nearby)}</span>
-                </dd>
-              </>
-            )}
+            <dt>Nearest high-risk flood zone</dt>
+            <dd>
+              {sfhaDistance(d.flood_nearby) ?? (d.flood_nearby.reason ? reasonText(d.flood_nearby.reason) : "None within 150 m")}
+              {d.flood_nearby.sfha && d.flood_nearby.zone && <small> · zone {d.flood_nearby.zone}</small>}
+            </dd>
             <dt>National Risk Index (tract)</dt>
             <dd>
               {d.nri.rating ?? reasonText(d.nri.reason)}

@@ -97,7 +97,7 @@ def compare(ids):
         at = hz.get('flood_at_pin') or {}
         cols.append({'id': str(l.pk), 'name': l.name, 'city': l.city, 'state': l.state, 'status': l.status,
             'screening': l.screening, 'ring_preset': l.ring_preset, 'attention': attention(l.pk),
-            'flood_zone': at.get('zone'), 'sfha': bool(at.get('sfha')),
+            'flood_zone': at.get('zone'), 'sfha': bool(at.get('in_sfha', at.get('sfha'))),
             'nri_rating': (hz.get('nri') or {}).get('rating'),
             'signals': [{'title': s['title'], 'severity': s['severity']} for s in active_for(l)][:5]})
     return {'locations': cols, 'rows': rows,
