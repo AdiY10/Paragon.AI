@@ -72,9 +72,13 @@ def _vintage_rings(lat, lon, radii, year, decennial, store, opener):
     for state in sorted({b.geoid[:2] for b in blocks}):
         snapshot = _latest('SRC-03', acs.scope_for(year, state))
         if snapshot is None and AUTO_INGEST:
-            # Screens can be anywhere in the US: ingest a missing state on demand (keyless bulk files).
+            # Screens can be anywhere in the US. Each bulk table is national, so one pass ingests
+            # every missing state at the same download cost: at most once per vintage, never per screen.
             try:
-                ingest_acs([state], year=year, store=store)
+                from apps.demographics.management.commands.ingest_acs import FIPS
+                have = {s.rsplit(':', 1)[1] for s in SourceSnapshot.objects.filter(
+                    source_id='SRC-03', release=str(year)).values_list('scope', flat=True)}
+                ingest_acs(sorted(set(FIPS.values()) - have), year=year, store=store)
             except (acs.AcsError, OSError):
                 pass
             snapshot = _latest('SRC-03', acs.scope_for(year, state))

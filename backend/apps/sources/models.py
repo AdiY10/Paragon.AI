@@ -56,7 +56,8 @@ class SourceSnapshot(models.Model):
     class Meta:
         ordering = ['-published_at', 'id']
         constraints = [models.UniqueConstraint(fields=['source','scope','release','sha256','adapter_version'], name='source_snapshot_content_unique')]
-        indexes = [models.Index(fields=['source','scope','release'])]
+        indexes = [models.Index(fields=['source','scope','release']), models.Index(fields=['source','release']),
+            models.Index(fields=['source','scope','retrieved_at'])]
 
     def save(self, *args, **kwargs):
         if not self._state.adding:

@@ -247,6 +247,18 @@ def hazards_section(run, lat, lon):
     return data, any(v.get('reason') is None for v in (at_pin, nearby, data['nri']))
 
 
+_WAC = {}
+
+
+def _parsed_wac(sha, raw):
+    """A state's LODES file is parsed once per process, not once per property (keep the last 4)."""
+    if sha not in _WAC:
+        if len(_WAC) >= 4:
+            _WAC.pop(next(iter(_WAC)))
+        _WAC[sha] = lodes.parse_wac(raw)
+    return _WAC[sha]
+
+
 def businesses_section(run, lat, lon, *, location=None, capturer=None):
     from . import overture_store as ostore
     capturer = capturer or overture.capture
@@ -363,8 +375,8 @@ def jobs_section(run, lat, lon, *, location=None):
             def fetch(st=st):
                 raw, url = lodes.fetch_wac(st, year, opener=run.opener)
                 return raw, url, str(year), f'LODES {year} (workplace jobs)'
-            raw, _ = run.cached('SRC-05', f'lodes:wac:{st}:{year}', None, fetch)
-            combined.update(lodes.parse_wac(raw))
+            raw, snap = run.cached('SRC-05', f'lodes:wac:{st}:{year}', None, fetch)
+            combined.update(_parsed_wac(snap.sha256, raw))
         return combined
 
     current = lodes.ring_jobs(blocks, wac(year), (lat, lon), radii)

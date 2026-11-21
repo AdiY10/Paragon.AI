@@ -164,6 +164,13 @@ def refresh_all(context=None, *, opener=None):
         try:
             raw = fetch_submissions(cik, opener=opener)
             parsed = parse_submissions(raw)
+            import hashlib
+            from apps.sources.models import SourceSnapshot
+            last = SourceSnapshot.objects.filter(source_id='SRC-14', scope=scope).order_by('-retrieved_at').first()
+            if last is not None and last.sha256 == hashlib.sha256(raw).hexdigest():
+                note_check('SRC-14', scope, snapshot=last)  # unchanged: no new copy, just a fresh check
+                fetched += 1
+                continue
             snap, _ = publish_snapshot(source_id='SRC-14', scope=scope, release=date.today().isoformat(),
                 data_period=f'Filings through {date.today().isoformat()}', source_url=SUBMISSIONS.format(cik=int(cik)),
                 adapter_version='sec-submissions-v1', stream=io.BytesIO(raw), store=store,

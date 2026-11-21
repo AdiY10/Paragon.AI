@@ -167,3 +167,29 @@ def test_filer_mapping_applies_to_the_same_brand_at_other_properties(client):
         content_type='application/json')
     assert r.status_code == 201
     assert set(TenantFiler.objects.values_list('tenant_id', flat=True)) == {ta.pk, tb.pk}
+
+
+def test_unchanged_sec_submissions_are_not_stored_again(client, tmp_path, settings, monkeypatch):
+    from datetime import date as d
+    from apps.sources.models import SourceSnapshot
+    from apps.locations import tenants as svc
+    admin = users(client)
+    settings.SOURCE_ARTIFACT_ROOT = tmp_path
+    monkeypatch.setenv('SEC_USER_AGENT', 'ParagonRadar ops@example.org')
+    loc = owned()
+    t, _ = svc.create_tenant(location_id=loc.pk, name='Rite Aid', request_key=uuid.uuid4(), actor=admin)
+    TenantFiler.objects.create(tenant=t, cik='84129', company_name='RITE AID CORP')
+    raw = (FIX / 'sec_submissions_CIK0000084129.json').read_bytes()
+    monkeypatch.setattr(sec, 'fetch_submissions', lambda cik, opener=None: raw)
+
+    class Day(d):
+        n = 0
+
+        @classmethod
+        def today(cls):
+            return d(2026, 11, 20 + cls.n)
+    monkeypatch.setattr(sec, 'date', Day)
+    assert sec.refresh_all() == (1, 0)
+    Day.n = 1
+    assert sec.refresh_all() == (1, 0)
+    assert SourceSnapshot.objects.filter(source_id='SRC-14').count() == 1
