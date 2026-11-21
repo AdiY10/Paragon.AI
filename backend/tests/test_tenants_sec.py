@@ -1,6 +1,7 @@
 """T8/T9: tenant roster API, listing import, SEC filer mapping and tenant watch (FR-07, FR-22, SIG-12/13)."""
 from datetime import date, datetime, timezone
 import io
+import uuid
 from pathlib import Path
 import pytest
 from apps.area.http import SourceError
@@ -132,3 +133,37 @@ def test_entity_search_parser(monkeypatch):
             return io.BytesIO((FIX / 'sec_entity_search_rite_aid.json').read_bytes())
     hits = sec.search_companies('rite aid', opener=Opener())
     assert hits[0] == {'cik': '84129', 'name': 'NEW RITE AID, LLC'}
+
+
+# ---- R2 item 10 ---------------------------------------------------------------------------
+
+def test_tenant_edit_keeps_sections_valid_and_escalates_own_store_closure(client):
+    from backend.tests.test_signals import section
+    from apps.area.models import AreaSection
+    from apps.insights import signals as engine
+    users(client)
+    loc = owned()
+    section(loc, 'businesses', {'release': '2026-11-18.0', 'changes': {'closures': [{'id': 'p1', 'name': 'CVS Pharmacy',
+        'brand': 'CVS Pharmacy', 'severity': 'Watch', 'distance_mi': 0.05, 'evidence': 'marked permanently closed'}]}})
+    engine.evaluate(loc)
+    assert Signal.objects.get(rule_id='SIG-09').severity == 'Watch'
+    version = loc.analysis_version
+    url = f'/api/locations/{loc.pk}/tenants/'
+    assert client.post(url, {'name': 'CVS Pharmacy'}, content_type='application/json').status_code == 200
+    loc.refresh_from_db()
+    assert loc.analysis_version == version and AreaSection.objects.filter(location=loc, analysis_version=version).exists()
+    s = Signal.objects.get(rule_id='SIG-09')
+    assert s.severity == 'High' and 'tenant' in s.why
+
+
+def test_filer_mapping_applies_to_the_same_brand_at_other_properties(client):
+    from apps.locations import tenants as svc
+    from apps.insights.models import TenantFiler
+    admin = users(client)
+    a, b = owned('Center A'), owned('Center B')
+    ta, _ = svc.create_tenant(location_id=a.pk, name='Rite Aid', request_key=uuid.uuid4(), actor=admin)
+    tb, _ = svc.create_tenant(location_id=b.pk, name='RITE AID', request_key=uuid.uuid4(), actor=admin)
+    r = client.post(f'/api/locations/{a.pk}/tenants/{ta.pk}/sec/', {'cik': '84129', 'company_name': 'RITE AID CORP'},
+        content_type='application/json')
+    assert r.status_code == 201
+    assert set(TenantFiler.objects.values_list('tenant_id', flat=True)) == {ta.pk, tb.pk}

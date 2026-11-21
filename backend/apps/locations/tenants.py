@@ -36,8 +36,10 @@ def _audit(tenant,actor,action,before):
 
 
 def _touch(location):
-    location.version+=1;location.analysis_version+=1
-    location.save(update_fields=['version','analysis_version','updated_at'])
+    # Tenants do not change the trade area: bump the record version (optimistic locking) only.
+    # analysis_version is for the pin and ring preset; bumping it here forced every section to recompute.
+    location.version+=1
+    location.save(update_fields=['version','updated_at'])
 
 
 def _unique(location,key,exclude=None):

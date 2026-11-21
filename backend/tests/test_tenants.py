@@ -24,7 +24,7 @@ def test_create_is_unconfirmed_with_unknown_anchor_and_attributed_history(roster
     assert created and not tenant.confirmed and tenant.is_anchor is None
     assert tenant.origin=='user' and not tenant.source_url
     assert tenant.history.get().actor==user and tenant.history.get().action=='created'
-    item.refresh_from_db();assert item.version==2 and item.analysis_version==2
+    item.refresh_from_db();assert item.version==2 and item.analysis_version==1  # R2.10: tenants leave the analysis valid
 
 
 def test_request_replay_does_not_duplicate_or_overwrite_later_edits(roster):

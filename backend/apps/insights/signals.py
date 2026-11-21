@@ -165,7 +165,16 @@ def candidates(location, t=None, today=None, evaluated=None):
     if biz and biz.status == 'available':
         evaluated.update({'SIG-09', 'SIG-10', f'overture@{biz.data.get("release")}'})
         ch, rel = biz.data.get('changes') or {}, biz.data.get('release')
+        from apps.area.businesses import brand_in, normalize_brand
+        tenants = {normalize_brand(n) for n in location.tenants.filter(archived=False).values_list('name', flat=True)}
+        tenants.discard(None)
         for c in ch.get('closures') or []:
+            c = dict(c)
+            label = c.get('brand') or c.get('name')
+            c['tenant_match'] = bool(tenants) and brand_in(label, tenants)
+            if c['tenant_match'] and c['distance_mi'] <= 0.093 and not ch.get('broad_data_change'):
+                # ~150 m from the pin: likely the tenant's own store at this center.
+                c['severity'] = 'High' if c.get('evidence') == 'marked permanently closed' else 'Watch'
             out.append(_candidate('SIG-09', f'place:{c["id"]}', 'Closure', c['severity'], 'negative',
                 f'Possible closure nearby: {c.get("name") or c.get("brand")} ({c["distance_mi"]:.1f} mi)',
                 ('Data suggests your tenant\'s location may have closed; confirm with the tenant.' if c.get('tenant_match') else
