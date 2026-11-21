@@ -5,35 +5,34 @@ Django root. It uses the existing private APIs; there is no separate public data
 feed or browser sign-in bypass. The UI is an implementation milestone, not a claim
 that Release 1's data calculations or production deployment are complete.
 
-## Implemented experience
+## Implemented experience (Release 2.0, items 17-23)
 
-- **This Week:** real portfolio counts, a confirmation queue, state-distribution
-  bars, property cards, and a source-coverage link. Until the signal pipeline runs,
-  the brief says **unavailable**, rather than claiming no material changes.
-- **Portfolio:** all saved records, state/status/asset filters, property cards, and
-  an add-location dialog. Counts use all API pages, including archived records
-  when the corresponding filter is selected.
-- **Property record:** source period, pin method/coordinates, confirmation status,
-  ring preset, user-provided GLA/notes, record confirmation, version-checked
-  editing, and previewed manual pin correction/confirmation, and source-backed Census suggestion review. The provenance drawer includes the original listing and change history.
-  Ring demographics and 2015–19 → 2020–24 trends appear in a "Who lives around this
-  property" section with margins of error, significance and an evidence drawer
-  (see [RING_DEMOGRAPHICS.md](RING_DEMOGRAPHICS.md)). Local economy, traffic, and flood/hazard
-  panels follow (see [AREA_PROFILE.md](AREA_PROFILE.md)).
-- **Data Sources:** the real 16-entry registry, recorded scoped health, periods,
-  last successful check, licensing, attribution, and privacy notes. No check is
-  displayed as “Not checked,” never as healthy.
-- **Admin:** recorded job activity; role restrictions are also enforced by the API.
-- **Screen / Compare:** clearly explain that area checks and comparable metrics
-  remain unavailable. Candidate record creation works; screening scores do not
-  exist yet.
+- **This Week (home):** the page heading is the brief's headline ("3 items need attention
+  across 3 properties"), followed by the attention items, "Resolved since the last brief",
+  an FYI count, then portfolio health (High / Watch / Clear tiles that open a filtered
+  portfolio) and a one-card setup reminder.
+- **Alerts:** every alert across the portfolio, filtered by status, level, category and
+  property (filters in the URL). Each alert opens "Evidence and actions": plain-English
+  evidence, the source, glossary terms, Mark reviewed, Dismiss with a note, Reopen and
+  "Was this useful?".
+- **Portfolio:** attention-ranked cards with key numbers (3-mile population, median
+  income, traffic), map, and state/status/type/attention filters that persist in the URL.
+- **Confirm your portfolio (#/setup):** bulk confirm or archive (with undo) the publicly
+  listed properties, then check each confirmed property's unconfirmed tenants.
+- **Property page:** a key-facts strip (attention, latest alert, population and 5-year
+  change, median income, main-road traffic, flood, nearest supermarket, active alerts),
+  a sticky section menu, and sections in FR-08 order: summary, trade area, economy and
+  jobs, retail, traffic, hazards, tenants (owned only), then the property record, map
+  pin and change history. "Refresh data" uses one flow with a live timer and a
+  persistent message when the background worker is slow or stopped.
+- **Screen / Compare / Data Sources / Admin:** as described in INSIGHTS.md and
+  DEPLOYMENT.md; a banner appears when a public source is failing.
 
-Portfolio and property screens now include interactive MapLibre maps with OSM
-raster tiles, linked reference pins, and geodesic distance rings. The list remains
-available when tiles or WebGL fail. See [MAPS.md](MAPS.md) for attribution, privacy,
-and display-geometry limits.
-Tenant management, signal evidence, comparison,
-and complete administrator controls remain in the implementation plan.
+Accessibility: route changes move focus to the main content and update the tab title;
+the map has a "Skip map" link; text is at least 12 px (body 14 px, phone inputs 16 px);
+the browser smoke runs axe with WCAG 2.2 AA tags, including a property page at 375 px.
+Code layout: `src/main.tsx` holds routing and the shell; pages live in `src/pages/`,
+shared pieces in `src/components/`.
 
 ## Build and serve
 

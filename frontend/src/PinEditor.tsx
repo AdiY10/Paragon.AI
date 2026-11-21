@@ -100,8 +100,8 @@ export default function PinEditor({ location }: { location: Location }) {
             </Suspense>
           ) : (
             <p className="notice">
-              Enter a valid latitude and longitude to preview a pin. Automatic
-              address geocoding is still unavailable.
+              Enter a valid latitude and longitude to preview a pin, or close this and use "Find from address"
+              to look the address up.
             </p>
           )}
           <form onSubmit={submit}>

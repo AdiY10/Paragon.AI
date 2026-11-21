@@ -129,8 +129,8 @@ export default function SummaryPanel({ location }: { location: Location }) {
             <p className="small muted">No notable strengths by the standard rules.</p>
           ) : (
             <ul className="summary-list">
-              {d.strengths.map((s) => (
-                <li key={s.text}>
+              {d.strengths.map((s, i) => (
+                <li key={`${i}-${s.metric}`}>
                   {s.text}
                   {s.period && <small> · {s.period}</small>}
                 </li>
@@ -146,8 +146,8 @@ export default function SummaryPanel({ location }: { location: Location }) {
             <p className="small muted">No notable concerns by the standard rules.</p>
           ) : (
             <ul className="summary-list concerns">
-              {d.concerns.map((s) => (
-                <li key={s.text}>
+              {d.concerns.map((s, i) => (
+                <li key={`${i}-${s.metric}`}>
                   {s.text}
                   {s.period && <small> · {s.period}</small>}
                 </li>

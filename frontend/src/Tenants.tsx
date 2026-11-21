@@ -62,9 +62,10 @@ export default function TenantsPanel({ location, isAdmin }: { location: Location
   if (location.status !== "owned") return null;
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const d = new FormData(e.currentTarget);
-    add.mutate({ name: String(d.get("name") ?? ""), is_anchor: d.get("anchor") ? true : null });
-    e.currentTarget.reset();
+    const form = e.currentTarget;
+    const d = new FormData(form);
+    // Clear the form only once the tenant is saved, so a failed save keeps what was typed.
+    add.mutate({ name: String(d.get("name") ?? ""), is_anchor: d.get("anchor") ? true : null }, { onSuccess: () => form.reset() });
   }
   const rows = (q.data?.results ?? []).filter((t) => !t.archived);
   return (
