@@ -198,6 +198,7 @@ Computed on the 3-mile ring against non-archived Owned locations (n ≥ 5):
 | `NOT_COVERED` | The source has no data for the area (no digital flood map, no HPMS segment within 250 m, LODES state-year missing) | "No federal traffic count within 250 m of this site." | No value; excluded from comparisons and percentiles |
 | `SUPPRESSED` | BLS disclosure `N`; ACS suppressed cell | "Not disclosed by BLS (confidentiality)." | No value; never 0 |
 | `LOW_RELIABILITY` | ACS CV > 40% | Value greyed plus "Very low reliability" | Shown; excluded from signals and highlights |
+| `SAME_COUNT` | The two HPMS years rest on the same traffic count (`aadt_vd`): the state estimated the newer year | "No new count: the state carried the last count forward." | Current value shown; no year-over-year change; SIG-08 does not fire |
 | `GEOGRAPHY_CHANGED` | Prior period unavailable for the same geography (CT), or the segment changed | "Trend unavailable: Connecticut moved to planning regions in 2022." | Current value shown; no trend |
 | `NOT_ENOUGH_DATA` | Percentile with n < 5; jobs trend under 1,000 | "Needs at least 5 confirmed properties to benchmark." | No percentile |
 | `CACHED_AFTER_ERROR` | Latest refresh failed; earlier data exists | Badge "Stale: last updated Nov 2 (source unavailable since Nov 14)" | Last good value shown with its date |

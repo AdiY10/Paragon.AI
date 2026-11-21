@@ -2,6 +2,7 @@
 import json
 from datetime import date
 import math
+import re
 from .http import fetch, arcgis_json, SourceError
 
 HPMS_URL = 'https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_{st}_{year}/FeatureServer/0/query'
@@ -39,7 +40,8 @@ def fetch_hpms(state_fips, year, lat, lon, *, opener=None):
     url = HPMS_URL.format(st=st, year=year)
     raw = fetch(url, params={'geometry': f'{lon},{lat}', 'geometryType': 'esriGeometryPoint', 'inSR': 4326,
         'spatialRel': 'esriSpatialRelIntersects', 'distance': TRAFFIC_RADIUS_M, 'units': 'esriSRUnit_Meter',
-        'outFields': '*', 'returnGeometry': 'false', 'f': 'json'}, opener=opener, max_bytes=8 * 1024 * 1024)
+        'outFields': '*', 'returnGeometry': 'true', 'outSR': 4326, 'geometryPrecision': 6, 'f': 'json'},
+        opener=opener, max_bytes=16 * 1024 * 1024)
     return raw, url
 
 
@@ -57,46 +59,119 @@ def fetch_hpms_latest(state_fips, lat, lon, *, today=None, opener=None):
     raise SourceError('NOT_COVERED', 'no HPMS year published for this state')
 
 
-def parse_hpms(raw):
+RAMP_OR_SERVICE = {4, 5, 6}   # HPMS facility_type: ramp, non-mainline, non-inventory direction
+FULL_ACCESS_CONTROL = 1       # HPMS access_control: limited-access highway (no driveway to the center)
+
+
+def _count_year(a):
+    """Year of the traffic count behind the AADT (aadt_vd), which can be older than data_year."""
+    vd = a.get('aadt_vd')
+    if isinstance(vd, str) and vd[:4].isdigit():
+        return int(vd[:4])
+    if isinstance(vd, (int, float)) and vd > 10_000_000_000:  # epoch milliseconds
+        from datetime import datetime, timezone
+        return datetime.fromtimestamp(vd / 1000, tz=timezone.utc).year
+    return None
+
+
+def _distance_m(paths, lat, lon):
+    if not paths:
+        return None
+    k = 111_320
+    cx = math.cos(math.radians(lat))
+    best = None
+    for path in paths:
+        pts = [((x - lon) * k * cx, (y - lat) * k) for x, y in path]
+        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+            dx, dy = bx - ax, by - ay
+            length = dx * dx + dy * dy
+            t = 0 if length == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / length))
+            d = math.hypot(ax + t * dx, ay + t * dy)
+            best = d if best is None or d < best else best
+    return None if best is None else round(best)
+
+
+def parse_hpms(raw, lat=None, lon=None):
+    try:
+        features = json.loads(raw).get('features')
+    except ValueError:
+        raise SourceError('SCHEMA_ERROR', 'not JSON') from None
+    arcgis_json(raw)  # raises on ArcGIS errors
     segments = []
-    for a in arcgis_json(raw):
+    for f in features or []:
+        a = f.get('attributes') or {}
         route_id, aadt = _pick(a, 'route_id'), a.get('aadt')
         if not aadt or not route_id:
             continue
         name = _pick(a, 'name')
         number = _pick(a, 'number')
+        paths = (f.get('geometry') or {}).get('paths')
         segments.append({'route_id': str(route_id), 'name': (str(name).strip() or None) if name else None,
-            'number': number, 'aadt': int(aadt), 'year': _pick(a, 'year'), 'f_system': a.get('f_system'),
-            'lanes': a.get('through_lanes'), 'begin': _pick(a, 'begin'), 'end': _pick(a, 'end')})
+            'number': number, 'aadt': int(aadt), 'year': _pick(a, 'year'), 'count_year': _count_year(a),
+            'f_system': a.get('f_system'), 'facility_type': a.get('facility_type'),
+            'access_control': a.get('access_control'), 'lanes': a.get('through_lanes'),
+            'begin': _pick(a, 'begin'), 'end': _pick(a, 'end'),
+            'distance_m': _distance_m(paths, lat, lon) if lat is not None else None})
     return segments
 
 
 def road_label(segment):
     if segment['name']:
-        return segment['name'].title().replace('Us ', 'US ')
+        label = segment['name'].title().replace('Us ', 'US ')
+        # Route designators stay upper case: "NC-87", "SR-2100", "I-95", "US 9W".
+        # Drop internal inventory codes in front of a street name ("G039 Fifteenth St", "EV2L Kindred St").
+        label = re.sub(r'^(?=\S*\d)[A-Za-z0-9]{3,5}\s+(?=[A-Za-z])', '', label) if not re.match(r'^\d', label) else label
+        label = re.sub(r'\b(\d+)(St|Nd|Rd|Th)\b', lambda m: m.group(1) + m.group(2).lower(), label)
+        label = re.sub(r'\b(Ne|Nw|Se|Sw)\b', lambda m: m.group(1).upper(), label)
+        return re.sub(r'\b([A-Za-z]{1,3})(-?\d+[A-Za-z]?)\b', lambda m: m.group(1).upper() + m.group(2).upper(), label)
     if segment['number']:
         return f"Route {segment['number']}"
     return F_SYSTEM.get(segment['f_system'], 'Road')
 
 
+def serves_the_site(s):
+    """Roads a shopper can drive in from: not ramps, service roads or limited-access highways."""
+    return s.get('facility_type') not in RAMP_OR_SERVICE and s.get('access_control') != FULL_ACCESS_CONTROL \
+        and s.get('f_system') != 1
+
+
+def _class_bucket(s):
+    f = s.get('f_system') or 9
+    return 0 if f <= 4 else 1 if f <= 6 else 2  # arterials, collectors, local
+
+
 def primary_roads(segments, limit=2):
-    """docs/04 §3.5: up to two distinct named routes, highest class then highest AADT."""
-    best = {}
-    for s in sorted(segments, key=lambda s: (s['f_system'] or 9, -s['aadt'])):
+    """docs/04 §3.5: up to two distinct routes that serve the site: arterials before collectors
+    before local roads, then the nearest; the segment nearest the pin gives each route's count.
+    Ramps and limited-access highways are used only when nothing else is within range."""
+    usable = [s for s in segments if serves_the_site(s)] or segments
+    far = 10 ** 6
+    by_route = {}
+    for s in sorted(usable, key=lambda s: (s['distance_m'] if s.get('distance_m') is not None else far, -s['aadt'])):
         key = s['name'] or s['number'] or s['route_id']
-        if key not in best:
-            best[key] = s
-    return list(best.values())[:limit]
+        by_route.setdefault(key, s)
+    ranked = sorted(by_route.values(), key=lambda s: (_class_bucket(s),
+        s['distance_m'] if s.get('distance_m') is not None else far, s['f_system'] or 9, -s['aadt']))
+    return ranked[:limit]
 
 
 def traffic_change(current, prior_segments):
-    """Same route ID with overlapping measures in the prior year; otherwise no comparison."""
+    """Same route with the largest overlap in the prior year. A change is reported only when the
+    count behind the AADT is newer; otherwise the state carried an estimate forward (SAME_COUNT)."""
+    best, overlap = None, 0
     for p in prior_segments:
-        if p['route_id'] == current['route_id'] and p['begin'] is not None and current['begin'] is not None \
-                and p['begin'] < current['end'] and current['begin'] < p['end']:
-            return {'prior_aadt': p['aadt'], 'prior_year': p['year'],
-                'change_pct': (current['aadt'] - p['aadt']) / p['aadt'] if p['aadt'] else None, 'reason': None}
-    return {'prior_aadt': None, 'change_pct': None, 'reason': 'GEOGRAPHY_CHANGED'}
+        if p['route_id'] != current['route_id'] or p['begin'] is None or current['begin'] is None:
+            continue
+        o = min(p['end'], current['end']) - max(p['begin'], current['begin'])
+        if o > overlap:
+            best, overlap = p, o
+    if best is None:
+        return {'prior_aadt': None, 'change_pct': None, 'reason': 'GEOGRAPHY_CHANGED'}
+    out = {'prior_aadt': best['aadt'], 'prior_year': best['year'], 'count_year': current.get('count_year'),
+        'prior_count_year': best.get('count_year')}
+    if current.get('count_year') and current.get('count_year') == best.get('count_year'):
+        return {**out, 'change_pct': None, 'reason': 'SAME_COUNT'}
+    return {**out, 'change_pct': (current['aadt'] - best['aadt']) / best['aadt'] if best['aadt'] else None, 'reason': None}
 
 
 # ---- FEMA flood zones ---------------------------------------------------------

@@ -284,16 +284,27 @@ function TrafficPanel({ section }: { section: Section<Traffic> }) {
                 <div>
                   <strong>{r.label}</strong>
                   <small>
-                    {[r.road_class, r.lanes ? `${r.lanes} lanes` : null].filter(Boolean).join(" · ")}
+                    {[
+                      r.road_class,
+                      r.lanes ? `${r.lanes} lanes` : null,
+                      r.distance_m != null ? `about ${r.distance_m} m from the pin` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </small>
                 </div>
                 <div className="road-count">
                   <strong>{count(r.aadt)}</strong>
-                  <small>vehicles/day · {r.year}</small>
+                  <small>
+                    vehicles/day · {r.year}
+                    {r.count_year && r.count_year !== r.year ? ` (counted ${r.count_year})` : ""}
+                  </small>
                   <small>
                     {r.change_pct != null
                       ? `${signedPct(r.change_pct)} vs ${r.prior_year}`
-                      : "No prior-year comparison"}
+                      : r.reason === "SAME_COUNT"
+                        ? "Estimate carried forward; no new count"
+                        : "No prior-year comparison"}
                   </small>
                 </div>
               </li>
