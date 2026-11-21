@@ -543,6 +543,12 @@ function App() {
               )}
             </section>
           )}
+          {(sources.data ?? []).some((s) => s.status === "Failing") && (
+            <p className="source-banner" role="status">
+              Some public data sources could not be refreshed. Affected figures show the last good values with
+              their dates. <a href="#/sources">See data sources</a>
+            </p>
+          )}
           <main id="main" tabIndex={-1}>
             {body}
           </main>
@@ -820,7 +826,7 @@ function LocationPage({ id }: { id: string }) {
         Portfolio <ChevronRight size={14} /> Property record
       </a>
       <PageHead
-        eyebrow={`${item.city}, ${item.state} · ${titleCase(item.status)}`}
+        eyebrow={[[item.city, item.state].filter(Boolean).join(", "), titleCase(item.status)].filter(Boolean).join(" · ")}
         title={item.name}
         description={item.address}
         action={

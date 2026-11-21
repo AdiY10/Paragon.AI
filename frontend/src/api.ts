@@ -31,14 +31,23 @@ export async function api<T>(
     body: data === undefined ? undefined : JSON.stringify(data),
   });
   if (!response.ok) {
-    const message =
+    let detail = "";
+    try {
+      const body = await response.clone().json();
+      if (body && typeof body.detail === "string") detail = body.detail;
+    } catch {
+      /* not JSON */
+    }
+    const message = detail && response.status !== 403 && response.status < 500 ? detail :
       response.status === 409
         ? "This record changed. Reload it before saving."
         : response.status === 403
           ? "Please sign in again to continue."
           : response.status === 400
             ? "Please check the entered values and try again."
-            : "This request could not be completed. Please try again.";
+            : response.status === 429
+              ? "Too many requests in a short time. Please wait a minute and try again."
+              : "This request could not be completed. Please try again.";
     throw new ApiError(response.status, message);
   }
   if (response.status === 204) return undefined as T;
