@@ -149,7 +149,7 @@ def candidates(location, t=None, today=None, evaluated=None):
                 {'zone': near['zone'], 'dfirm_id': near.get('dfirm_id')}, 'Effective flood maps', 'SRC-11'))
     biz = rows.get('businesses')
     if biz and biz.status == 'available':
-        evaluated.update({'SIG-09', 'SIG-10'})
+        evaluated.update({'SIG-09', 'SIG-10', f'overture@{biz.data.get("release")}'})
         ch, rel = biz.data.get('changes') or {}, biz.data.get('release')
         for c in ch.get('closures') or []:
             out.append(_candidate('SIG-09', f'place:{c["id"]}', 'Closure', c['severity'], 'negative',
@@ -249,7 +249,11 @@ def evaluate(location, *, today=None):
         moved = s.analysis_version != location.analysis_version
         if moved and s.rule_id not in evaluated:
             s.status, s.resolved_reason = 'resolved', 'location corrected'
-        elif s.rule_id in EVENT_RULES and s.event_date:
+        elif s.rule_id in EVENT_RULES and s.event_date and not (
+                s.rule_id in ('SIG-09', 'SIG-10') and f'overture@{s.evidence.get("release")}' in evaluated) and \
+                s.rule_id not in ('SIG-12', 'SIG-13'):
+            # A closure from an earlier release stays listed until it ages out; one that the same
+            # release no longer flags (better filtering) resolves. Filings are re-queried each time.
             if too_old(s.event_date):
                 s.status, s.resolved_reason = 'expired', 'older than event window'
                 s.last_changed_at = now

@@ -10,7 +10,9 @@ import unicodedata
 from apps.demographics.rings import haversine_miles
 
 MIN_COUNT_CONFIDENCE = 0.5
-CLOSURE_PRIOR_CONFIDENCE = 0.7
+CLOSURE_PRIOR_CONFIDENCE = 0.7       # explicit "permanently closed" in the new release
+DISAPPEARANCE_PRIOR_CONFIDENCE = 0.9  # silently missing, non-anchor: needs a stronger prior
+SAME_PLACE_MILES = 0.093              # ~150 m: a record with the same name here is the same place
 OPENING_CONFIDENCE = 0.8
 
 GROUPS = {
@@ -59,6 +61,13 @@ BIG_BOX_BRANDS = {'walmart', 'target', 'costco', 'costco wholesale', 'bjs wholes
     'big lots', 'barnes noble', 'old navy', 'michaels', 'hobby lobby', 'at home', 'bed bath beyond',
     'regal', 'amc', 'bow tie cinemas', 'kinney drugs', 'harbor freight tools', 'aldi', 'lidl'}
 ANCHOR_BRANDS = GROCERY_BRANDS | BIG_BOX_BRANDS
+
+# Not co-tenancy: their records churn constantly in map data (agents, kiosks, chargers).
+NOISE_CATEGORIES = GROUPS['Banks and financial'] | GROUPS['Medical and health'] | {
+    'atm', 'ev_charging_station', 'parcel_locker', 'post_office', 'insurance_agency', 'real_estate',
+    'real_estate_agent', 'mortgage_broker', 'tax_service', 'atms', 'vending_machine'}
+NOISE_NAME = re.compile(r'\b(atm|mortgage|loans?|insurance|charging|chargepoint|electrify america|evgo|tesla supercharger|'
+    r'locker|amazon hub|redbox|coinstar|bitcoin|moneygram|western union|kiosk)\b')
 
 
 def normalize_brand(name):
@@ -138,15 +147,47 @@ def _severity_down(level):
     return {'High': 'Watch', 'Watch': 'FYI', 'FYI': 'FYI'}[level]
 
 
+def is_noise(r):
+    """Banks, financial and medical records (even an anchor's in-store money center or clinic),
+    and ATMs, chargers or lockers by name unless the record is a curated anchor brand."""
+    if r.get('basic_category') in NOISE_CATEGORIES:
+        return True
+    name = normalize_brand(r.get('name')) or ''
+    return bool(NOISE_NAME.search(name)) and not brand_in(r.get('brand'), ANCHOR_BRANDS)
+
+
+def same_place_present(old, present):
+    """A present record within ~150 m with the same name or brand, or whose name is a prefix of
+    the old one ("Stop & Shop" for "Stop & Shop Pharmacy"): ID churn or an in-store department."""
+    name, brand = normalize_brand(old.get('name')), normalize_brand(old.get('brand'))
+    for r in present:
+        if r['id'] == old['id'] or haversine_miles(old['lat'], old['lon'], r['lat'], r['lon']) > SAME_PLACE_MILES:
+            continue
+        other, other_brand = normalize_brand(r.get('name')), normalize_brand(r.get('brand'))
+        if name and other and (name == other or name.startswith(other + ' ')):
+            return True
+        if brand and other_brand and brand == other_brand:
+            return True
+    return False
+
+
 def changes(prior, current, center, tenant_brands=()):
-    """Possible closures (SIG-09) and new key businesses (SIG-10) between two releases."""
+    """Possible closures (SIG-09) and new key businesses (SIG-10) between two releases.
+
+    De-noising (R2 item 6): explicit closures and anchor disappearances need prior confidence
+    >= 0.7, other disappearances >= 0.9; financial, medical, ATM, charger and locker records are ignored; a closure is
+    dropped when the same place is still present nearby under another id or as its parent store.
+    """
     tenants = {normalize_brand(t) for t in tenant_brands if normalize_brand(t)}
     now = {r['id']: r for r in current}
     before = {r['id']: r for r in prior}
+    present = [r for r in current if is_present(r)]
     closures, openings = [], []
     for pid, old in before.items():
         conf = old.get('confidence')
         if old.get('operating_status') == 'permanently_closed' or conf is None or conf < CLOSURE_PRIOR_CONFIDENCE:
+            continue
+        if is_noise(old):
             continue
         branded, key = bool(old.get('brand')), is_key(old)
         retail = old.get('basic_category') in CATEGORY_GROUP
@@ -158,6 +199,10 @@ def changes(prior, current, center, tenant_brands=()):
         if new is not None and new.get('operating_status') != 'permanently_closed':
             continue  # still present (null -> open transitions are enrichment, ignored)
         explicit = new is not None
+        if not explicit and not key and conf < DISAPPEARANCE_PRIOR_CONFIDENCE:
+            continue
+        if same_place_present(old, present):
+            continue
         brand = normalize_brand(old.get('brand'))
         tenant_match = bool(brand) and brand_in(brand, tenants) if tenants else False
         if tenant_match and d <= 0.093:  # ~150 m: likely the tenant's own store
@@ -172,8 +217,10 @@ def changes(prior, current, center, tenant_brands=()):
             'evidence': 'marked permanently closed' if explicit else 'no longer in the dataset',
             'tenant_match': tenant_match})
     for pid, new in now.items():
-        if pid in before or not is_present(new) or not is_key(new):
+        if pid in before or not is_present(new) or not is_key(new) or is_noise(new):
             continue
+        if same_place_present(new, [r for r in prior if is_present(r)]):
+            continue  # an existing place under a new id
         if new.get('confidence') is None or new['confidence'] < OPENING_CONFIDENCE or _distance(center, new) > 3:
             continue
         openings.append({**_place(center, new), 'severity': 'FYI'})
