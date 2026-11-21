@@ -2544,3 +2544,34 @@ small,
 .alert-list a {
   text-decoration: underline;
 }
+
+/* ---- R2.21 compute flow ---- */
+.compute-status {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.compute-status p {
+  margin: 0;
+}
+.compute-status small {
+  display: block;
+  color: var(--muted);
+}
+.source-banner {
+  margin: 0;
+  padding: 10px 24px;
+  font-size: 14px;
+  background: var(--stale-bg);
+  color: var(--stale-ink);
+  border-bottom: 1px solid #c9d2e3;
+}
+.source-banner a {
+  text-decoration: underline;
+}
+.notice.error .button {
+  margin-top: 8px;
+}
+.area-action-title {
+  font-size: 17px;
+}

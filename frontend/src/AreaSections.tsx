@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Briefcase, Building, Car, RefreshCw, ShieldAlert, Store } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ComputeStatus, POLL_MS, SectionState, useComputeJob } from "./useComputeJob";
+import { Briefcase, Building, Car, ShieldAlert, Store } from "lucide-react";
 import { api, dateLabel } from "./api";
 import type { Location } from "./types";
 import { reasonText } from "./demographics";
@@ -27,74 +28,53 @@ import {
   type Traffic,
 } from "./area";
 
-const POLL_MS = 4000;
 const POLL_LIMIT_MS = 240_000;
 
 export default function AreaSections({ location, autoStart = false }: { location: Location; autoStart?: boolean }) {
-  const [pollingSince, setPollingSince] = useState<number | null>(null);
+  const [polling, setPolling] = useState(false);
   const query = useQuery({
     queryKey: ["area", location.id, location.analysis_version],
     queryFn: () => api<Area>(`/api/locations/${location.id}/area/`),
     refetchInterval: (q) => {
       const s = q.state.data?.sections;
       const pending = !s || Object.values(s).some((x) => x.status === "not_computed");
-      return pollingSince !== null && pending ? POLL_MS : false;
+      return polling && pending ? POLL_MS : false;
     },
   });
-  const compute = useMutation({
-    mutationFn: () =>
-      api(`/api/locations/${location.id}/area/`, "POST"),
-    onSuccess: () => setPollingSince(Date.now()),
-  });
   const sections = query.data?.sections;
-  const allDone =
-    !!sections && Object.values(sections).every((s) => s.status !== "not_computed");
-  const timedOut =
-    pollingSince !== null && !allDone && Date.now() - pollingSince > POLL_LIMIT_MS;
-  useEffect(() => {
-    if (allDone || timedOut) setPollingSince(null);
-  }, [allDone, timedOut]);
+  const allDone = !!sections && Object.values(sections).every((s) => s.status !== "not_computed");
+  const job = useComputeJob({
+    start: () => api(`/api/locations/${location.id}/area/`, "POST"),
+    done: allDone,
+    limitMs: POLL_LIMIT_MS,
+    invalidate: [["summary", location.id], ["location", location.id]],
+  });
+  useEffect(() => setPolling(job.polling), [job.polling]);
 
   const missing = !!sections && Object.values(sections).some((s) => s.status === "not_computed" && s.reason === "NOT_COMPUTED");
   useEffect(() => {
-    if (autoStart && query.data?.placed && missing && pollingSince === null && !compute.isPending) compute.mutate();
+    if (autoStart && query.data?.placed && missing && !job.computing) job.run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, missing, query.data?.placed]);
-  if (query.error)
+  if (!sections)
     return (
-      <p className="notice error" role="alert">
-        Area data could not be loaded. Please try again.
-      </p>
+      <SectionState loading={!query.error} error={query.error} retry={() => query.refetch()} what="Area data" />
     );
-  if (!sections) return <p className="notice">Loading area data…</p>;
 
-  const computing = pollingSince !== null || compute.isPending;
   const anyMissing = Object.values(sections).some((s) => s.status === "not_computed");
   const stale = Object.values(sections).some((s) => s.reason === "STALE");
-  const action = query.data!.placed && anyMissing && (
+  const action = query.data!.placed && (anyMissing || job.timedOut) && (
     <div className="area-action">
-      <p>
-        {computing
-          ? "Checking federal sources… this usually takes under a minute."
-          : stale
-            ? "The pin moved. Re-check area data for the new location."
-            : "Economy, traffic, hazards and nearby businesses have not been checked for this location yet."}
-      </p>
-      {timedOut && (
-        <p className="notice error" role="alert">
-          The check has not finished. The background worker may be busy or stopped.
-        </p>
-      )}
-      {compute.error && (
-        <p className="notice error" role="alert">
-          {(compute.error as Error).message}
-        </p>
-      )}
-      {!computing && (
-        <button className="button small-button" onClick={() => compute.mutate()}>
-          <RefreshCw size={15} /> Check area data
-        </button>
-      )}
+      <h2 className="area-action-title">Area data</h2>
+      <ComputeStatus
+        job={job}
+        idleText={
+          stale
+            ? "The pin moved since area data was checked. Re-check it for the new location."
+            : "Economy, traffic, hazards and nearby businesses have not been checked for this location yet."
+        }
+        actionLabel="Check area data"
+      />
     </div>
   );
 

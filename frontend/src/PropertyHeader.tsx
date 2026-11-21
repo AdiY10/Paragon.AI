@@ -34,6 +34,7 @@ export default function PropertyHeader({ location }: { location: Location }) {
   const alerts = signals.filter((s) => s.severity !== "FYI");
   const latest = [...alerts].sort((a, b) => b.detected_at.localeCompare(a.detected_at))[0];
   const attention = location.attention ?? "Clear";
+  const checked = pop?.value != null || (area.data && Object.values(area.data.sections).some((s) => s.status === "available"));
   const facts: [string, string, string?][] = [
     [
       "People within 3 miles",
@@ -53,9 +54,13 @@ export default function PropertyHeader({ location }: { location: Location }) {
   return (
     <section className="property-header" aria-label="Key facts">
       <div className="attention-line">
-        <span className={`badge ${severityTone(attention) || "green"}`}>
-          {attention === "Clear" ? "No attention needed" : `${attention} attention`}
-        </span>
+        {attention === "Clear" && !checked ? (
+          <span className="badge">Not checked yet</span>
+        ) : (
+          <span className={`badge ${severityTone(attention) || "green"}`}>
+            {attention === "Clear" ? "No attention needed" : `${attention} attention`}
+          </span>
+        )}
         {latest && (
           <span className="what-changed">
             Latest:{" "}

@@ -84,6 +84,7 @@ export default function SummaryPanel({ location }: { location: Location }) {
   const d = query.data;
   if (!d) return <p className="notice">Loading comparison…</p>;
   const shown = d.metrics.filter((m) => m.value !== null);
+  const nothingYet = shown.length === 0 && d.signals.length === 0;
   return (
     <section className="panel summary-panel" aria-labelledby="summary-title">
       <div className="section-heading">
@@ -93,6 +94,12 @@ export default function SummaryPanel({ location }: { location: Location }) {
         </div>
         <Gauge size={22} />
       </div>
+      {nothingYet && (
+        <p className="notice" role="status">
+          Not calculated yet. Use "Calculate ring demographics" and "Check area data" below; this summary fills
+          in on its own when they finish.
+        </p>
+      )}
       {!d.benchmark_ready && (
         <p className="notice">
           Portfolio comparison needs at least {d.min_portfolio} other owned properties with data (you have{" "}

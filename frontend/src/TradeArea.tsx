@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { ComputeStatus, POLL_MS, SectionState, useComputeJob } from "./useComputeJob";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowDownRight,
@@ -25,45 +26,31 @@ import {
   type Ring,
 } from "./demographics";
 
-const POLL_MS = 4000;
 const POLL_LIMIT_MS = 180_000;
 
 export default function TradeArea({ location, autoStart = false }: { location: Location; autoStart?: boolean }) {
-  const [pollingSince, setPollingSince] = useState<number | null>(null);
+  const [polling, setPolling] = useState(false);
   const query = useQuery({
     queryKey: ["demographics", location.id, location.analysis_version],
-    queryFn: () =>
-      api<Demographics>(`/api/locations/${location.id}/demographics/`),
-    refetchInterval: (q) =>
-      pollingSince !== null && q.state.data?.status !== "available"
-        ? POLL_MS
-        : false,
-  });
-  const compute = useMutation({
-    mutationFn: () =>
-      api<{ job_id: string }>(
-        `/api/locations/${location.id}/demographics/`,
-        "POST",
-      ),
-    onSuccess: () => setPollingSince(Date.now()),
+    queryFn: () => api<Demographics>(`/api/locations/${location.id}/demographics/`),
+    refetchInterval: (q) => (polling && q.state.data?.status !== "available" ? POLL_MS : false),
   });
   const data = query.data;
-  const timedOut =
-    pollingSince !== null &&
-    data?.status !== "available" &&
-    Date.now() - pollingSince > POLL_LIMIT_MS;
-  useEffect(() => {
-    if (data?.status === "available" || timedOut) setPollingSince(null);
-  }, [data?.status, timedOut]);
+  const job = useComputeJob({
+    start: () => api(`/api/locations/${location.id}/demographics/`, "POST"),
+    done: data?.status === "available",
+    limitMs: POLL_LIMIT_MS,
+    invalidate: [["summary", location.id], ["location", location.id]],
+  });
+  useEffect(() => setPolling(job.polling), [job.polling]);
 
   const placed = location.current_revision.lat !== null;
   const notComputed = data?.status === "unavailable" && data.reason === "NOT_COMPUTED";
   useEffect(() => {
     // Screens load progressively: start the calculation as soon as the page opens.
-    if (autoStart && placed && notComputed && pollingSince === null && !compute.isPending) compute.mutate();
+    if (autoStart && placed && notComputed && !job.computing) job.run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, placed, notComputed]);
-  const computing = pollingSince !== null || compute.isPending;
 
   return (
     <section className="panel trade-area" aria-labelledby="trade-area-title">
@@ -74,46 +61,22 @@ export default function TradeArea({ location, autoStart = false }: { location: L
         </div>
         <Users size={22} />
       </div>
-      {query.error ? (
-        <p className="notice error" role="alert">
-          Ring demographics could not be loaded. Please try again.
-        </p>
-      ) : !data ? (
-        <p className="notice">Loading ring demographics…</p>
-      ) : data.status === "unavailable" ? (
+      <SectionState loading={!data && !query.error} error={query.error} retry={() => query.refetch()} what="Ring demographics" />
+      {data?.status === "unavailable" && (
         <div className="trade-empty">
-          <p>{computing ? "Calculating ring demographics…" : data.message}</p>
-          {computing && (
-            <p className="small muted" role="status">
-              This usually takes under a minute. The page updates on its own.
-            </p>
-          )}
-          {timedOut && (
-            <p className="notice error" role="alert">
-              The calculation has not finished. The background worker may be
-              busy or stopped; try again later.
-            </p>
-          )}
-          {compute.error && (
-            <p className="notice error" role="alert">
-              {(compute.error as Error).message}
-            </p>
-          )}
-          {placed && !computing && data.reason !== "NOT_PROVIDED" && (
-            <button
-              className="button small-button"
-              onClick={() => compute.mutate()}
-            >
-              <RefreshCw size={15} />
-              {data.reason === "STALE"
-                ? "Recalculate for the new pin"
-                : "Calculate ring demographics"}
-            </button>
-          )}
+          <ComputeStatus
+            job={job}
+            canRun={placed && data.reason !== "NOT_PROVIDED"}
+            idleText={
+              data.reason === "STALE"
+                ? "The pin or trade-area rings changed since this was calculated."
+                : data.message
+            }
+            actionLabel={data.reason === "STALE" ? "Recalculate for the new pin" : "Calculate ring demographics"}
+          />
         </div>
-      ) : (
-        <Available data={data} />
       )}
+      {data?.status === "available" && <Available data={data} />}
     </section>
   );
 }
