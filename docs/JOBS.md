@@ -32,11 +32,14 @@ The database broker needs no Redis service. Start the maintenance worker with:
 python backend/manage.py qcluster
 ```
 
-Maintenance has one worker, a 1,800-second hard timeout, a 1,830-second application
-lease, and a 2,100-second receipt retry. Foreground capacity is reserved with an alternate
-cluster: `Q_CLUSTER_NAME=paragon-foreground python backend/manage.py qcluster`.
-Its hard timeout is 90 seconds and receipt retry is 150 seconds. No foreground product
-handler is registered yet. Bulk ingestion must be chunked; do not put unbounded national
+Maintenance (scheduled refreshes, SEC, `maintenance_daily`) has one worker, a 7,200-second
+hard timeout and a 7,500-second receipt retry. The foreground cluster runs user-triggered
+work (`compute_area_profile`, `compute_ring_demographics`, `brief_weekly`) so it never waits
+behind a refresh: `Q_CLUSTER_NAME=paragon-foreground python backend/manage.py qcluster`,
+two workers, 1,200-second timeout, 1,500-second retry. The receipt retry always exceeds the
+timeout so a running task is never re-delivered. Attempts hold a 600-second lease that every
+`heartbeat()` renews; a recovered (fenced) attempt stops at its next heartbeat. Only one
+Overture DuckDB scan runs at a time (`area/locks.py`, a Postgres advisory lock). Bulk ingestion must be chunked; do not put unbounded national
 imports into a single job or execute them inside web requests.
 
 The built-in Q2 recurring scheduler is disabled. The application scheduler is documented

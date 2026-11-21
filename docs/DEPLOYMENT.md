@@ -3,12 +3,13 @@
 **Status:** everything needed to run Release 1 on a regular host is in `main`, and the full local verification is in `docs/TEST_REPORT.md`. **Nothing has been provisioned.** Hosting needs Adi's decision and approval (below).
 
 ## What runs
-`render.yaml` starts `python infra/start_all.py`. It prepares the release (migrations, source catalog), enables the implemented schedules, then supervises three processes in one container:
+`render.yaml` starts `python infra/start_all.py`. It prepares the release (migrations, source catalog), enables the implemented schedules, then supervises four processes in one container:
 - **Gunicorn** (web)
-- **django-q worker** (`qcluster`)
+- **Maintenance worker** (`qcluster`): scheduled refreshes
+- **Foreground worker** (`Q_CLUSTER_NAME=paragon-foreground qcluster`): screens, computes, brief
 - **Scheduler** (`run_scheduler --interval 30`)
 
-All three are needed because the private evidence disk attaches to one service only. If any process exits, the container exits and the host restarts it. `RUN_BACKGROUND_WORKERS=true` turns on the worker and scheduler.
+All of them are needed because the private evidence disk attaches to one service only. If any process exits, the container exits and the host restarts it. `RUN_BACKGROUND_WORKERS=true` turns on the worker and scheduler.
 
 ## Secrets and settings to add in the host
 | Variable | Needed for | Notes |

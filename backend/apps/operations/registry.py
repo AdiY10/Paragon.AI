@@ -9,6 +9,8 @@ class JobSpec:
     queue: str
     timeout_seconds: int
     parameter_keys: frozenset[str]=frozenset()
+    # Seconds an attempt may go without a heartbeat before recovery may take it over.
+    lease_seconds: int=600
 
 
 def sync_source_catalog(context,parameters):
@@ -99,16 +101,36 @@ def sec_daily(context,parameters):
         raise JobFailure('SOURCE_ERROR')
     return JobResult(records=fetched,failed=failed)
 
+def maintenance_daily(context,parameters):
+    """Housekeeping: expire unsaved screens, drop old finished job records and resolved alerts."""
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.insights.screens import expire_screens
+    from apps.accounts.models import LoginThrottle
+    from .models import AlertEvent,JobRun
+    context.heartbeat()
+    now=timezone.now()
+    done=expire_screens(now=now) or 0
+    done+=JobRun.objects.filter(status__in=['succeeded','failed'],finished_at__lt=now-timedelta(days=180)).delete()[0]
+    done+=AlertEvent.objects.filter(resolved_at__lt=now-timedelta(days=90)).delete()[0]
+    done+=LoginThrottle.objects.filter(window_start__lt=now-timedelta(days=1)).delete()[0]
+    return JobResult(records=done)
+
+FOREGROUND='paragon-foreground'
+MAINTENANCE='paragon-maintenance'
+
 # Only code-defined handlers are executable. No API accepts arbitrary Python paths.
-REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance',1800),
-    'compute_ring_demographics':JobSpec(compute_ring_demographics,'paragon-maintenance',900,
+REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,MAINTENANCE,1800),
+    # Foreground: user-triggered and short; never waits behind a multi-hour refresh.
+    'compute_ring_demographics':JobSpec(compute_ring_demographics,FOREGROUND,1100,
+        frozenset({'location_id','analysis_version'}),lease_seconds=1130),
+    'compute_area_profile':JobSpec(compute_area_profile,FOREGROUND,900,
         frozenset({'location_id','analysis_version'})),
-    'compute_area_profile':JobSpec(compute_area_profile,'paragon-maintenance',900,
-        frozenset({'location_id','analysis_version'})),
-    # Scheduled refreshes (config/schedules.yaml); long-running, one location at a time.
-    'bls_bps_check':JobSpec(bls_bps_check,'paragon-maintenance',3600),
-    'overture_check':JobSpec(overture_check,'paragon-maintenance',7200),
-    'flood_recheck':JobSpec(flood_recheck,'paragon-maintenance',3600),
-    'annual_sources_check':JobSpec(annual_sources_check,'paragon-maintenance',7200),
-    'brief_weekly':JobSpec(brief_weekly,'paragon-maintenance',600),
-    'sec_daily':JobSpec(sec_daily,'paragon-maintenance',1800)}
+    'brief_weekly':JobSpec(brief_weekly,FOREGROUND,600),
+    # Maintenance: scheduled refreshes (config/schedules.yaml), one location at a time.
+    'bls_bps_check':JobSpec(bls_bps_check,MAINTENANCE,3600),
+    'overture_check':JobSpec(overture_check,MAINTENANCE,7200),
+    'flood_recheck':JobSpec(flood_recheck,MAINTENANCE,3600),
+    'annual_sources_check':JobSpec(annual_sources_check,MAINTENANCE,7200),
+    'sec_daily':JobSpec(sec_daily,MAINTENANCE,1800),
+    'maintenance_daily':JobSpec(maintenance_daily,MAINTENANCE,600)}
