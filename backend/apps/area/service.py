@@ -28,7 +28,7 @@ from .models import AreaSection
 
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
-SECTION_LOGIC = {'businesses': 4}
+SECTION_LOGIC = {'businesses': 4, 'hazards': 3}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
@@ -218,16 +218,29 @@ def hazards_section(run, lat, lon):
             lambda: (th.fetch_nri(lat, lon, opener=run.opener), th.NRI_URL, 'current', 'National Risk Index'))
         return th.parse_nri(raw)
 
-    at_pin, nearby = _part(lambda: flood(30)), _part(lambda: flood(100))
+    def sfha_nearby():
+        raw, snap = run.cached('SRC-11', f'nfhl-sfha:{_pin_key(lat, lon)}:150m', 30,
+            lambda: (th.fetch_flood(lat, lon, 150, opener=run.opener, geometry=True), th.NFHL_URL, 'current',
+                'Effective flood maps'))
+        return {**th.parse_flood_nearby(raw, lat, lon), 'checked': snap.retrieved_at.isoformat()}
+
+    # Zone at the pin from a ~5 m envelope; high-risk polygons within 150 m decide inside vs nearby.
+    at_pin, nearby = _part(lambda: flood(5)), _part(sfha_nearby)
+    if nearby.get('reason') is None and nearby.get('distance_m') is not None:
+        # The polygon test is authoritative: a 5 m envelope can touch a zone the pin is just outside.
+        at_pin = {**at_pin, 'in_sfha': bool(nearby.get('inside'))}
+    elif 'value' not in at_pin:  # a failed lookup stays {'value': None, 'reason': ...}
+        at_pin = {**at_pin, 'in_sfha': bool(at_pin.get('sfha'))}
     data = {'flood_at_pin': at_pin, 'flood_nearby': nearby, 'nri': _part(nri),
         'disclaimer': 'Screening only, not an official flood determination. Request a FIRMette or survey for decisions.'}
     concerns = []
-    if at_pin.get('sfha'):
-        concerns.append(f"Pin is in FEMA zone {at_pin['zone']} (Special Flood Hazard Area)")
-    elif nearby.get('sfha'):
-        concerns.append(f"FEMA zone {nearby['zone']} (Special Flood Hazard Area) within about 100 m of the pin")
+    if at_pin.get('in_sfha'):
+        concerns.append(f"Pin is inside a FEMA high-risk flood zone ({nearby.get('zone') or at_pin['zone']})")
+    elif nearby.get('sfha') and (nearby.get('distance_m') is None or nearby['distance_m'] <= 100):
+        where = f"about {nearby['distance_m']} m" if nearby.get('distance_m') is not None else 'close to'
+        concerns.append(f"FEMA high-risk flood zone {nearby['zone']} {where} from the pin")
     if data['nri'].get('concern'):
-        concerns.append(f"National Risk Index rates this tract {data['nri']['rating']}")
+        concerns.append(f"National Risk Index rates {', '.join(data['nri']['high_hazards'][:3])} risk high for this tract")
     data['concerns'] = concerns
     return data, any(v.get('reason') is None for v in (at_pin, nearby, data['nri']))
 

@@ -139,14 +139,20 @@ def candidates(location, t=None, today=None, evaluated=None):
         at, near = hazards.data.get('flood_at_pin') or {}, hazards.data.get('flood_nearby') or {}
         why = ('Special Flood Hazard Areas usually require flood insurance for financed properties and carry higher '
             'physical risk. Screening only, not a flood determination.')
-        if at.get('sfha'):
+        inside = at.get('in_sfha', at.get('sfha'))
+        dist = near.get('distance_m')
+        if inside:
+            zone = near.get('zone') if near.get('inside') else at.get('zone')
             out.append(_candidate('SIG-11', 'flood:sfha', 'Hazard', 'High', 'negative',
-                f'Pin is in FEMA flood zone {at["zone"]} (Special Flood Hazard Area)', why,
-                {'zone': at['zone'], 'bfe_ft': at.get('bfe_ft'), 'dfirm_id': at.get('dfirm_id')}, 'Effective flood maps', 'SRC-11'))
-        elif near.get('sfha'):
+                f'Pin is inside FEMA high-risk flood zone {zone}', why,
+                {'zone': zone, 'base_flood_elevation_ft': at.get('bfe_ft'), 'flood_map_panel': at.get('dfirm_id')},
+                'Effective flood maps', 'SRC-11'))
+        elif near.get('sfha') and (dist is None or dist <= 100):
             out.append(_candidate('SIG-11', 'flood:sfha', 'Hazard', 'Watch', 'negative',
-                f'FEMA flood zone {near["zone"]} within about 100 m of the pin', why,
-                {'zone': near['zone'], 'dfirm_id': near.get('dfirm_id')}, 'Effective flood maps', 'SRC-11'))
+                f'FEMA high-risk flood zone {near["zone"]} ' + (f'about {dist} m from the pin' if dist is not None
+                    else 'close to the pin'), why,
+                {'zone': near['zone'], 'distance_m': dist, 'flood_map_panel': near.get('dfirm_id')},
+                'Effective flood maps', 'SRC-11'))
     biz = rows.get('businesses')
     if biz and biz.status == 'available':
         evaluated.update({'SIG-09', 'SIG-10', f'overture@{biz.data.get("release")}'})

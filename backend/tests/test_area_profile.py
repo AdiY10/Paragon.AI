@@ -187,7 +187,7 @@ def test_flood_zone_raises_a_concern(tmp_path, client, settings):
     from apps.area.service import compute_area
     location = setup(tmp_path, client, *CYPRESS, settings)
     hazards = {r.section: r for r in compute_area(location.pk, sections=('hazards',), opener=FixtureOpener('cypress'))}['hazards']
-    assert hazards.data['concerns'][0].startswith('Pin is in FEMA zone AE')
+    assert hazards.data['concerns'][0] == 'Pin is inside a FEMA high-risk flood zone (AE)'
 
 
 @pytest.mark.django_db
@@ -431,3 +431,56 @@ def test_fetches_record_health_and_failures_fall_back_to_last_good(tmp_path, cli
     assert body['sections']['economy']['stale'] is True
     sources = {s['id']: s for s in client.get('/api/sources/').json()}
     assert sources['SRC-07']['status'] == 'Failing' and sources['SRC-06']['status'] == 'OK'
+
+
+# ---- R2 item 7: flood polygons -------------------------------------------------------------
+
+def _sfha(rings, zone='AE'):
+    import json
+    return json.dumps({'features': [{'attributes': {'FLD_ZONE': zone, 'SFHA_TF': 'T', 'DFIRM_ID': '09001C'},
+        'geometry': {'rings': rings}}]}).encode()
+
+
+def test_flood_polygon_inside_outside_and_holes():
+    lat, lon = 41.0, -73.0
+    d = 0.0009  # ~100 m
+    square = [[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d], [lon - d, lat + d], [lon - d, lat - d]]
+    inside = th.parse_flood_nearby(_sfha([square]), lat, lon)
+    assert inside['inside'] is True and inside['distance_m'] == 0
+    h = 0.0002
+    hole = [[lon - h, lat - h], [lon - h, lat + h], [lon + h, lat + h], [lon + h, lat - h], [lon - h, lat - h]]
+    in_hole = th.parse_flood_nearby(_sfha([square, hole]), lat, lon)
+    assert in_hole['inside'] is False and 15 <= in_hole['distance_m'] <= 25  # ~17 m to the hole's edge
+    east = [[lon + 0.0006, lat - d], [lon + 0.002, lat - d], [lon + 0.002, lat + d], [lon + 0.0006, lat + d], [lon + 0.0006, lat - d]]
+    near = th.parse_flood_nearby(_sfha([east]), lat, lon)
+    assert near['inside'] is False and 45 <= near['distance_m'] <= 55  # 0.0006 deg of lon at 41N ~ 50 m
+    none = th.parse_flood_nearby(b'{"features": []}', lat, lon)
+    assert none == {'zone': None, 'sfha': False, 'inside': False, 'distance_m': None, 'reason': None}
+
+
+@pytest.mark.django_db
+def test_sig11_high_only_inside_and_watch_within_100m():
+    from backend.tests.test_signals import placed, section
+    from apps.insights import signals as engine
+    from apps.insights.models import Signal
+    loc = placed()
+    section(loc, 'hazards', {'flood_at_pin': {'zone': 'AE', 'sfha': True, 'in_sfha': False},
+        'flood_nearby': {'zone': 'AE', 'sfha': True, 'inside': False, 'distance_m': 40}, 'nri': {}})
+    engine.evaluate(loc)
+    s = Signal.objects.get(rule_id='SIG-11')
+    assert s.severity == 'Watch' and 'about 40 m' in s.title
+    section(loc, 'hazards', {'flood_at_pin': {'zone': 'X', 'sfha': False, 'in_sfha': False},
+        'flood_nearby': {'zone': 'AE', 'sfha': True, 'inside': False, 'distance_m': 140}, 'nri': {}})
+    engine.evaluate(loc)
+    assert Signal.objects.get(rule_id='SIG-11').status == 'resolved'
+
+
+def test_nri_concern_uses_specific_hazards():
+    import json
+    row = {'TRACTFIPS': '1', 'RISK_RATNG': 'Very High', 'RISK_SPCTL': 99.0, 'NRI_VER': 'x',
+        'HRCN_RISKR': 'Relatively Low', 'IFLD_RISKR': 'Very Low'}
+    calm = th.parse_nri(json.dumps({'features': [{'attributes': row}]}).encode())
+    assert calm['concern'] is False and calm['high_hazards'] == []
+    row['HRCN_RISKR'] = 'Very High'
+    windy = th.parse_nri(json.dumps({'features': [{'attributes': row}]}).encode())
+    assert windy['concern'] is True and windy['high_hazards'] == ['Hurricane']
