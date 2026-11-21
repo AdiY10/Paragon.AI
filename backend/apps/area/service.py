@@ -184,26 +184,29 @@ def traffic_section(run, lat, lon):
     def latest():
         raw, url, year = th.fetch_hpms_latest(state, lat, lon, opener=run.opener)
         return raw, url, str(year), f'HPMS {year}'
-    raw, snap = run.cached('SRC-10', f'hpms:{_pin_key(lat, lon)}', 30, latest)
+    # 'hpms2' scopes carry road geometry (distance to the pin); older captures did not.
+    raw, snap = run.cached('SRC-10', f'hpms2:{_pin_key(lat, lon)}', 30, latest)
     year = int(snap.release)
-    roads = th.primary_roads(th.parse_hpms(raw))
+    roads = th.primary_roads(th.parse_hpms(raw, lat, lon))
     prior = []
     try:
         def fetch_prior():
             raw, url = th.fetch_hpms(state, year - 1, lat, lon, opener=run.opener)
             return raw, url, str(year - 1), f'HPMS {year - 1}'
-        prior_raw, _ = run.cached('SRC-10', f'hpms:{_pin_key(lat, lon)}:{year - 1}', None, fetch_prior)
-        prior = th.parse_hpms(prior_raw)
+        prior_raw, _ = run.cached('SRC-10', f'hpms2:{_pin_key(lat, lon)}:{year - 1}', None, fetch_prior)
+        prior = th.parse_hpms(prior_raw, lat, lon)
     except SourceError:
         pass
     out = []
     for r in roads:
         change = th.traffic_change(r, prior) if prior else {'change_pct': None, 'reason': 'NOT_COVERED'}
-        out.append({'label': th.road_label(r), 'aadt': r['aadt'], 'year': r['year'],
-            'road_class': th.F_SYSTEM.get(r['f_system']), 'lanes': r['lanes'], **change})
+        out.append({'label': th.road_label(r), 'aadt': r['aadt'], 'year': r['year'], 'count_year': r.get('count_year'),
+            'road_class': th.F_SYSTEM.get(r['f_system']), 'lanes': r['lanes'], 'distance_m': r.get('distance_m'),
+            **change})
     data = {'radius_m': th.TRAFFIC_RADIUS_M, 'year': year, 'roads': out,
         'reason': None if out else 'NOT_COVERED',
-        'note': 'Annual average daily traffic on the road segment; may be estimated by the state DOT.'}
+        'note': 'Annual average daily traffic on the nearest segment of each road; states count most roads every '
+            'few years and estimate the years between.'}
     return data, bool(out)
 
 

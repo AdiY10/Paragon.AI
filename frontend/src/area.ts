@@ -65,6 +65,8 @@ export interface Road {
   prior_year?: number;
   change_pct: number | null;
   reason: string | null;
+  count_year?: number | null;
+  distance_m?: number | null;
 }
 export interface Traffic {
   radius_m: number;

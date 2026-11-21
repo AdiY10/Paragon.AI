@@ -105,6 +105,8 @@ export function reasonText(reason: string | null | undefined): string {
       return "Not covered";
     case "GEOGRAPHY_CHANGED":
       return "Unavailable: census geography changed";
+    case "SAME_COUNT":
+      return "No new count: the state carried the last count forward";
     case "NOT_ENOUGH_DATA":
       return "Not enough data";
     case "SOURCE_ERROR":

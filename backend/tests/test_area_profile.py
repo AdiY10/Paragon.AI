@@ -130,8 +130,29 @@ def test_hpms_field_aliases_across_years_and_traffic_change():
     road = th.primary_roads(current)[0]
     assert th.road_label(road) == 'Ulster Ave US 9W' and road['aadt'] == 22422 and road['year'] == 2025
     change = th.traffic_change(road, prior)
-    assert change['prior_aadt'] == 22523 and change['change_pct'] == pytest.approx(-0.00448, abs=1e-4)
+    # Both HPMS years rest on the 2023 count: an estimate carried forward, not a real change (R2.11).
+    assert road['count_year'] == 2023 and change['prior_aadt'] == 22523
+    assert change['change_pct'] is None and change['reason'] == 'SAME_COUNT'
+    newer = th.traffic_change({**road, 'count_year': 2025}, prior)
+    assert newer['change_pct'] == pytest.approx(-0.00448, abs=1e-4)
     assert th.traffic_change({**road, 'route_id': 'other'}, prior)['reason'] == 'GEOGRAPHY_CHANGED'
+
+
+def test_ramps_and_limited_access_roads_are_skipped_unless_alone():
+    import json
+    lat, lon = 36.0635, -79.4006
+
+    def seg(rid, name, aadt, f, fac, acc, dlon):
+        return {'attributes': {'route_id': rid, 'routename': name, 'aadt': aadt, 'f_system': f, 'facility_type': fac,
+            'access_control': acc, 'aadt_vd': '2024-01-01', 'data_year': 2024, 'begin_point': 0, 'end_point': 1},
+            'geometry': {'paths': [[[lon + dlon, lat - 0.001], [lon + dlon, lat + 0.001]]]}}
+    ramp = seg('8', None, 3269, 1, 4, None, 0.0003)
+    nc87 = seg('3', 'NC-87', 18399, 3, 2, 3, 0.0012)
+    sr = seg('4', 'SR-2100', 5525, 5, 2, 3, 0.0002)
+    roads = th.primary_roads(th.parse_hpms(json.dumps({'features': [ramp, nc87, sr]}).encode(), lat, lon))
+    assert [th.road_label(r) for r in roads] == ['NC-87', 'SR-2100'] and 100 <= roads[0]['distance_m'] <= 115
+    alone = th.primary_roads(th.parse_hpms(json.dumps({'features': [ramp]}).encode(), lat, lon))
+    assert alone[0]['aadt'] == 3269
 
 
 def test_flood_and_nri_real_cypress_lake():
