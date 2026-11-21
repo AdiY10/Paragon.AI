@@ -207,3 +207,20 @@ def test_migration_collapses_period_keyed_duplicates():
     rows = list(Signal.objects.filter(rule_id='SIG-05'))
     assert len(rows) == 1 and rows[0].status == 'dismissed' and rows[0].subject == 'county:36111:unemployment'
     assert Signal.objects.get(rule_id='SIG-09').subject == 'place:abc'
+
+
+def test_review_feedback_and_reopen(client):
+    from backend.tests.test_accounts import member
+    loc = placed()
+    all_sections(loc)
+    engine.evaluate(loc, today=TODAY)
+    user, _ = member()
+    client.force_login(user)
+    s = Signal.objects.get(rule_id='SIG-09')
+    url = f'/api/signals/{s.pk}/review/'
+    body = client.post(url, {'action': 'dismissed', 'note': 'Regal still open', 'feedback': 'not_useful'},
+        content_type='application/json').json()
+    assert body['status'] == 'dismissed' and body['feedback'] == 'not_useful' and body['reviewed'] is True
+    assert client.post(url, {'action': 'reopened'}, content_type='application/json').json()['status'] == 'active'
+    assert client.post(url, {'action': 'feedback', 'feedback': 'maybe'}, content_type='application/json').status_code == 400
+    assert Signal.objects.get(pk=s.pk).review_note == 'Regal still open'

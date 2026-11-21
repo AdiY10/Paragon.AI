@@ -27,7 +27,7 @@ def signal_list(request):
     """Portfolio-wide signals, ranked (docs/04 §5.4). ?status=active|resolved|all, ?location=<uuid>."""
     from .models import Signal
     from .signals import serialize, rank_key
-    qs = Signal.objects.select_related('location').exclude(location__status='archived')
+    qs = Signal.objects.select_related('location').exclude(location__status='archived').exclude(location__screening=True)
     status = request.query_params.get('status', 'active')
     if status != 'all':
         qs = qs.filter(status=status)
@@ -41,19 +41,35 @@ def signal_list(request):
 
 @api_view(['POST'])
 def signal_review(request, signal_id):
-    """FR-23: mark a signal reviewed (kept active) or dismissed (hidden unless it escalates)."""
+    """FR-23: mark a signal reviewed (kept active), dismissed (hidden unless it escalates) or reopened.
+
+    Optional ``note`` and ``feedback`` ("useful" / "not_useful").
+    """
+    from django.utils import timezone
     from .models import Signal
     from .signals import serialize
     signal = get_object_or_404(Signal.objects.select_related('location'), pk=signal_id)
     action = request.data.get('action')
-    if action not in ('reviewed', 'dismissed'):
-        return Response({'detail': 'action must be reviewed or dismissed'}, status=400)
-    note = str(request.data.get('note', ''))[:2000]
-    signal.reviewed_by = request.user
-    signal.review_note = note
+    if action not in ('reviewed', 'dismissed', 'reopened', 'feedback'):
+        return Response({'detail': 'action must be reviewed, dismissed, reopened or feedback'}, status=400)
+    feedback = request.data.get('feedback', '')
+    if feedback not in ('', 'useful', 'not_useful'):
+        return Response({'detail': 'feedback must be useful or not_useful'}, status=400)
+    fields = ['reviewed_by', 'reviewed_at']
+    signal.reviewed_by, signal.reviewed_at = request.user, timezone.now()
+    if 'note' in request.data:
+        signal.review_note = str(request.data.get('note', ''))[:2000]
+        fields.append('review_note')
+    if feedback:
+        signal.feedback = feedback
+        fields.append('feedback')
     if action == 'dismissed':
         signal.status = 'dismissed'
-    signal.save(update_fields=['reviewed_by', 'review_note', 'status'])
+        fields.append('status')
+    elif action == 'reopened' and signal.status == 'dismissed':
+        signal.status = 'active'
+        fields.append('status')
+    signal.save(update_fields=fields)
     from .metrics import refresh_snapshot
     refresh_snapshot(signal.location)
     return Response(serialize(signal))

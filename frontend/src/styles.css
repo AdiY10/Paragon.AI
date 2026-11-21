@@ -2489,3 +2489,58 @@ small,
   color: var(--stale-ink);
   border-color: #c9d2e3;
 }
+
+/* ---- R2.20 alert actions ---- */
+.alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.alert-actions .feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+}
+.alert-actions .icon-button.pressed {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+.dismiss-form {
+  flex-basis: 100%;
+  display: grid;
+  gap: 8px;
+}
+.dismiss-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+.dismiss-form textarea {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.glossary {
+  margin: 14px 0;
+  padding: 12px 14px;
+  background: var(--page);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.glossary dt {
+  font-weight: 600;
+}
+.glossary dd {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+}
+.alert-list a {
+  text-decoration: underline;
+}
