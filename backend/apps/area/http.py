@@ -2,8 +2,8 @@
 import json
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import HTTPSHandler, Request, build_opener
+from urllib.parse import urlencode, urlsplit
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 import ssl
 import certifi
 
@@ -12,8 +12,18 @@ USER_AGENT = 'ParagonRadar/0.1 (+https://github.com/AdiY10/Paragon.AI)'
 _CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
+class _SameSiteRedirects(HTTPRedirectHandler):
+    """Follow redirects only to https URLs on the same registrable domain (census.gov -> www2.census.gov)."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        old, new = urlsplit(req.full_url), urlsplit(newurl)
+        site = lambda host: '.'.join((host or '').lower().split('.')[-2:])
+        if new.scheme != 'https' or not new.hostname or site(new.hostname) != site(old.hostname):
+            raise HTTPError(newurl, code, 'Redirect blocked', headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def default_opener():
-    return build_opener(HTTPSHandler(context=_CONTEXT))
+    return build_opener(HTTPSHandler(context=_CONTEXT), _SameSiteRedirects())
 
 
 class SourceError(Exception):

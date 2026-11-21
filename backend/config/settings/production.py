@@ -8,6 +8,8 @@ if len(SECRET_KEY) < 50:
     raise ImproperlyConfigured('DJANGO_SECRET_KEY must contain at least 50 characters')
 if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
     raise ImproperlyConfigured('DJANGO_ALLOWED_HOSTS must list explicit hostnames')
+if LOCAL_PREVIEW or LOCAL_SHARED_PASSWORD or os.environ.get('LOCAL_SHARED_PASSWORD'):
+    raise ImproperlyConfigured('LOCAL_PREVIEW and LOCAL_SHARED_PASSWORD are for local previews only')
 url = urlsplit(os.environ.get('DATABASE_URL', ''))
 if url.scheme not in ('postgres', 'postgresql') or not url.hostname or not url.path.strip('/'):
     raise ImproperlyConfigured('DATABASE_URL must identify a PostgreSQL database')

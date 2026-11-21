@@ -13,7 +13,8 @@ import io
 import json
 import math
 from urllib.parse import urlencode
-from urllib.request import Request, build_opener
+from urllib.request import Request
+from apps.area.http import default_opener
 from apps.sources.snapshots import publish_snapshot, ValidationReport
 from .rings import Block, BlockGroupTotals
 
@@ -40,7 +41,7 @@ class GeographyError(Exception):
 def _get(url, params, opener, timeout):
     request = Request(url + '?' + urlencode(params),
         headers={'User-Agent': 'ParagonRadar/0.1 (+https://github.com/AdiY10/Paragon.AI)'})
-    with (opener or build_opener()).open(request, timeout=timeout) as response:
+    with (opener or default_opener()).open(request, timeout=timeout) as response:
         if response.status != 200:
             raise GeographyError(f'HTTP {response.status}')
         raw = response.read(MAX_BYTES + 1)
@@ -103,7 +104,7 @@ def fetch_geography(lat, lon, radius_miles, *, acs_year, decennial=2020, opener=
     search = radius_miles + SEARCH_MARGIN_MILES
     blocks = _paged(blocks_url, {**_near(lat, lon, search),
         'outFields': 'GEOID,POP100,AREALAND,INTPTLAT,INTPTLON'}, opener, timeout)
-    bgs = sorted({b['GEOID'][:12] for b in blocks})
+    bgs = sorted({g[:12] for b in blocks if isinstance(g := b.get('GEOID'), str) and len(g) == 15 and g.isdigit()})
     totals = []
     for i in range(0, len(bgs), 200):
         chunk = bgs[i:i + 200]

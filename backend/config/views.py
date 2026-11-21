@@ -13,6 +13,19 @@ from rest_framework.response import Response
 def health(request):
     return JsonResponse({'status': 'ok'})
 
+
+@login_not_required
+@never_cache
+def health_ready(request):
+    """Readiness: the database answers. Returns no details on failure."""
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+    except Exception:
+        return JsonResponse({'status': 'unavailable'}, status=503)
+    return JsonResponse({'status': 'ok'})
+
 @never_cache
 def application(request):
     try:

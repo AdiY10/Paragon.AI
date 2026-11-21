@@ -123,21 +123,24 @@ def test_concurrent_attempts_do_not_bypass_limit():
 # ---- local preview shared password (never active on a deployed host) -----------------
 
 import pytest as _pt
+import secrets as _secrets
+SHARED = _secrets.token_urlsafe(12)
 
 
 @_pt.mark.django_db
 def test_local_shared_password_signs_in_any_email_on_localhost_only(client, settings):
     settings.PASSWORD_ACCESS_ENABLED = True
     settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'radar.example']
-    settings.LOCAL_SHARED_PASSWORD = 'Lilo123'
-    ok = client.post('/access/login/', {'email': 'anyone@example.org', 'password': 'Lilo123'},
+    settings.LOCAL_PREVIEW = True
+    settings.LOCAL_SHARED_PASSWORD = SHARED
+    ok = client.post('/access/login/', {'email': 'anyone@example.org', 'password': SHARED},
         HTTP_HOST='127.0.0.1:8765', REMOTE_ADDR='127.0.0.1')
     assert ok.status_code == 302
     client.logout()
     wrong = client.post('/access/login/', {'email': 'anyone@example.org', 'password': 'nope'},
         HTTP_HOST='127.0.0.1:8765', REMOTE_ADDR='127.0.0.1')
     assert wrong.status_code == 401
-    remote = client.post('/access/login/', {'email': 'other@example.org', 'password': 'Lilo123'},
+    remote = client.post('/access/login/', {'email': 'other@example.org', 'password': SHARED},
         HTTP_HOST='radar.example', REMOTE_ADDR='203.0.113.9')
     assert remote.status_code == 401
 
@@ -147,6 +150,75 @@ def test_shared_password_off_without_setting(client, settings):
     settings.PASSWORD_ACCESS_ENABLED = True
     settings.ALLOWED_HOSTS = ['127.0.0.1']
     settings.LOCAL_SHARED_PASSWORD = ''
-    r = client.post('/access/login/', {'email': 'x@example.org', 'password': 'Lilo123'},
+    r = client.post('/access/login/', {'email': 'x@example.org', 'password': SHARED},
         HTTP_HOST='127.0.0.1', REMOTE_ADDR='127.0.0.1')
     assert r.status_code == 401
+
+
+def _shared(settings):
+    settings.PASSWORD_ACCESS_ENABLED = True
+    settings.ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+    settings.LOCAL_SHARED_PASSWORD = SHARED
+
+
+@_pt.mark.django_db
+def test_shared_password_needs_local_preview_and_no_proxy_headers(client, settings):
+    _shared(settings)
+    settings.LOCAL_PREVIEW = False
+    post = lambda **extra: client.post('/access/login/', {'email': 'p@example.org', 'password': SHARED},
+        HTTP_HOST='127.0.0.1', REMOTE_ADDR='127.0.0.1', **extra)
+    assert post().status_code == 401
+    settings.LOCAL_PREVIEW = True
+    # A reverse proxy on the same box connects from 127.0.0.1 but adds forwarding headers.
+    assert post(HTTP_X_FORWARDED_FOR='203.0.113.9').status_code == 401
+    assert post().status_code == 302
+    assert Membership.objects.get(email='p@example.org').role == 'member'
+
+
+def test_production_settings_refuse_the_shared_password(monkeypatch):
+    import importlib, sys
+    from django.core.exceptions import ImproperlyConfigured
+    monkeypatch.setenv('DJANGO_SECRET_KEY', 'x' * 60)
+    monkeypatch.setenv('DJANGO_ALLOWED_HOSTS', 'radar.example')
+    monkeypatch.setenv('DATABASE_URL', 'postgres://u:p@db/paragon')
+    monkeypatch.setenv('LOCAL_SHARED_PASSWORD', SHARED)
+    [sys.modules.pop(m, None) for m in ('config.settings.production', 'config.settings.base')]
+    with _pt.raises(ImproperlyConfigured):
+        importlib.import_module('config.settings.production')
+    monkeypatch.delenv('LOCAL_SHARED_PASSWORD')
+    [sys.modules.pop(m, None) for m in ('config.settings.production', 'config.settings.base')]
+    importlib.import_module('config.settings.production')
+    [sys.modules.pop(m, None) for m in ('config.settings.production', 'config.settings.base')]
+
+
+@_pt.mark.django_db
+def test_throttle_uses_trusted_proxy_client_ip_and_success_clears_account(client, settings, password_mode):
+    from apps.accounts.password_access import client_ip
+    from django.test import RequestFactory
+    settings.TRUSTED_PROXY_COUNT = 1
+    r = RequestFactory().get('/', REMOTE_ADDR='127.0.0.1', HTTP_X_FORWARDED_FOR='6.6.6.6, 198.51.100.7')
+    assert client_ip(r) == '198.51.100.7'  # the spoofable left entry is ignored
+    settings.TRUSTED_PROXY_COUNT = 0
+    assert client_ip(r) == '127.0.0.1'
+    user, membership = setup_account()
+    for _ in range(3):
+        client.post('/access/login/', {'email': membership.email, 'password': 'wrong-password-123456'})
+    assert AccessAuditEvent.objects.filter(action='password_login_failed').count() == 3
+    assert client.post('/access/login/', {'email': membership.email, 'password': PASSWORD}).status_code == 302
+    assert max(LoginThrottle.objects.values_list('attempts', flat=True)) == 4  # IP bucket keeps counting
+    assert sorted(LoginThrottle.objects.values_list('attempts', flat=True))[0] == 0  # account bucket cleared
+    client.post('/access/logout/')
+    assert AccessAuditEvent.objects.filter(action='logout').count() == 1
+
+
+@_pt.mark.django_db
+def test_absolute_session_cap(client, settings):
+    import time
+    user, _ = setup_account()
+    client.force_login(user)
+    assert client.get('/api/locations/').status_code == 200
+    session = client.session
+    session['signed_in_at'] = int(time.time()) - settings.SESSION_ABSOLUTE_SECONDS - 5
+    session.save()
+    assert client.get('/api/locations/').status_code == 401
+    assert settings.SESSION_COOKIE_AGE == 12 * 3600

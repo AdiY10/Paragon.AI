@@ -2,7 +2,8 @@
 import uuid
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from apps.accounts.permissions import IsAdministrator, ExpensiveThrottle
 from rest_framework.response import Response
 from apps.locations.models import Location, Tenant
 from apps.locations.service import LocationConflict
@@ -67,6 +68,7 @@ def tenant_confirm(request, location_id, tenant_id):
 
 
 @api_view(['GET'])
+@throttle_classes([ExpensiveThrottle])
 def sec_search(request):
     from apps.area.http import SourceError
     from .sec import search_companies
@@ -79,13 +81,11 @@ def sec_search(request):
 
 
 @api_view(['POST', 'DELETE'])
+@permission_classes([IsAdministrator])
 def tenant_filer(request, location_id, tenant_id):
     """Admins map a tenant to an SEC filer after reviewing suggestions; mappings are never automatic."""
-    from apps.accounts.models import Membership
     from .models import TenantFiler
     from .signals import safe_evaluate
-    if not Membership.objects.filter(user=request.user, role='admin').exists():
-        return Response({'detail': 'Administrators only'}, status=403)
     tenant = get_object_or_404(Tenant, pk=tenant_id, location_id=location_id)
     if request.method == 'DELETE':
         TenantFiler.objects.filter(tenant=tenant).delete()

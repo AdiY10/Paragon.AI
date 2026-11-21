@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 import io
 import json
 import re
-from urllib.request import Request, build_opener
+from urllib.request import Request
+from apps.area.http import default_opener
 from apps.sources.snapshots import publish_snapshot, ValidationReport
 
 ADAPTER_VERSION = 'acs-table-sf-v1'
@@ -83,7 +84,7 @@ def parse_table(lines, table, states):
 
 def _stream_lines(url, opener, timeout):
     request = Request(url, headers={'User-Agent': 'ParagonRadar/0.1 (+https://github.com/AdiY10/Paragon.AI)'})
-    response = (opener or build_opener()).open(request, timeout=timeout)
+    response = (opener or default_opener()).open(request, timeout=timeout)
     if response.status != 200:
         raise AcsError(f'HTTP {response.status}')
     read = 0
@@ -200,7 +201,7 @@ def check_legacy_layout(lookup_lines):
 class HttpRangeFile:
     """Minimal seekable file over HTTP range requests, enough for zipfile."""
     def __init__(self, url, opener=None, timeout=60):
-        self.url, self.opener, self.timeout, self.pos = url, opener or build_opener(), timeout, 0
+        self.url, self.opener, self.timeout, self.pos = url, opener or default_opener(), timeout, 0
         with self.opener.open(Request(url, method='HEAD', headers=_HEADERS), timeout=timeout) as r:
             self.size = int(r.headers['Content-Length'])
         self.requests = 0
