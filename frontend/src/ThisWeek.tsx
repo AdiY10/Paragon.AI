@@ -36,7 +36,7 @@ export interface Brief {
 export const flagLabel = (f: BriefItem["flag"]) =>
   f === "new" ? "New" : f === "changed" ? "Changed" : f === "resolved" ? "Resolved" : "Still active";
 
-export default function ThisWeek({ isAdmin }: { isAdmin: boolean }) {
+export default function ThisWeek({ isAdmin, lead = false }: { isAdmin: boolean; lead?: boolean }) {
   const [selected, setSelected] = useState<string | null>(null);
   const cache = useQueryClient();
   const latest = useQuery({
@@ -63,7 +63,11 @@ export default function ThisWeek({ isAdmin }: { isAdmin: boolean }) {
       <div className="section-heading">
         <div>
           <span className="eyebrow">THIS WEEK</span>
-          <h2 id="brief-title">{brief ? brief.title : "No brief generated yet"}</h2>
+          {lead ? (
+            <h1 id="brief-title">{brief ? brief.title : "No brief generated yet"}</h1>
+          ) : (
+            <h2 id="brief-title">{brief ? brief.title : "No brief generated yet"}</h2>
+          )}
         </div>
         <Activity size={22} />
       </div>

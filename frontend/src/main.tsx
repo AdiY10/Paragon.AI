@@ -60,10 +60,12 @@ const subscribe = (fn: () => void) => {
   return () => window.removeEventListener("hashchange", fn);
 };
 function useRoute() {
-  return useSyncExternalStore(
-    subscribe,
-    () => window.location.hash.slice(1) || "/",
-  );
+  const full = useSyncExternalStore(subscribe, () => window.location.hash.slice(1) || "/");
+  return full.split("?")[0] || "/";
+}
+/** Query parameters after the hash route, e.g. #/portfolio?attention=High. */
+export function hashParams() {
+  return new URLSearchParams(window.location.hash.split("?")[1] ?? "");
 }
 const titleCase = (text: string) =>
   text.replaceAll("_", " ").replace(/\b\w/g, (s) => s.toUpperCase());
@@ -329,8 +331,9 @@ function App() {
       : []),
   ];
   let body: ReactNode;
-  if (portfolio.error) body = <ErrorNotice error={portfolio.error} />;
-  else if (portfolio.isPending)
+  const needsPortfolio = route === "/" || route === "/portfolio" || route === "/screen";
+  if (needsPortfolio && portfolio.error) body = <ErrorNotice error={portfolio.error} />;
+  else if (needsPortfolio && portfolio.isPending)
     body = (
       <div className="skeleton-grid" aria-label="Loading portfolio">
         <div />
@@ -550,170 +553,67 @@ function App() {
 }
 function Overview({
   locations,
-  sources,
   isAdmin,
 }: {
   locations: Location[];
   sources: Source[];
   isAdmin: boolean;
 }) {
-  const owned = locations.filter((l) => l.status === "owned"),
-    unconfirmed = owned.filter((l) => !l.confirmed),
-    states = new Set(owned.map((l) => l.state).filter(Boolean)),
-    missing = owned.filter((l) => l.current_revision.lat === null);
-  const distribution = Object.entries(
-    owned.reduce<Record<string, number>>((counts, item) => {
-      if (item.state) counts[item.state] = (counts[item.state] ?? 0) + 1;
-      return counts;
-    }, {}),
-  ).sort((a, b) => b[1] - a[1]);
+  const owned = locations.filter((l) => l.status === "owned");
+  const counts = { High: 0, Watch: 0, Clear: 0 };
+  for (const l of owned) counts[(l.attention ?? "Clear") as keyof typeof counts] += 1;
+  const unconfirmed = owned.filter((l) => !l.confirmed).length,
+    missing = owned.filter((l) => l.current_revision.lat === null).length;
+  const flagged = owned
+    .filter((l) => l.attention === "High" || l.attention === "Watch")
+    .sort((a, b) => rankAttention(a) - rankAttention(b) || a.name.localeCompare(b.name));
   return (
     <>
-      <PageHead
-        eyebrow="Portfolio intelligence"
-        title="Your portfolio, in focus."
-        description="One place to understand your locations—and the evidence behind them."
-        action={<AddLocation />}
-      />
-      <ThisWeek isAdmin={isAdmin} />
-      <div className="stat-grid">
-        {[
-          [
-            owned.length,
-            "Owned records",
-            Building2,
-            "Public seed / team records",
-          ],
-          [
-            states.size,
-            "States represented",
-            Compass,
-            "Based on recorded addresses",
-          ],
-          [
-            unconfirmed.length,
-            "To confirm",
-            ShieldCheck,
-            "Ownership needs your review",
-          ],
-          [missing.length, "Missing pins", MapPin, "A location must be placed"],
-        ].map(([value, label, Icon, detail]) => (
-          <article className="stat" key={String(label)}>
-            <div className="stat-top">
-              <span>{String(label)}</span>
-              {React.createElement(Icon as typeof Building2, { size: 18 })}
-            </div>
-            <strong>{String(value)}</strong>
-            <small>{String(detail)}</small>
-          </article>
-        ))}
-      </div>
-      <div className="dashboard-columns">
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">GETTING THE RECORD RIGHT</span>
-              <h2>Your review queue</h2>
-            </div>
-            <Badge tone="amber">{unconfirmed.length} unconfirmed</Badge>
+      <ThisWeek isAdmin={isAdmin} lead />
+      <section className="panel health" aria-labelledby="health-title">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">PORTFOLIO HEALTH</span>
+            <h2 id="health-title">{owned.length} owned properties</h2>
           </div>
-          <p className="muted intro">
-            Public listings are a starting point. Confirm what is still part of
-            your portfolio.
-          </p>
-          {unconfirmed.length ? (
-            unconfirmed.slice(0, 5).map((item) => (
-              <a
-                className="review-row"
-                href={"#/locations/" + item.id}
-                key={item.id}
-              >
-                <span className="property-icon">
-                  <Building2 size={20} />
-                </span>
-                <span>
-                  <strong>{item.name}</strong>
-                  <small>
-                    {item.city}, {item.state}
-                  </small>
-                </span>
-                <ChevronRight size={17} />
-              </a>
-            ))
-          ) : (
-            <Empty title="No unconfirmed owned records">
-              Every owned record has been reviewed. You can still update it from
-              the portfolio.
-            </Empty>
-          )}
-          <a className="panel-link" href="#/portfolio">
+          <a className="text-button" href="#/portfolio">
             Open portfolio <ArrowRight size={15} />
           </a>
-        </section>
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">WHERE YOU ARE</span>
-              <h2>Portfolio footprint</h2>
-            </div>
-            <Compass size={21} />
-          </div>
-          <div
-            className="state-bars"
-            role="img"
-            aria-label={distribution
-              .map(([state, n]) => `${state}: ${n} properties`)
-              .join("; ")}
-          >
-            {distribution.slice(0, 6).map(([state, count]) => (
-              <div key={state}>
-                <span>{state}</span>
-                <div>
-                  <i
-                    style={{
-                      width: `${(count / Math.max(...distribution.map((d) => d[1]), 1)) * 100}%`,
-                    }}
-                  />
-                </div>
-                <strong>{count}</strong>
-              </div>
-            ))}
-          </div>
-          <p className="source-note">
-            Property counts from portfolio records.{" "}
-            {states.size > 6
-              ? `${states.size - 6} additional states are represented.`
-              : ""}
-          </p>
-          <div className="coverage-note">
-            <Database size={20} />
-            <div>
-              <strong>Know what is behind each number.</strong>
-              <p>
-                Sources, periods, and uncertainty belong alongside the evidence.
-              </p>
-              <a href="#/sources">
-                Explore {sources.length || "the"} data sources{" "}
-                <ArrowRight size={14} />
-              </a>
-            </div>
-          </div>
-        </section>
-      </div>
-      <div className="section-heading wide-heading">
-        <div>
-          <span className="eyebrow">YOUR LOCATIONS</span>
-          <h2>Start with a property</h2>
         </div>
-        <a className="text-button" href="#/portfolio">
-          View all <ArrowRight size={15} />
-        </a>
-      </div>
-      <div className="property-grid">
-        {owned.slice(0, 3).map((item) => (
-          <PropertyCard key={item.id} location={item} />
-        ))}
-      </div>
+        <div className="health-strip">
+          {(["High", "Watch", "Clear"] as const).map((level) => (
+            <a key={level} className={`health-tile ${level.toLowerCase()}`} href={`#/portfolio?attention=${level}`}>
+              <strong>{counts[level]}</strong>
+              <span>{level === "Clear" ? "No attention needed" : `${level} attention`}</span>
+            </a>
+          ))}
+        </div>
+        {flagged.length > 0 && (
+          <ul className="flagged-list" aria-label="Properties that need attention">
+            {flagged.slice(0, 8).map((l) => (
+              <li key={l.id}>
+                <Badge tone={l.attention === "High" ? "red" : "amber"}>{l.attention}</Badge>
+                <a href={"#/locations/" + l.id}>{l.name}</a>
+                <small>
+                  {l.city}, {l.state}
+                </small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {(unconfirmed > 0 || missing > 0) && (
+        <section className="panel setup-note" aria-labelledby="setup-title">
+          <h2 id="setup-title">Setup</h2>
+          <p className="muted">
+            {unconfirmed > 0 && `${unconfirmed} properties still need you to confirm they are owned. `}
+            {missing > 0 && `${missing} need a map pin before area data can be computed.`}
+          </p>
+          <a className="text-button" href="#/portfolio?confirmed=no">
+            Review properties <ArrowRight size={15} />
+          </a>
+        </section>
+      )}
     </>
   );
 }
@@ -758,17 +658,20 @@ function Portfolio({
   locations: Location[];
   candidates?: boolean;
 }) {
-  const [state, setState] = useState(""),
-    [status, setStatus] = useState(candidates ? "candidate" : "owned"),
-    [type, setType] = useState(""),
-    [attention, setAttention] = useState(""),
+  const params = candidates ? new URLSearchParams() : hashParams();
+  const [state, setState] = useState(params.get("state") ?? ""),
+    [status, setStatus] = useState(candidates ? "candidate" : (params.get("status") ?? "owned")),
+    [type, setType] = useState(params.get("type") ?? ""),
+    [attention, setAttention] = useState(params.get("attention") ?? ""),
+    [onlyUnconfirmed] = useState(params.get("confirmed") === "no"),
     [showMap, setShowMap] = useState(!candidates);
   const filtered = locations.filter(
     (item) =>
       (!state || item.state === state) &&
       (!status || item.status === status) &&
       (!type || item.asset_type === type) &&
-      (!attention || (item.attention ?? "Clear") === attention),
+      (!attention || (item.attention ?? "Clear") === attention) &&
+      (!onlyUnconfirmed || !item.confirmed),
   ).sort((a, b) => rankAttention(a) - rankAttention(b) || a.name.localeCompare(b.name));
   return (
     <>
