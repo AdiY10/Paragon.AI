@@ -23,7 +23,7 @@ def make_owned(n):
 
 
 def fake_extract(table):
-    def extract(location):
+    def extract(location, fresh=False):
         return dict(table.get(location.name, {}))
     return extract
 
@@ -91,3 +91,41 @@ def test_every_rendered_number_has_source_and_period(tmp_path, client, settings)
     for name, sec in area.items():
         if sec['status'] in ('available', 'unavailable') and sec.get('sources'):
             assert all(s['id'] and s['period'] and s['retrieved_at'] and s['url'].startswith('https://') for s in sec['sources'])
+
+
+# ---- R2 item 13: query budgets -------------------------------------------------------------
+
+def test_query_budgets_do_not_grow_with_the_portfolio(client):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+    from backend.tests.test_accounts import member
+    from backend.tests.test_signals import section, economy
+    locs = make_owned(12)
+    for loc in locs:
+        section(loc, 'economy', economy())
+    user, _ = member()
+    client.force_login(user)
+    ids = ','.join(str(l.pk) for l in locs[:3])
+    urls = ['/api/locations/?page_size=200', f'/api/locations/{locs[0].pk}/summary/', f'/api/compare/?ids={ids}']
+    for url in urls:
+        client.get(url)  # warm the snapshots
+    budgets = {}
+    for url in urls:
+        with CaptureQueriesContext(connection) as q:
+            assert client.get(url).status_code == 200
+        budgets[url] = len(q.captured_queries)
+    assert budgets[urls[0]] <= 12 and budgets[urls[1]] <= 20 and budgets[urls[2]] <= 22, budgets
+
+
+def test_snapshot_follows_reviews_and_pin_moves(client):
+    from apps.insights.models import LocationMetrics, Signal
+    from apps.insights.signals import safe_evaluate, cached_attention
+    from backend.tests.test_signals import section, all_sections
+    loc = make_owned(1)[0]
+    all_sections(loc)
+    safe_evaluate(loc.pk)
+    loc.refresh_from_db()
+    assert LocationMetrics.objects.get(location=loc).attention == 'High' and cached_attention(loc) == 'High'
+    from apps.locations.service import change_pin
+    loc = change_pin(location_id=loc.pk, expected_version=loc.version, lat=41.5, lon=-73, actor=None)
+    assert cached_attention(loc) in ('High', 'Watch', 'Clear')  # stale row ignored, recomputed live

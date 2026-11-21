@@ -54,6 +54,8 @@ def signal_review(request, signal_id):
     if action == 'dismissed':
         signal.status = 'dismissed'
     signal.save(update_fields=['reviewed_by', 'review_note', 'status'])
+    from .metrics import refresh_snapshot
+    refresh_snapshot(signal.location)
     return Response(serialize(signal))
 
 

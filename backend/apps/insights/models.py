@@ -69,3 +69,18 @@ class TenantFiler(models.Model):
     company_name = models.CharField(max_length=200)
     mapped_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     mapped_at = models.DateTimeField(auto_now_add=True)
+
+
+class LocationMetrics(models.Model):
+    """Per-location snapshot of comparable values and attention (R2 item 13).
+
+    Derived, not a source of truth: rebuilt after every evaluation or review and ignored
+    when its analysis_version is behind the location's, so lists and comparisons read one
+    row per property instead of re-deriving everything.
+    """
+    location = models.OneToOneField('locations.Location', on_delete=models.CASCADE, primary_key=True,
+        related_name='metrics_snapshot')
+    analysis_version = models.PositiveIntegerField()
+    values = models.JSONField(default=dict)
+    attention = models.CharField(max_length=8, default='Clear')
+    updated_at = models.DateTimeField(auto_now=True)
