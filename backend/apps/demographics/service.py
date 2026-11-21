@@ -10,6 +10,7 @@ from . import acs, cpi, geography
 from .metrics import compute_rings
 from .trends import ring_trends, unavailable
 from .models import RingDemographics
+from . import vintage
 
 DEFAULT_ACS_YEAR = 2024
 AUTO_INGEST = True  # tests turn this off; jobs ingest a missing state's ACS rows on demand
@@ -45,6 +46,7 @@ def ingest_acs(states, *, year=DEFAULT_ACS_YEAR, store=None, opener=None, line_s
 
 
 def _geography(lat, lon, radius, year, store, opener, decennial=2020):
+    year = vintage.geography_year(year) if decennial == 2020 else year
     snapshot = _latest('SRC-04', geography.scope_for(lat, lon, radius, decennial))
     if snapshot and snapshot.context.get('acs_year') == year:
         return snapshot, geography.load_capture(snapshot, store)
@@ -100,9 +102,10 @@ def _cpi(years, store, opener):
     return snapshot, cpi.load(snapshot, store)
 
 
-def compute_for_location(location_id, *, year=DEFAULT_ACS_YEAR, baseline_year=BASELINE_ACS_YEAR,
+def compute_for_location(location_id, *, year=None, baseline_year=BASELINE_ACS_YEAR,
         store=None, opener=None):
     store = _store(store)
+    year = year or vintage.current_acs_year()
     location = Location.objects.select_related('current_revision').get(pk=location_id)
     revision = location.current_revision
     if revision is None or revision.lat is None:
@@ -120,7 +123,7 @@ def compute_for_location(location_id, *, year=DEFAULT_ACS_YEAR, baseline_year=BA
         for ring, base in zip(rings, base_rings):
             ring['baseline'] = {'acs_period': acs.vintage_period(baseline_year), 'metrics': base['metrics'],
                 'method': {**base['method'], 'apportionment': 'decennial block-population weights (2010 Census blocks)'}}
-            ring['trends'] = ring_trends(ring, base, cpi_ratio, label)
+            ring['trends'] = ring_trends(ring, base, cpi_ratio, label, vintage.trend_period(baseline_year, year))
         baseline = {'acs_year': baseline_year, 'geography_snapshot_id': str(base_geo.pk),
             'acs_snapshot_ids': base_ids, 'cpi_snapshot_id': str(cpi_snapshot.pk), 'cpi_ratio': cpi_ratio}
     except DemographicsUnavailable as exc:
@@ -148,7 +151,7 @@ def compute_for_location(location_id, *, year=DEFAULT_ACS_YEAR, baseline_year=BA
 
 
 def current_result(location):
-    """Latest result for the location's current pin and ring preset, or None."""
+    """Latest result for the location's current pin and ring preset, or None (newest vintage first)."""
     return (RingDemographics.objects.filter(location=location, analysis_version=location.analysis_version)
         .select_related('geography_snapshot').order_by('-acs_year', '-computed_at').first())
 
@@ -174,7 +177,7 @@ def serialize(location, result):
              'period': '2020 Census', 'retrieved_at': result.geography_snapshot.retrieved_at,
              'url': 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html'},
             *([{'id': 'SRC-08', 'name': 'U.S. Bureau of Labor Statistics, CPI-U annual average (CUUR0000SA0)',
-                'period': '2019 and 2024', 'url': 'https://www.bls.gov/cpi/'},
+                'period': f"{result.baseline['acs_year']} and {result.acs_year}", 'url': 'https://www.bls.gov/cpi/'},
                {'id': 'SRC-03', 'name': 'U.S. Census Bureau, ACS 5-year sequence-based summary file (trend baseline)',
                 'period': acs.vintage_period(result.baseline['acs_year']), 'url': acs.LEGACY_BASE}]
               if result.baseline else [])],

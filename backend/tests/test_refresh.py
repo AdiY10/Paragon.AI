@@ -127,3 +127,16 @@ def test_unchanged_refetch_counts_as_fresh_and_newest_content_wins(tmp_path, set
     raw, snap = Run(store, None).cached('SRC-04', 'county:test', 0, fetcher(b'A'))
     raw, snap = Run(store, None).cached('SRC-04', 'county:test', None, fetcher(b'Z'))
     assert raw == b'A' and snap.pk == first.pk and calls[-1] == b'A'
+
+
+def test_newest_acs_year_treats_staged_401_as_unpublished(monkeypatch):
+    from datetime import date
+    from apps.area import refresh
+    from apps.area.http import SourceError
+
+    def fake_fetch(url, **k):
+        if '2025' in url:
+            raise SourceError('HTTP_ERROR', '401')
+        return b'x'
+    monkeypatch.setattr(refresh, 'fetch', fake_fetch)
+    assert refresh.newest_acs_year(today=date(2026, 11, 21)) == 2024

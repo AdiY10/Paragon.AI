@@ -351,7 +351,8 @@ def jobs_section(run, lat, lon, *, location=None):
     from apps.demographics.service import _geography, DemographicsUnavailable
     radii = RING_RADII[location.ring_preset if location else '1/3/5']
     try:
-        geo_snap, capture = _geography(lat, lon, max(radii), 2024, run.store, run.opener)
+        from apps.demographics.vintage import current_acs_year
+        geo_snap, capture = _geography(lat, lon, max(radii), current_acs_year(), run.store, run.opener)
     except DemographicsUnavailable as exc:
         raise SourceError(exc.code if exc.code in ('SOURCE_ERROR', 'NOT_COVERED') else 'SOURCE_ERROR') from None
     blocks, *_ = geography.parse_geography(capture)

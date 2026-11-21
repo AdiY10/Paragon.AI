@@ -1,7 +1,7 @@
 """Statistically qualified trends between non-overlapping ACS vintages (docs/04 §4.1).
 
 MET-06 population change and MET-07 real mean household income change compare
-ACS 2015-2019 (2010 geography) with ACS 2020-2024 (2020 geography). Each
+ACS 2015-2019 (2010 geography) with the current vintage (2020 geography). Each
 vintage is apportioned to the ring with its own geography, so boundary changes
 add noise; that is one reason a change must be statistically significant at
 90% before anything is flagged.
@@ -32,8 +32,7 @@ def trend(metric_id, current, baseline, *, scale=1.0, period, adjustment=None):
         'note': None if usable else 'Very low reliability input; excluded from signals.'}
 
 
-def ring_trends(current_ring, baseline_ring, cpi_ratio, cpi_label):
-    period = '2015–2019 → 2020–2024'
+def ring_trends(current_ring, baseline_ring, cpi_ratio, cpi_label, period='2015–2019 → 2020–2024'):
     c, b = current_ring['metrics'], baseline_ring['metrics']
     return {
         'population_change': trend('MET-06', c['population'], b['population'], period=period),
