@@ -1,0 +1,15 @@
+# Automatic HTTPS (Let's Encrypt) for the Paragon Radar domain.
+{$PARAGON_DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https://tile.openstreetmap.org; connect-src 'self' https://tile.openstreetmap.org; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+	# Caddy replaces any client-sent X-Forwarded-* headers with its own (no trusted upstream proxies),
+	# so Django can trust exactly one hop (TRUSTED_PROXY_COUNT=1).
+	reverse_proxy app:8000
+}

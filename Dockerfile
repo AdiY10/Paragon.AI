@@ -13,7 +13,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-python-downloads
 
 FROM python:3.12-slim-bookworm
-RUN apt-get update && apt-get install -y --no-install-recommends libgdal32 libgeos-c1v5 libpq5 && rm -rf /var/lib/apt/lists/*
+# Plain Postgres: no GIS libraries needed (no geometry fields are stored).
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system paragon && useradd --system --gid paragon --home-dir /app paragon
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
@@ -27,4 +28,4 @@ RUN install -d -o paragon -g paragon /app/var
 USER paragon
 RUN DJANGO_SETTINGS_MODULE=config.settings.test python backend/manage.py collectstatic --noinput
 EXPOSE 8000
-CMD ["python", "infra/start_web.py"]
+CMD ["python", "infra/start_all.py"]

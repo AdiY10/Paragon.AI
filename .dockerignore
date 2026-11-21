@@ -8,3 +8,12 @@ __pycache__
 .pytest_cache
 node_modules
 paragon-plan
+**/node_modules
+**/node_modules.*
+.venv.*
+*.nosync
+.claude
+* 2
+* 2.*
+frontend/test-results
+backend/static/ui

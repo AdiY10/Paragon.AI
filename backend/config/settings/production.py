@@ -14,7 +14,7 @@ url = urlsplit(os.environ.get('DATABASE_URL', ''))
 if url.scheme not in ('postgres', 'postgresql') or not url.hostname or not url.path.strip('/'):
     raise ImproperlyConfigured('DATABASE_URL must identify a PostgreSQL database')
 DATABASES = {'default': {
-    'ENGINE': 'django.contrib.gis.db.backends.postgis',
+    'ENGINE': 'django.db.backends.postgresql',
     'NAME': unquote(url.path.lstrip('/')), 'USER': unquote(url.username or ''),
     'PASSWORD': unquote(url.password or ''), 'HOST': unquote(url.hostname),
     'PORT': url.port or 5432, 'CONN_MAX_AGE': 60,
