@@ -144,7 +144,7 @@ function Panel({
         {icon}
       </div>
       {section.stale && (
-        <p className="notice" role="status">
+        <p className="notice stale" role="status">
           Stale: a source could not be refreshed, so the last good values are shown with their dates.
         </p>
       )}

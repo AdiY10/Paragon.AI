@@ -630,7 +630,7 @@ function PropertyCard({ location }: { location: Location }) {
           {location.attention && location.attention !== "Clear" && (
             <Badge tone={location.attention === "High" ? "red" : "amber"}>{location.attention}</Badge>
           )}
-          <Badge tone={location.confirmed ? "green" : "amber"}>
+          <Badge tone={location.confirmed ? "green" : "unverified"}>
             {location.confirmed ? "Confirmed" : "Unconfirmed"}
           </Badge>
         </span>

@@ -96,7 +96,7 @@ export default function TenantsPanel({ location, isAdmin }: { location: Location
                 <strong>{t.name}</strong>
                 <span className="card-badges">
                   {t.is_anchor && <span className="badge">Anchor</span>}
-                  <span className={`badge ${t.confirmed ? "green" : "amber"}`}>
+                  <span className={`badge ${t.confirmed ? "green" : "unverified"}`}>
                     {t.confirmed ? "Confirmed" : presenceLabel(t.presence)}
                   </span>
                 </span>
