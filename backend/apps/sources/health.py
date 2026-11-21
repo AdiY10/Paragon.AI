@@ -50,9 +50,12 @@ def record_check(*,source_id,scope,run_key,succeeded,completed_at=None,error_cod
     # failure or claim a successful check today.
     is_latest=health.last_checked_at is None or completed_at>health.last_checked_at
     if succeeded:
-        if health.last_success_at is None or completed_at>health.last_success_at:
+        newest_success=health.last_success_at is None or completed_at>=health.last_success_at
+        if newest_success:
             health.last_success_at=completed_at
-        if snapshot is not None and (health.latest_snapshot_id is None or snapshot.retrieved_at>health.latest_snapshot.retrieved_at):
+        # The newest successful check decides the current data, even when its content matches an
+        # older snapshot (A -> B -> A returns the original A snapshot with an older retrieved_at).
+        if snapshot is not None and (health.latest_snapshot_id is None or newest_success):
             health.latest_snapshot=snapshot
             health.processed_release=snapshot.release
         if is_latest and available_release is not None:

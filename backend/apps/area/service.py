@@ -15,7 +15,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from apps.demographics.rings import haversine_miles
 from apps.locations.models import Location
-from apps.sources.models import SourceSnapshot
+from apps.sources.models import SourceHealth, SourceSnapshot
 from apps.sources.snapshots import publish_snapshot, ValidationReport
 from apps.sources.storage import LocalArtifactStore
 from . import economy as econ
@@ -77,9 +77,15 @@ class Run:
         If a refresh fails but an older snapshot exists, the older one is used and the
         citation is marked stale with its date (docs/04 §7 CACHED_AFTER_ERROR).
         """
-        snap = (SourceSnapshot.objects.filter(source_id=source_id, scope=scope)
+        # Freshness comes from the last successful check, not the snapshot: snapshots are
+        # content-addressed, so an unchanged re-fetch keeps its original retrieved_at.
+        health = (SourceHealth.objects.filter(source_id=source_id, scope=scope[:160])
+            .select_related('latest_snapshot').first())
+        snap = health.latest_snapshot if health and health.latest_snapshot_id else (
+            SourceSnapshot.objects.filter(source_id=source_id, scope=scope[:160])
             .order_by('-retrieved_at', '-published_at').first())
-        fresh = snap and (max_age_days is None or snap.retrieved_at >= timezone.now() - timedelta(days=max_age_days))
+        checked = max(filter(None, [snap and snap.retrieved_at, health and health.last_success_at]), default=None)
+        fresh = snap and (max_age_days is None or checked >= timezone.now() - timedelta(days=max_age_days))
         stale_error = None
         if fresh and (release_match is None or snap.release == release_match):
             with self.store.open_verified(snap.artifact_key) as handle:
@@ -91,6 +97,7 @@ class Run:
                     data_period=period[:160], source_url=url, adapter_version=ADAPTER, stream=io.BytesIO(raw),
                     store=self.store, validation=ValidationReport(True, True, {'format': 'raw response'}, 1))
                 note_check(source_id, scope, snapshot=snap)
+                checked = timezone.now()
             except SourceError as exc:
                 note_check(source_id, scope, error=exc.code)
                 if snap is None or exc.code == 'NOT_COVERED':
@@ -101,7 +108,8 @@ class Run:
         self.snapshots.append(str(snap.pk))
         name, link = SOURCE_META[source_id]
         entry = self.sources.setdefault(source_id + snap.data_period, {'id': source_id, 'name': name, 'url': link,
-            'period': snap.data_period, 'retrieved_at': snap.retrieved_at.isoformat(), 'stale': False})
+            'period': snap.data_period, 'retrieved_at': snap.retrieved_at.isoformat(),
+            'checked_at': (checked or snap.retrieved_at).isoformat(), 'stale': False})
         if stale_error:
             entry.update(stale=True, stale_reason=stale_error)
         return raw, snap
