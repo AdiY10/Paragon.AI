@@ -28,6 +28,9 @@ def build_commands(env=None):
 
 def main():
     subprocess.run([sys.executable, 'backend/manage.py', 'prepare_release'], check=True)
+    # STATIC_ROOT lives on the persistent volume, so each new image must refresh it (new hashed
+    # bundle names), or the page loads an old file list and the app stays blank.
+    subprocess.run([sys.executable, 'backend/manage.py', 'collectstatic', '--noinput', '-v', '0'], check=True)
     subprocess.run([sys.executable, 'backend/manage.py', 'sync_schedules', '--enable-available'], check=False)
     os.environ.pop('ACCESS_BOOTSTRAP_PASSWORD', None)
     processes = [subprocess.Popen(argv, env={**os.environ, **extra}) for argv, extra in build_commands()]
