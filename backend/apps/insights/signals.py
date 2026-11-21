@@ -94,12 +94,20 @@ def candidates(location, t=None, today=None, evaluated=None):
                 'Falling retail employment can indicate retail contraction in the county.',
                 {'value': retail, **t['SIG-04']}, emp.get('period'), 'SRC-06'))
         u = e.get('unemployment') or {}
-        if u.get('change_pts') is not None and u['change_pts'] >= t['SIG-05']['watch_at_or_above_pts']:
+        c = t['SIG-05']
+        smoothed = 'avg3_change_pts' in u
+        change = u.get('avg3_change_pts') if smoothed else u.get('change_pts')
+        excess = u.get('excess_vs_state_pts')
+        if change is not None and change >= c['watch_at_or_above_pts'] and (
+                excess is None or excess >= c['min_excess_vs_state_pts']):
+            rate = (u.get('avg3_rate') if smoothed and u.get('avg3_rate') is not None else u['rate']) * 100
             out.append(_candidate('SIG-05', f'county:{fips}:unemployment', 'Economy', 'Watch', 'negative',
-                f'{county} unemployment up {u["change_pts"]:.1f} pts to {u["rate"] * 100:.1f}%'
-                + (' (preliminary)' if u.get('preliminary') else ''),
-                'Rising unemployment can weaken local spending.', {'rate': u.get('rate'), 'prior_rate': u.get('prior_rate'),
-                    'change_pts': u['change_pts'], **t['SIG-05']}, u.get('period'), 'SRC-07'))
+                f'{county} unemployment up {change:.1f} pts to {rate:.1f}%'
+                + (' (3-month average)' if smoothed else '') + (' (preliminary)' if u.get('preliminary') else ''),
+                'Rising unemployment can weaken local spending.' + (
+                    f' It rose {excess:.1f} pts more than the state.' if excess is not None else ''),
+                {'rate': u.get('rate'), 'three_month_average': u.get('avg3_rate'), 'prior_rate': u.get('prior_rate'),
+                    'change_pts': change, 'more_than_state_pts': excess, **c}, u.get('period'), 'SRC-07'))
         p = e.get('permits') or {}
         c = t['SIG-07']
         if p.get('change_pct') is not None and abs(p['change_pct']) >= c['min_abs_pct'] and abs(p.get('change') or 0) >= c['min_abs_units']:
@@ -305,7 +313,13 @@ def rank_key(s):
     return (SEVERITY_ORDER[s.severity], cat, -s.last_changed_at.timestamp(), s.location.name)
 
 
+COUNTY_ONLY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'}
+
+
 def attention(location_id):
-    sev = list(Signal.objects.filter(location_id=location_id, status='active').values_list('severity', flat=True))
+    """A property's own attention level. County-wide figures are context, shown in the brief once,
+    not a reason to flag every property in the county."""
+    sev = list(Signal.objects.filter(location_id=location_id, status='active')
+        .exclude(rule_id__in=COUNTY_ONLY_RULES).values_list('severity', flat=True))
     top = min(sev, key=SEVERITY_ORDER.get) if sev else None
     return top if top in ('High', 'Watch') else 'Clear'

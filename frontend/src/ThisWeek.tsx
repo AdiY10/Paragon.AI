@@ -15,7 +15,8 @@ export interface BriefItem {
   period: string;
   source: string | null;
   evidence: Record<string, unknown>;
-  flag: "new" | "changed" | "still_active";
+  flag: "new" | "changed" | "still_active" | "resolved";
+  resolved_reason?: string;
   location: { id: string; name: string; city: string; state: string };
   locations?: { id: string; name: string; city: string; state: string }[];
 }
@@ -27,12 +28,13 @@ export interface Brief {
   since: string | null;
   items: BriefItem[];
   fyi: BriefItem[];
+  resolved?: BriefItem[];
   sources_updated: { id: string; name: string; period: string }[];
   stats: Record<string, number>;
 }
 
 export const flagLabel = (f: BriefItem["flag"]) =>
-  f === "new" ? "New" : f === "changed" ? "Changed" : "Still active";
+  f === "new" ? "New" : f === "changed" ? "Changed" : f === "resolved" ? "Resolved" : "Still active";
 
 export default function ThisWeek({ isAdmin }: { isAdmin: boolean }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -86,6 +88,18 @@ export default function ThisWeek({ isAdmin }: { isAdmin: boolean }) {
                 <BriefRow key={i.id} item={i} />
               ))}
             </ul>
+          )}
+          {(brief.resolved?.length ?? 0) > 0 && (
+            <details className="area-sources" open>
+              <summary>
+                Resolved since the last brief ({brief.resolved!.length})
+              </summary>
+              <ul className="change-list">
+                {brief.resolved!.map((i) => (
+                  <BriefRow key={i.id} item={i} />
+                ))}
+              </ul>
+            </details>
           )}
           {brief.fyi.length > 0 && (
             <details className="area-sources">

@@ -88,10 +88,32 @@ def laus_series(fips):
     return f'LAUCN{fips}0000000003'
 
 
+def state_laus_series(fips):
+    return f'LASST{fips[:2]}0000000000003'
+
+
+def _avg3_change(points, anchor=None):
+    """Change in the 3-month average rate vs the same 3 months a year earlier (points newest first).
+
+    ``anchor`` (a point) aligns another series, such as the state's, to the county's months.
+    """
+    by = {(d['year'], d['period']): d['value'] for d in points}
+    latest = anchor or points[0]
+    y, m = int(latest['year']), int(latest['period'][1:])
+    months = [((y if m - i > 0 else y - 1), (m - i - 1) % 12 + 1) for i in range(3)]
+    try:
+        now = [float(by[(str(yy), f'M{mm:02d}')]) for yy, mm in months]
+        before = [float(by[(str(yy - 1), f'M{mm:02d}')]) for yy, mm in months]
+    except (KeyError, ValueError):
+        return None, None
+    return round(sum(now) / 3, 2), round(sum(now) / 3 - sum(before) / 3, 2)
+
+
 def fetch_laus(fips, *, today=None, opener=None):
     today = today or date.today()
     key = os.environ.get('BLS_API_KEY')
-    body = {'seriesid': [laus_series(fips)], 'startyear': str(today.year - 2), 'endyear': str(today.year)}
+    # County plus its state, so a statewide swing is not reported as a local problem.
+    body = {'seriesid': [laus_series(fips), state_laus_series(fips)], 'startyear': str(today.year - 2), 'endyear': str(today.year)}
     if key:
         body['registrationkey'] = key
     return fetch(LAUS_V2 if key else LAUS_V1, body=body, opener=opener), (LAUS_V2 if key else LAUS_V1)
@@ -101,9 +123,11 @@ def parse_laus(raw, fips):
     data = json.loads(raw)
     if data.get('status') != 'REQUEST_SUCCEEDED':
         raise SourceError('SOURCE_ERROR', 'BLS request not successful')
-    series = data['Results']['series'][0]
-    if series.get('seriesID') != laus_series(fips):
+    by_id = {s.get('seriesID'): s for s in data['Results']['series']}
+    series = by_id.get(laus_series(fips))
+    if series is None:
         raise SourceError('SCHEMA_ERROR', 'unexpected series')
+    state = by_id.get(state_laus_series(fips))
     points = [d for d in series['data'] if d['period'].startswith('M') and d['period'] != 'M13']
     if not points:
         raise SourceError('NOT_COVERED', 'no monthly values')
@@ -118,6 +142,13 @@ def parse_laus(raw, fips):
     else:
         out.update(prior_rate=float(prior['value']) / 100,
             change_pts=round(value - float(prior['value']), 2), change_reason=None)
+    # Single months are noisy (and missing during federal shutdowns): alerts use 3-month averages.
+    avg, avg_change = _avg3_change(points)
+    out.update(avg3_rate=None if avg is None else avg / 100, avg3_change_pts=avg_change)
+    state_points = [d for d in (state or {}).get('data', []) if d['period'].startswith('M') and d['period'] != 'M13']
+    state_change = _avg3_change(state_points, anchor=latest)[1] if state_points else None
+    out.update(state_avg3_change_pts=state_change,
+        excess_vs_state_pts=None if state_change is None or avg_change is None else round(avg_change - state_change, 2))
     return out
 
 

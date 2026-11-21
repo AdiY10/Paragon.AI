@@ -5,7 +5,7 @@ thresholds:
   SIG-02: {watch_at_or_below: -0.05, fyi_at_or_above: 0.05}   # real mean HH income, significant only
   SIG-03: {watch_at_or_below: -0.02, fyi_at_or_above: 0.03}   # county private jobs YoY
   SIG-04: {watch_at_or_below: -0.04}             # county retail jobs YoY
-  SIG-05: {watch_at_or_above_pts: 1.0}           # unemployment change vs a year earlier
+  SIG-05: {watch_at_or_above_pts: 1.0, min_excess_vs_state_pts: 0.5}  # 3-month avg vs a year earlier, beyond the state's change
   SIG-06: {watch_at_or_below: -0.05, fyi_at_or_above: 0.05}   # jobs within 3 miles YoY
   SIG-07: {min_abs_pct: 0.25, min_abs_units: 50} # housing permits T12M vs prior T12M
   SIG-08: {watch_at_or_below: -0.10, fyi_at_or_above: 0.10}   # main-road AADT YoY
