@@ -28,6 +28,10 @@ class Signal(models.Model):
     analysis_version = models.PositiveIntegerField()
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     review_note = models.TextField(blank=True)
+    # Evidence when the current episode began, and how many times the condition has (re)appeared.
+    first_evidence = models.JSONField(default=dict, blank=True)
+    episode = models.PositiveIntegerField(default=1)
+    episode_started_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-last_changed_at', 'id']

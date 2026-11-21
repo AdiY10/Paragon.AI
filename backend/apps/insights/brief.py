@@ -33,7 +33,7 @@ def generate(*, kind='weekly', now=None):
     active = (Signal.objects.filter(status='active', location__status='owned').select_related('location'))
     items = []
     for s in sorted(active, key=rank_key):
-        new = baseline or s.first_detected_at > since
+        new = baseline or (s.episode_started_at or s.first_detected_at) > since
         changed = not new and s.last_changed_at > since
         still_high = s.severity == 'High' and not new and not changed
         if new or changed or still_high:

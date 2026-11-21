@@ -136,3 +136,74 @@ def test_real_cypress_lake_flood_and_kingston_regal_closure(tmp_path, client, se
     engine.evaluate(king, today=TODAY)
     regal = Signal.objects.get(location=king, rule_id='SIG-09', title__contains='Regal Cinemas')
     assert regal.severity == 'Watch' and regal.evidence['evidence'] == 'marked permanently closed'
+
+
+# ---- R2 item 5: stable identity and lifecycle -----------------------------------------
+
+def test_new_data_period_updates_the_same_alert_and_keeps_dismissal():
+    loc = placed()
+    section(loc, 'economy', economy())
+    engine.evaluate(loc, today=TODAY)
+    s05 = Signal.objects.get(rule_id='SIG-05')
+    assert s05.subject == 'county:36111:unemployment'
+    s05.status = 'dismissed'
+    s05.save()
+    later = economy()
+    later['unemployment'] = {**later['unemployment'], 'period': '2026-10', 'change_pts': 1.3}
+    section(loc, 'economy', later)
+    engine.evaluate(loc, today=TODAY)
+    rows = Signal.objects.filter(rule_id='SIG-05')
+    assert rows.count() == 1 and rows[0].status == 'dismissed' and rows[0].period == '2026-10'
+    assert Signal.objects.filter(rule_id='SIG-03').count() == 1
+
+
+def test_reappearing_condition_starts_a_new_episode():
+    loc = placed()
+    section(loc, 'economy', economy())
+    engine.evaluate(loc, today=TODAY)
+    first = Signal.objects.get(rule_id='SIG-04')
+    section(loc, 'economy', economy(retail=0.0))
+    engine.evaluate(loc, today=TODAY)
+    assert Signal.objects.get(pk=first.pk).status == 'resolved'
+    section(loc, 'economy', economy(retail=-0.06))
+    engine.evaluate(loc, today=TODAY)
+    again = Signal.objects.get(pk=first.pk)
+    assert again.status == 'active' and again.episode == 2
+    assert again.first_evidence['value'] == -0.06 and again.episode_started_at > first.episode_started_at
+
+
+def test_missing_inputs_never_resolve_alerts():
+    loc = placed()
+    all_sections(loc)
+    engine.evaluate(loc, today=TODAY)
+    section(loc, 'hazards', {}, status='unavailable')  # newer row for the same version wins
+    engine.evaluate(loc, today=TODAY)
+    assert Signal.objects.get(rule_id='SIG-11').status == 'active'
+
+
+def test_event_alerts_stay_until_the_window_ends_even_when_not_in_the_latest_diff():
+    loc = placed()
+    all_sections(loc)
+    engine.evaluate(loc, today=TODAY)
+    section(loc, 'businesses', {'release': '2026-12-17.0', 'prior_release': '2026-11-18.0', 'changes': {}})
+    engine.evaluate(loc, today=date(2026, 12, 20))
+    assert Signal.objects.get(rule_id='SIG-09').status == 'active'
+    engine.evaluate(loc, today=date(2027, 3, 1))
+    assert Signal.objects.get(rule_id='SIG-09').status == 'expired'
+
+
+def test_migration_collapses_period_keyed_duplicates():
+    import importlib
+    from django.apps import apps as django_apps
+    mig = importlib.import_module('apps.insights.migrations.0005_rekey_signal_subjects')
+    loc = placed()
+    section(loc, 'economy', economy())
+    common = dict(location=loc, rule_id='SIG-05', category='Economy', severity='Watch', direction='negative',
+        title='t', why='w', analysis_version=loc.analysis_version)
+    Signal.objects.create(subject='laus:2026-08', status='dismissed', **common)
+    Signal.objects.create(subject='laus:2026-09', status='active', **common)
+    Signal.objects.create(subject='overture:abc', **{**common, 'rule_id': 'SIG-09', 'category': 'Closure'})
+    mig.forwards(django_apps, None)
+    rows = list(Signal.objects.filter(rule_id='SIG-05'))
+    assert len(rows) == 1 and rows[0].status == 'dismissed' and rows[0].subject == 'county:36111:unemployment'
+    assert Signal.objects.get(rule_id='SIG-09').subject == 'place:abc'
