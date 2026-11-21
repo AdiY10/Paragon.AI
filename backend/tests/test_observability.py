@@ -89,20 +89,6 @@ def test_refresh_failures_logged_with_ids_not_coordinates(monkeypatch, caplog):
     assert 'refresh economy failed for location' in text and '41.1' not in text and '-73.4' not in text
 
 
-def test_acs_rollover_is_held_until_enabled(monkeypatch, settings):
-    from apps.area import refresh
-    from backend.tests.test_refresh import locations, Ctx
-    locations()
-    settings.ACS_ROLLOVER_ENABLED = False
-    ingested = []
-    monkeypatch.setattr(refresh, 'newest_acs_year', lambda opener=None: 2025)
-    monkeypatch.setattr(refresh, 'ingested_acs_states', lambda year: set() if year == 2025 else {'09', '36'})
-    monkeypatch.setattr('apps.demographics.service.ingest_acs', lambda states, year, **k: ingested.append(year))
-    monkeypatch.setattr('apps.area.service.compute_area', lambda *a, **k: [])
-    out = refresh.refresh_annual(Ctx())
-    assert 2025 not in ingested and out.info['acs_rollover_pending'] == 2025
-
-
 def test_alerts_api_is_admin_only(client):
     from backend.tests.test_accounts import member
     raise_alert('job:x:failing', 'x failed twice')

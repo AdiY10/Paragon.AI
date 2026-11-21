@@ -13,7 +13,7 @@ METRICS = {
     'households': ('Households within 3 miles', 'households', 'up', 'Trade area'),
     'median_household_income': ('Median household income (3 mi)', 'usd', 'up', 'Trade area'),
     'mean_household_income': ('Average household income (3 mi)', 'usd', 'up', 'Trade area'),
-    'population_change': ('Population change 2015–19 → 2020–24 (3 mi)', 'pct', 'up', 'Trade area'),
+    'population_change': ('Population change over 5 years (3 mi)', 'pct', 'up', 'Trade area'),
     'real_income_change': ('Real average income change (3 mi)', 'pct', 'up', 'Trade area'),
     'jobs': ('Jobs located within 3 miles', 'people', 'up', 'Jobs'),
     'jobs_change': ('Change in jobs within 3 miles', 'pct', 'up', 'Jobs'),
@@ -42,11 +42,13 @@ def extract(location):
             for key in ('population', 'households', 'median_household_income', 'mean_household_income'):
                 m = ring['metrics'].get(key) or {}
                 if m.get('value') is not None and m.get('reliability') != 'very_low':
-                    out[key] = {'value': m['value'], 'period': demo.data_period, 'source': 'SRC-03'}
+                    out[key] = {'value': m['value'], 'period': demo.data_period, 'source': 'SRC-03',
+                        'vintage': demo.acs_year}
             for key, tkey in (('population_change', 'population_change'), ('real_income_change', 'real_mean_income_change')):
                 t = (ring.get('trends') or {}).get(tkey) or {}
                 if t.get('value') is not None and t.get('significant') is True:
-                    out[key] = {'value': t['value'], 'period': t.get('period'), 'source': 'SRC-03'}
+                    out[key] = {'value': t['value'], 'period': t.get('period'), 'source': 'SRC-03',
+                        'vintage': demo.acs_year}
     rows = {}
     for row in AreaSection.objects.filter(location=location, analysis_version=location.analysis_version).order_by('computed_at'):
         rows[row.section] = row  # latest wins
@@ -91,12 +93,15 @@ def portfolio_values(exclude_id=None):
     from apps.locations.models import Location
     owned = (Location.objects.filter(status='owned').exclude(current_revision__lat__isnull=True)
         .select_related('current_revision'))
+    from apps.demographics.vintage import current_acs_year
+    year = current_acs_year()
     values = {}
     for loc in owned:
         if loc.pk == exclude_id:
             continue
         for key, item in extract(loc).items():
-            if key in METRICS:
+            # Percentiles compare one ACS vintage only; a property still on the old one is left out.
+            if key in METRICS and item.get('vintage', year) == year:
                 values.setdefault(key, []).append(item['value'])
     return values, owned.count() - (1 if exclude_id and owned.filter(pk=exclude_id).exists() else 0)
 
@@ -119,6 +124,8 @@ def _fmt(key, value):
 
 
 def summary(location, signals=()):
+    from apps.demographics.vintage import current_acs_year
+    current_year = current_acs_year()
     mine = extract(location)
     others, n_owned = portfolio_values(exclude_id=location.pk)
     metrics, strengths, concerns = [], [], []
@@ -129,7 +136,7 @@ def summary(location, signals=()):
             'value': None if item is None else item['value'], 'period': item and item.get('period'),
             'source': item and item.get('source'), 'detail': item and item.get('detail'),
             'percentile': None, 'n': len(peer)}
-        if item is not None and len(peer) >= MIN_PORTFOLIO:
+        if item is not None and len(peer) >= MIN_PORTFOLIO and item.get('vintage', current_year) == current_year:
             pct = percentile(item['value'], peer)
             entry['percentile'] = pct
             favourable = pct if direction == 'up' else 100 - pct
@@ -145,7 +152,7 @@ def summary(location, signals=()):
     hz = mine.get('_hazards')
     if hz:
         for text in hz.get('concerns') or []:
-            hazard_concerns.append({'text': text, 'metric': 'hazards', 'source': 'SRC-11' if 'FEMA zone' in text else 'SRC-12',
+            hazard_concerns.append({'text': text, 'metric': 'hazards', 'source': 'SRC-11' if 'flood zone' in text else 'SRC-12',
                 'period': None, 'weight': 200})
     signal_items = [{'text': f"{s['title']} ({s['severity']})", 'metric': 'signal', 'source': s.get('source'),
         'period': s.get('period'), 'weight': 300 if s['severity'] == 'High' else 150}

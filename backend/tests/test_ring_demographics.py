@@ -292,9 +292,9 @@ def test_source_outage_is_reported_not_guessed(placed):
     from apps.sources.models import SourceSnapshot
     location, store, _ = placed
     with pytest.raises(DemographicsUnavailable) as exc:
-        compute_for_location(location.pk, store=store, year=2023, opener=Offline())
+        compute_for_location(location.pk, store=store, year=2021, opener=Offline())  # 2021 has its own geography
     assert exc.value.code == 'SOURCE_ERROR'
-    assert not SourceSnapshot.objects.filter(source_id='SRC-03', release='2023').exists()
+    assert not SourceSnapshot.objects.filter(source_id='SRC-03', release='2021').exists()
 
 
 @pytest.mark.django_db
@@ -441,3 +441,47 @@ def test_post_requires_a_placed_pin(client, tmp_path):
         content_type='application/json').json()
     assert client.post(f"/api/locations/{created['id']}/demographics/").status_code == 400
     assert client.get(f"/api/locations/{created['id']}/demographics/").json()['reason'] == 'NOT_PROVIDED'
+
+
+# ---- R2 item 9: ACS vintage rollover ------------------------------------------------------
+
+@pytest.mark.django_db
+def test_portfolio_switches_vintage_only_when_every_state_is_in(tmp_path, client, monkeypatch):
+    from apps.demographics import vintage
+    from apps.demographics.service import compute_for_location, current_result
+    from apps.area import refresh
+    from apps.locations.models import Location
+    location, store, _ = setup_location(tmp_path, client, with_acs=True, with_baseline=True)
+    Location.objects.filter(pk=location.pk).update(state='CT', status='owned')
+    first = compute_for_location(location.pk, store=store, opener=Offline())
+    assert first.acs_year == 2024 and first.rings[1]['trends']['population_change']['period'] == '2015–2019 → 2020–2024'
+    needed = vintage.required_states()
+    assert '09' in needed
+    rows = json.loads((FIX / 'norwalk_acs2024_rows.json').read_text())['rows']
+
+    def publish(year, state):
+        acs.publish_extract(acs.AcsExtract(year, state, rows if state == '09' else {},
+            (acs.BASE_URL.format(year=year, table='b01003'),), datetime(2026, 11, 20, tzinfo=timezone.utc)), store)
+    publish(2025, '09')
+    assert vintage.current_acs_year() == 2024  # neighbours not in yet: stay on 2024
+    for state in needed - {'09'}:
+        publish(2025, state)
+        publish(2024, state)
+    assert vintage.current_acs_year() == 2025
+    # The monthly refresh recomputes anyone not on the current vintage, reusing the 2020-era geography.
+    monkeypatch.setattr(refresh, 'newest_acs_year', lambda opener=None: 2025)
+    monkeypatch.setattr('apps.demographics.service._store', lambda s: store)
+    monkeypatch.setattr('apps.demographics.service.ingest_acs', lambda *a, **k: [])
+    monkeypatch.setattr(refresh, '_each', lambda *a, **k: refresh.Outcome())
+    from apps.demographics import cpi
+
+    def no_network(*a, **k):
+        raise cpi.CpiError('offline')
+    monkeypatch.setattr(cpi, 'fetch', no_network)
+    out = refresh.refresh_annual(type('C', (), {'heartbeat': lambda self: None})(), acs_opener=Offline())
+    assert out.done == 1 and out.info['acs_year'] == 2025
+    now = current_result(location)
+    assert now.acs_year == 2025 and now.data_period == 'ACS 2021–2025 5-year'
+    assert now.geography_snapshot_id == first.geography_snapshot_id
+    # CPI for 2025 is unavailable offline: trends say so rather than mixing vintages.
+    assert now.rings[1]['trends']['population_change']['reason'] == 'SOURCE_ERROR'

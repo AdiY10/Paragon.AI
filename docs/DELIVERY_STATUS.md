@@ -49,7 +49,7 @@
 - **PostGIS:** the test suite was not run on this machine. Run `make test-postgis` (or rely on the first deploy's migrations) before cutover.
 - **Overture data:** coarse categories; anchors depend on a curated brand list. Monthly diffs show "possible" closures that need verifying.
 - **County figures:** economy figures are county-level (Connecticut planning regions), not neighborhood-level.
-- **Trends:** use 2015–19 vs 2020–24. The 2021–25 ACS vintage (expected December 2026) is picked up automatically by `annual_sources_check`.
+- **Trends:** compare 2015–19 with the current ACS vintage. When the 2021–25 vintage is published (expected December 2026), `annual_sources_check` ingests it for every portfolio state and switches all properties together (`demographics/vintage.py`); percentiles never mix vintages.
 - **Tenant edits:** each edit advances the property's analysis version (existing tenant-domain behaviour), so sections recompute from cache. This is cheap, but Amit's agent may want to revisit it.
 - **Not built (P1):** email digest, FEMA flood overlay on the map, CSV export.
 - **Coordination:** Amit's agent has unpushed tenant API and seed work in a local stash. It should reconcile with `apps/insights/tenant_views.py` and `import_listing_tenants` rather than duplicate them.

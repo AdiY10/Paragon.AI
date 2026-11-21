@@ -96,7 +96,8 @@ def newest_acs_year(*, opener=None, today=None):
                 headers={'Range': 'bytes=0-63'})
             return candidate
         except SourceError as exc:
-            if exc.code != 'NOT_COVERED':
+            # Census answers 401/403 for staged, not-yet-public vintages and 404 for absent ones.
+            if exc.code != 'NOT_COVERED' and not (exc.code == 'HTTP_ERROR' and exc.detail in ('401', '403')):
                 raise
     return None
 
@@ -110,34 +111,32 @@ def refresh_annual(context, *, opener=None, acs_opener=None, **kwargs):
     """Monthly: new ACS vintage -> ingest and recompute demographics; then traffic and jobs (new HPMS/LODES years)."""
     from apps.demographics.service import ingest_acs, compute_for_location
     from apps.demographics.acs import LEGACY_YEAR
-    states = set()
-    for location in monitored():
-        from apps.demographics.management.commands.ingest_acs import FIPS, NEIGHBOURS
-        if location.state in FIPS:
-            states |= {FIPS[s] for s in [location.state, *NEIGHBOURS.get(location.state, [])] if s in FIPS}
+    from apps.demographics.vintage import required_states, current_acs_year
+    from apps.demographics.service import current_result
+    states = required_states()
     out = Outcome()
     year = newest_acs_year(opener=acs_opener)
-    new_vintage = False
-    if not getattr(settings, 'ACS_ROLLOVER_ENABLED', False) and year and year > 2024:
-        # Plan item 9: until vintage-aware code ships, never switch the portfolio to a new ACS vintage.
-        log.info('ACS %s is published; rollover is disabled (ACS_ROLLOVER_ENABLED=false)', year)
-        out.info['acs_rollover_pending'] = year
-        year = None
+    # Ingest every required state for the newest vintage once; the portfolio switches only
+    # when all of them are in (current_acs_year), never per screen.
     if year and states - ingested_acs_states(year):
+        context.heartbeat()
         ingest_acs(sorted(states - ingested_acs_states(year)), year=year, opener=acs_opener)
-        new_vintage = True
     if states - ingested_acs_states(LEGACY_YEAR):
         ingest_acs(sorted(states - ingested_acs_states(LEGACY_YEAR)), year=LEGACY_YEAR, opener=acs_opener)
-    if new_vintage:
-        for location in monitored():
-            context.heartbeat()
-            try:
-                compute_for_location(location.pk, year=year)
-                out.done += 1
-            except Exception as exc:
-                out.failed += 1
-                out.failures[str(location.pk)] = _code(exc)
-                log.warning('demographics refresh failed for location %s: %s', location.pk, _code(exc))
+    current = current_acs_year(states)
+    for location in monitored():
+        result = current_result(location)
+        if result is not None and result.acs_year == current:
+            continue
+        context.heartbeat()
+        try:
+            compute_for_location(location.pk, year=current)
+            out.done += 1
+        except Exception as exc:
+            out.failed += 1
+            out.failures[str(location.pk)] = _code(exc)
+            log.warning('demographics refresh failed for location %s: %s', location.pk, _code(exc))
+    year = current
     out.add(_each(context, ('traffic', 'jobs'), opener=opener, **kwargs))
     out.info['acs_year'] = year
     return out
