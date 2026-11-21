@@ -29,3 +29,8 @@ frontend/test-results/
 # iCloud/Finder sync duplicates (e.g. "acs 2.py") — never commit
 * 2.*
 * 2
+node_modules
+*.nosync/
+node_modules.old-icloud/
+.venv
+.venv.old-icloud/

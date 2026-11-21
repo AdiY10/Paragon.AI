@@ -42,6 +42,7 @@ import GeocodeDialog from "./GeocodeDialog";
 import TradeArea from "./TradeArea";
 import AreaSections from "./AreaSections";
 import SummaryPanel from "./Summary";
+import PropertyHeader, { SectionNav } from "./PropertyHeader";
 import ThisWeek from "./ThisWeek";
 import { ComparePage, CompareButton, ScreenBanner, ScreenPage } from "./Acquisitions";
 import TenantsPanel from "./Tenants";
@@ -815,18 +816,11 @@ function LocationPage({ id }: { id: string }) {
         Portfolio <ChevronRight size={14} /> Property record
       </a>
       <PageHead
-        eyebrow={`${item.city}, ${item.state}`}
+        eyebrow={`${item.city}, ${item.state} · ${titleCase(item.status)}`}
         title={item.name}
         description={item.address}
         action={
           <div className="actions">
-            <Badge tone={item.confirmed ? "green" : "amber"}>
-              {item.confirmed
-                ? "Confirmed"
-                : item.status === "owned"
-                  ? "Ownership unconfirmed"
-                  : "Record unconfirmed"}
-            </Badge>
             <CompareButton id={item.id} />
             <EditLocation location={item} />
           </div>
@@ -839,95 +833,96 @@ function LocationPage({ id }: { id: string }) {
       )}
       {confirm.error && <ErrorNotice error={confirm.error} />}
       <ScreenBanner location={item} />
-      <SummaryPanel location={item} />
-      <div className="location-columns">
-        <section className="panel">
-          <div className="section-heading">
-            <h2>Property record</h2>
-            <Building2 size={21} />
-          </div>
-          <dl className="facts">
-            <dt>Status</dt>
-            <dd>{titleCase(item.status)}</dd>
-            <dt>Asset type</dt>
-            <dd>{titleCase(item.asset_type)}</dd>
-            <dt>Trade-area rings</dt>
-            <dd>{item.ring_preset} miles</dd>
-            <dt>Gross leasable area</dt>
-            <dd>
-              {item.gla_sqft === null
-                ? "Not provided"
-                : `${item.gla_sqft.toLocaleString()} SF · User-provided`}
-            </dd>
-            <dt>Reference period</dt>
-            <dd>
-              {item.source_context.source_as_of
-                ? dateLabel(String(item.source_context.source_as_of))
-                : "User-maintained record"}
-            </dd>
-          </dl>
-          <RecordEvidence location={item} />
-          {!item.confirmed && (
-            <div className="confirm-box">
-              <ShieldCheck size={22} />
-              <div>
-                <strong>
-                  {item.status === "owned"
-                    ? "Is this still part of your portfolio?"
-                    : "Have you reviewed this record?"}
-                </strong>
-                <p>Confirm this record after reviewing its source.</p>
-                <button
-                  className="button small-button"
-                  disabled={confirm.isPending}
-                  onClick={() => confirm.mutate()}
-                >
-                  {confirm.isPending ? "Saving…" : "Confirm record"}
-                  <Check size={15} />
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
-        <section className="panel pin-panel">
-          <div className="section-heading">
-            <h2>Location reference</h2>
-            <MapPin size={21} />
-          </div>
-          <Suspense
-            fallback={<p className="notice">Loading interactive map…</p>}
-          >
-            <LocationMap locations={[item]} rings />
-          </Suspense>
-          <div className="pin-actions">
-            <GeocodeDialog location={item} />
-            <PinEditor location={item} />
-          </div>
-          <Badge>{titleCase(pin.method)}</Badge>
-          <p>
-            {pin.lat === null
-              ? "This property needs a pin."
-              : `${pin.lat.toFixed(6)}, ${pin.lon?.toFixed(6)}`}
-          </p>
-          <p className="small muted">
-            {pin.confirmed
-              ? "Pin confirmed by a team member."
-              : "Check that the pin is on the building before relying on location-based screening."}
-          </p>
-        </section>
+      <PropertyHeader location={item} />
+      {!item.confirmed && item.status === "owned" && (
+        <div className="confirm-strip" role="note">
+          <ShieldCheck size={18} />
+          <span>Is this still part of your portfolio?</span>
+          <button className="button small-button" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
+            {confirm.isPending ? "Saving…" : "Yes, confirm"} <Check size={15} />
+          </button>
+        </div>
+      )}
+      <SectionNav owned={item.status === "owned"} />
+      <div id="alerts" className="page-section" tabIndex={-1}>
+        <SummaryPanel location={item} />
       </div>
-      <TradeArea location={item} autoStart={item.screening} />
+      <div id="trade-area" className="page-section" tabIndex={-1}>
+        <TradeArea location={item} autoStart={item.screening} />
+      </div>
       <AreaSections location={item} autoStart={item.screening} />
-      <TenantsPanel location={item} isAdmin={session.data?.role === "admin"} />
+      {item.status === "owned" && (
+        <div id="tenants" className="page-section" tabIndex={-1}>
+          <TenantsPanel location={item} isAdmin={session.data?.role === "admin"} />
+        </div>
+      )}
       {item.notes && (
         <section className="panel notes">
           <h2>Team notes</h2>
           <p>{item.notes}</p>
-          <span className="source-note">
-            User-provided · details in change history
-          </span>
+          <span className="source-note">User-provided · details in change history</span>
         </section>
       )}
+      <details id="details" className="page-section property-details" tabIndex={-1}>
+        <summary>
+          <strong>Property record and map pin</strong>
+          <small>Status, source record, pin placement and change history</small>
+        </summary>
+        <div className="location-columns">
+          <section className="panel">
+            <div className="section-heading">
+              <h2>Property record</h2>
+              <Building2 size={21} />
+            </div>
+            <dl className="facts">
+              <dt>Status</dt>
+              <dd>{titleCase(item.status)}</dd>
+              <dt>Asset type</dt>
+              <dd>{titleCase(item.asset_type)}</dd>
+              <dt>Trade-area rings</dt>
+              <dd>{item.ring_preset} miles</dd>
+              <dt>Gross leasable area</dt>
+              <dd>
+                {item.gla_sqft === null ? "Not provided" : `${item.gla_sqft.toLocaleString()} SF · User-provided`}
+              </dd>
+              <dt>Reference period</dt>
+              <dd>
+                {item.source_context.source_as_of
+                  ? dateLabel(String(item.source_context.source_as_of))
+                  : "User-maintained record"}
+              </dd>
+            </dl>
+            <RecordEvidence location={item} />
+            {!item.confirmed && item.status !== "owned" && (
+              <button className="button small-button" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
+                {confirm.isPending ? "Saving…" : "Confirm record"} <Check size={15} />
+              </button>
+            )}
+          </section>
+          <section className="panel pin-panel">
+            <div className="section-heading">
+              <h2>Location reference</h2>
+              <MapPin size={21} />
+            </div>
+            <Suspense fallback={<p className="notice">Loading interactive map…</p>}>
+              <LocationMap locations={[item]} rings />
+            </Suspense>
+            <div className="pin-actions">
+              <GeocodeDialog location={item} />
+              <PinEditor location={item} />
+            </div>
+            <Badge>{titleCase(pin.method)}</Badge>
+            <p>
+              {pin.lat === null ? "This property needs a pin." : `${pin.lat.toFixed(6)}, ${pin.lon?.toFixed(6)}`}
+            </p>
+            <p className="small muted">
+              {pin.confirmed
+                ? "Pin confirmed by a team member."
+                : "Check that the pin is on the building before relying on location-based screening."}
+            </p>
+          </section>
+        </div>
+      </details>
     </>
   );
 }
