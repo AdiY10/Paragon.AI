@@ -48,6 +48,7 @@ class Brief(models.Model):
     since = models.DateTimeField(null=True, blank=True)
     items = models.JSONField(default=list)
     fyi = models.JSONField(default=list)
+    resolved = models.JSONField(default=list, blank=True)
     sources_updated = models.JSONField(default=list)
     stats = models.JSONField(default=dict)
 

@@ -38,8 +38,14 @@ def generate(*, kind='weekly', now=None):
         still_high = s.severity == 'High' and not new and not changed
         if new or changed or still_high:
             items.append({**serialize(s), 'flag': 'new' if new else 'changed' if changed else 'still_active'})
-    items = group_county_items(items)
+    items = group_by_subject(items)
     main = [i for i in items if i['severity'] in ('High', 'Watch')]
+    resolved = []
+    if since:
+        gone = (Signal.objects.filter(status__in=('resolved', 'expired'), last_changed_at__gt=since,
+            location__status='owned', severity__in=('High', 'Watch')).select_related('location'))
+        resolved = group_by_subject([{**serialize(s), 'flag': 'resolved', 'resolved_reason': s.resolved_reason}
+            for s in sorted(gone, key=rank_key)])
     fyi = [i for i in items if i['severity'] == 'FYI']
     properties = len({loc['id'] for i in main for loc in i['locations']})
     owned = active.values('location').distinct().count()
@@ -52,22 +58,25 @@ def generate(*, kind='weekly', now=None):
     else:
         title = 'No material changes this week'
     return Brief.objects.create(kind='baseline' if baseline else kind, title=title, since=since,
-        items=main, fyi=fyi, sources_updated=_sources_updated(since),
-        stats={'attention_items': len(main), 'fyi_items': len(fyi), 'properties_with_items': properties,
+        items=main, fyi=fyi, resolved=resolved, sources_updated=_sources_updated(since),
+        stats={'attention_items': len(main), 'fyi_items': len(fyi), 'resolved_items': len(resolved),
+            'properties_with_items': properties,
             'properties_with_active_signals': owned})
 
 
 COUNTY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'}
+SHARED_SUBJECT_RULES = COUNTY_RULES | {'SIG-09', 'SIG-10'}
 
 
-def group_county_items(items):
-    """County-level signals repeat for every property in the county; show them once, listing the properties."""
+def group_by_subject(items):
+    """One county figure, or one place near several properties, appears once with every property listed."""
     out, seen = [], {}
     for item in items:
         item = {**item, 'locations': [item['location']]}
-        key = (item['rule_id'], item['title']) if item['rule_id'] in COUNTY_RULES else None
+        key = (item['rule_id'], item.get('subject')) if item['rule_id'] in SHARED_SUBJECT_RULES and item.get('subject') else None
         if key and key in seen:
-            seen[key]['locations'].append(item['location'])
+            if item['location']['id'] not in {l['id'] for l in seen[key]['locations']}:
+                seen[key]['locations'].append(item['location'])
             continue
         if key:
             seen[key] = item
@@ -75,7 +84,10 @@ def group_county_items(items):
     return out
 
 
+group_county_items = group_by_subject  # backwards-compatible name
+
+
 def serialize_brief(b):
     return {'id': str(b.id), 'kind': b.kind, 'title': b.title, 'generated_at': b.generated_at.isoformat(),
-        'since': b.since.isoformat() if b.since else None, 'items': b.items, 'fyi': b.fyi,
+        'since': b.since.isoformat() if b.since else None, 'items': b.items, 'fyi': b.fyi, 'resolved': b.resolved,
         'sources_updated': b.sources_updated, 'stats': b.stats}
