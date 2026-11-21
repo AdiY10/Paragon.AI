@@ -1,3 +1,27 @@
+# Release 2.0 progress (2026-11-21)
+
+Plan approved 2026-11-21 (items 1-26). Merged, PRs #52-#67:
+
+| # | Item | Result on the 35-property preview |
+|---|---|---|
+| 1 | Observability | Job failure counts, operational alerts on Admin, logs without locations |
+| 2 | Security lockdown | Shared password local-only; proxied-IP throttle; 12 h / 14 d sessions; API throttles |
+| 3 | Cache freshness | No more endless refetching; newest content wins |
+| 4 | Job routing | Foreground cluster for screens/computes; renewable leases; one Overture scan at a time |
+| 5 | Alert identity | Stable subjects; dismissals survive new months; episodes |
+| 6, 15 | Closure de-noising | Closure alerts 94 -> 5 (two-release confirmation, brand-wide drops ignored) |
+| 7 | Flood | High only inside a FEMA high-risk zone (Cypress Lake); others Watch with distance |
+| 8 | Brief | 18 attention items; county figures grouped, not on property badges; resolved section |
+| 9 | ACS rollover | Ready for the December 2021-2025 release; switches all properties together |
+| 10 | Tenants | Edits no longer force recomputes; SEC mapping per brand |
+| 11 | Traffic | CVS-Graham uses NC-87 (21,000, not an I-85 ramp); 24 roads say "estimate carried forward" |
+| 12 | Small fixes | Brand matching, labels, duplicate concerns |
+| 13 | Snapshot table | Summary 84 -> 15 queries, list 44 -> 9, compare 92 -> 17 |
+| 14 | Overture storage | 1,324 MB -> 77 MB; full recompute peaks ~400 MB RAM |
+| 16 | Ingestion | One-pass ACS, LODES parsed once, SEC stored only on change |
+
+Remaining before deploy: items 17-23 (executive UX), then 24-26 (droplet, backups, go-live).
+
 # Delivery status: Release 1 (2026-11-19)
 
 ## Done (merged to `main`, PRs #43–#50)
