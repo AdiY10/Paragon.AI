@@ -2229,3 +2229,82 @@ th {
 .tenant-form input[name="name"] {
   flex: 1 1 220px;
 }
+
+/* ---- R2.17 home: brief first, then portfolio health ---- */
+.brief h1 {
+  font-size: 30px;
+  letter-spacing: -1px;
+  margin: 4px 0 8px;
+}
+.health-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+.health-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf5;
+}
+.health-tile strong {
+  font-size: 28px;
+  line-height: 1;
+}
+.health-tile span {
+  font-size: 14px;
+  color: var(--muted);
+}
+.health-tile.high {
+  border-color: #e4b9aa;
+  background: #fbf0eb;
+}
+.health-tile.watch {
+  border-color: #e3d3a8;
+  background: #faf5e8;
+}
+.health-tile:hover {
+  border-color: var(--pine);
+}
+.flagged-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.flagged-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #eceee7;
+  font-size: 15px;
+}
+.flagged-list a {
+  font-weight: 600;
+}
+.flagged-list a:hover {
+  text-decoration: underline;
+}
+.flagged-list small {
+  color: var(--muted);
+  font-size: 13px;
+  margin-left: auto;
+}
+.setup-note h2 {
+  font-size: 17px;
+}
+.setup-note p {
+  font-size: 14px;
+}
+@media (max-width: 640px) {
+  .brief h1 {
+    font-size: 24px;
+  }
+  .health-strip {
+    grid-template-columns: 1fr;
+  }
+}

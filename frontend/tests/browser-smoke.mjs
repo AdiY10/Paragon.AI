@@ -44,9 +44,10 @@ try {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(base);
     await page
-      .getByRole("heading", { name: "Your portfolio, in focus." })
+      .getByRole("heading", { level: 1 })
+      .first()
       .waitFor();
-    await page.getByText("36", { exact: true }).first().waitFor();
+    await page.getByText("PORTFOLIO HEALTH", { exact: true }).waitFor();
     if (
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
