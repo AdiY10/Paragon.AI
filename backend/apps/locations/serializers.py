@@ -17,11 +17,24 @@ class RevisionSerializer(serializers.ModelSerializer):
 class LocationSerializer(serializers.ModelSerializer):
     current_revision=RevisionSerializer(read_only=True)
     attention=serializers.SerializerMethodField()
+    key_numbers=serializers.SerializerMethodField()
+    unconfirmed_tenants=serializers.SerializerMethodField()
     class Meta:
         model=Location
         fields=['id','seed_id','name','address','city','state','status','asset_type','ring_preset',
             'gla_sqft','notes','confirmed','confirmed_at','origin','source_url','source_context',
-            'version','analysis_version','current_revision','created_at','updated_at','attention','screening']
+            'version','analysis_version','current_revision','created_at','updated_at','attention','screening',
+            'key_numbers','unconfirmed_tenants']
+    def get_key_numbers(self,obj):
+        # From the LocationMetrics snapshot (prefetched in lists); never computed here.
+        from django.core.exceptions import ObjectDoesNotExist
+        try:row=obj.metrics_snapshot
+        except ObjectDoesNotExist:return {}
+        if row.analysis_version!=obj.analysis_version:return {}
+        return {k:(row.values.get(k) or {}).get('value') for k in ('population','median_household_income','aadt')
+            if (row.values.get(k) or {}).get('value') is not None}
+    def get_unconfirmed_tenants(self,obj):
+        return getattr(obj,'unconfirmed_tenant_count',None)
     def get_attention(self,obj):
         # FR-20: highest active signal severity (High, Watch) or Clear.
         from apps.insights.signals import cached_attention

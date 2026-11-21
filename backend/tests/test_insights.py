@@ -129,3 +129,20 @@ def test_snapshot_follows_reviews_and_pin_moves(client):
     from apps.locations.service import change_pin
     loc = change_pin(location_id=loc.pk, expected_version=loc.version, lat=41.5, lon=-73, actor=None)
     assert cached_attention(loc) in ('High', 'Watch', 'Clear')  # stale row ignored, recomputed live
+
+
+def test_location_list_carries_key_numbers_and_unconfirmed_tenants(client):
+    import uuid
+    from backend.tests.test_accounts import member
+    from apps.insights.metrics import refresh_snapshot
+    from apps.locations import tenants as svc
+    loc = make_owned(1)[0]
+    user, _ = member()
+    client.force_login(user)
+    svc.create_tenant(location_id=loc.pk, name='Stop & Shop', request_key=uuid.uuid4(), actor=user)
+    from apps.insights import metrics as mm
+    import unittest.mock as um
+    with um.patch.object(mm, 'extract', lambda location, fresh=False: {'population': {'value': 41000}, 'aadt': {'value': 18000}}):
+        refresh_snapshot(loc)
+    row = next(r for r in client.get('/api/locations/').json()['results'] if r['id'] == str(loc.pk))
+    assert row['key_numbers'] == {'population': 41000, 'aadt': 18000} and row['unconfirmed_tenants'] == 1

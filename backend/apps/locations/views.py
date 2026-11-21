@@ -31,7 +31,9 @@ def locations(request):
 
 
 def listed_locations(request,filters):
-    queryset=Location.objects.select_related('current_revision','metrics_snapshot')
+    from django.db.models import Count
+    queryset=(Location.objects.select_related('current_revision','metrics_snapshot')
+        .annotate(unconfirmed_tenant_count=Count('tenants',filter=Q(tenants__confirmed=False,tenants__archived=False))))
     if filters.get('screening')!='include':queryset=queryset.filter(screening=False)
     status=filters.get('status')
     if status is None:queryset=queryset.exclude(status='archived')

@@ -40,6 +40,8 @@ export interface Location {
   updated_at: string;
   attention?: "High" | "Watch" | "Clear";
   screening?: boolean;
+  key_numbers?: { population?: number; median_household_income?: number; aadt?: number };
+  unconfirmed_tenants?: number | null;
 }
 export interface Page<T> {
   count: number;
