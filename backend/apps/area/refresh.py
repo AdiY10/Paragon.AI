@@ -4,13 +4,35 @@ Each handler is idempotent: section rows are keyed by their input snapshots, so 
 run that finds no newer source period stores nothing new. Per-location failures are
 counted and skipped; one bad location never stops the batch.
 """
-from django.db.models import Q
+from dataclasses import dataclass, field
+import logging
+from django.conf import settings
 from apps.locations.models import Location
 from apps.sources.models import SourceSnapshot
 from .http import SourceError, fetch
 from . import overture
 
 MONITORED_STATUSES = ('owned', 'candidate')
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class Outcome:
+    """What a refresh did: done/failed location counts, failure codes by location id, extra info."""
+    done: int = 0
+    failed: int = 0
+    failures: dict = field(default_factory=dict)
+    info: dict = field(default_factory=dict)
+
+    def add(self, other):
+        self.done += other.done
+        self.failed += other.failed
+        self.failures.update(other.failures)
+        return self
+
+
+def _code(exc):
+    return getattr(exc, 'code', None) or type(exc).__name__
 
 
 def monitored():
@@ -24,15 +46,17 @@ def monitored():
 
 def _each(context, sections, **kwargs):
     from .service import compute_area
-    done = failed = 0
+    out = Outcome()
     for location in monitored():
         context.heartbeat()
         try:
             compute_area(location.pk, sections=sections, **kwargs)
-            done += 1
-        except Exception:
-            failed += 1
-    return done, failed
+            out.done += 1
+        except Exception as exc:
+            out.failed += 1
+            out.failures[str(location.pk)] = _code(exc)
+            log.warning('refresh %s failed for location %s: %s', '+'.join(sections), location.pk, _code(exc))
+    return out
 
 
 def refresh_economy(context, **kwargs):
@@ -49,7 +73,9 @@ def refresh_businesses(context, *, opener=None, **kwargs):
     except SourceError as exc:
         note_check('SRC-13', 'releases', error=exc.code)
         raise
-    return _each(context, ('businesses',), opener=opener, **kwargs) + (releases[-1],)
+    out = _each(context, ('businesses',), opener=opener, **kwargs)
+    out.info['release'] = releases[-1]
+    return out
 
 
 def refresh_hazards(context, **kwargs):
@@ -82,28 +108,36 @@ def ingested_acs_states(year):
 
 def refresh_annual(context, *, opener=None, acs_opener=None, **kwargs):
     """Monthly: new ACS vintage -> ingest and recompute demographics; then traffic and jobs (new HPMS/LODES years)."""
-    from apps.demographics.service import ingest_acs, compute_for_location, DemographicsUnavailable
+    from apps.demographics.service import ingest_acs, compute_for_location
     from apps.demographics.acs import LEGACY_YEAR
     states = set()
     for location in monitored():
         from apps.demographics.management.commands.ingest_acs import FIPS, NEIGHBOURS
         if location.state in FIPS:
             states |= {FIPS[s] for s in [location.state, *NEIGHBOURS.get(location.state, [])] if s in FIPS}
+    out = Outcome()
     year = newest_acs_year(opener=acs_opener)
     new_vintage = False
+    if not getattr(settings, 'ACS_ROLLOVER_ENABLED', False) and year and year > 2024:
+        # Plan item 9: until vintage-aware code ships, never switch the portfolio to a new ACS vintage.
+        log.info('ACS %s is published; rollover is disabled (ACS_ROLLOVER_ENABLED=false)', year)
+        out.info['acs_rollover_pending'] = year
+        year = None
     if year and states - ingested_acs_states(year):
         ingest_acs(sorted(states - ingested_acs_states(year)), year=year, opener=acs_opener)
         new_vintage = True
     if states - ingested_acs_states(LEGACY_YEAR):
         ingest_acs(sorted(states - ingested_acs_states(LEGACY_YEAR)), year=LEGACY_YEAR, opener=acs_opener)
-    demographics = 0
     if new_vintage:
         for location in monitored():
             context.heartbeat()
             try:
                 compute_for_location(location.pk, year=year)
-                demographics += 1
-            except (DemographicsUnavailable, Exception):
-                pass
-    done, failed = _each(context, ('traffic', 'jobs'), opener=opener, **kwargs)
-    return done, failed, demographics, year
+                out.done += 1
+            except Exception as exc:
+                out.failed += 1
+                out.failures[str(location.pk)] = _code(exc)
+                log.warning('demographics refresh failed for location %s: %s', location.pk, _code(exc))
+    out.add(_each(context, ('traffic', 'jobs'), opener=opener, **kwargs))
+    out.info['acs_year'] = year
+    return out

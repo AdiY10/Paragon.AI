@@ -31,6 +31,8 @@ class JobRun(models.Model):
     recovery_count=models.PositiveSmallIntegerField(default=0)
     last_recovered_at=models.DateTimeField(null=True)
     records=models.PositiveBigIntegerField(default=0)
+    failed_items=models.PositiveIntegerField(default=0)
+    detail=models.JSONField(default=dict,blank=True)
     error_code=models.CharField(max_length=32,blank=True)
     class Meta:
         ordering=['-created_at','id']
@@ -82,3 +84,16 @@ class JobRecoveryEvent(models.Model):
     replacement_task_id=models.CharField(max_length=64,blank=True)
     class Meta:
         ordering=['recorded_at','id']
+
+
+class AlertEvent(models.Model):
+    """An operational problem an administrator should see (failing job or source). One row per key."""
+    key=models.CharField(primary_key=True,max_length=200)
+    summary=models.CharField(max_length=300)
+    count=models.PositiveIntegerField(default=1)
+    first_at=models.DateTimeField()
+    last_at=models.DateTimeField()
+    notified_at=models.DateTimeField(null=True,blank=True)
+    resolved_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['-last_at']

@@ -44,12 +44,16 @@ def compute_area_profile(context,parameters):
     except SourceError as exc:
         raise JobFailure('NOT_CONFIGURED' if exc.code=='NOT_PROVIDED' else 'SOURCE_ERROR',
             retryable=exc.code!='NOT_PROVIDED') from None
-    return JobResult(records=len(rows))
+    unavailable={r.section:r.data.get('reason','UNAVAILABLE') for r in rows if r.status!='available'}
+    return JobResult(records=len(rows)-len(unavailable),failed=len(unavailable),detail=unavailable)
 
 def _refresh(fn):
     def handler(context,parameters):
-        result=fn(context)
-        return JobResult(records=result[0])
+        from .contracts import JobFailure
+        out=fn(context)
+        if out.done==0 and out.failed>0:
+            raise JobFailure('SOURCE_ERROR')  # every location failed: a terminal failure, alerted on repeat
+        return JobResult(records=out.done,failed=out.failed,detail=dict(list(out.failures.items())[:50]))
     return handler
 
 
@@ -91,7 +95,9 @@ def sec_daily(context,parameters):
         fetched,failed=refresh_all(context)
     except SourceError as exc:
         raise JobFailure(exc.code if exc.code in JobFailure.CODES else 'SOURCE_ERROR',retryable=exc.code!='NOT_CONFIGURED') from None
-    return JobResult(records=fetched)
+    if fetched==0 and failed>0:
+        raise JobFailure('SOURCE_ERROR')
+    return JobResult(records=fetched,failed=failed)
 
 # Only code-defined handlers are executable. No API accepts arbitrary Python paths.
 REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,'paragon-maintenance',1800),

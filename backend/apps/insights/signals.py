@@ -213,11 +213,13 @@ def evaluate(location, *, today=None):
 
 
 def safe_evaluate(location_id):
-    """Called after section computations; never breaks them."""
+    """Called after section computations; never breaks them, but always logs failures."""
+    import logging
     from apps.locations.models import Location
     try:
         return evaluate(Location.objects.get(pk=location_id))
     except Exception:
+        logging.getLogger(__name__).exception('signal evaluation failed for location %s', location_id)
         return None
 
 

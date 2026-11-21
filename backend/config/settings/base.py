@@ -107,6 +107,25 @@ Q_CLUSTER = {
     }},
 }
 
+# Structured logs to stdout (collected by the container runtime). Log ids and codes only,
+# never addresses, coordinates or cache scopes: candidate sites are confidential.
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {'plain': {'format': '%(asctime)s %(levelname)s %(name)s %(message)s'}},
+    'handlers': {'stdout': {'class': 'logging.StreamHandler', 'stream': 'ext://sys.stdout', 'formatter': 'plain'}},
+    'loggers': {
+        'apps': {'handlers': ['stdout'], 'level': LOG_LEVEL, 'propagate': False},
+        'django.request': {'handlers': ['stdout'], 'level': 'ERROR', 'propagate': False},
+        'django_q': {'handlers': ['stdout'], 'level': 'INFO', 'propagate': False},
+    },
+}
+# Operational alerts are always shown in-app; email is sent only when both are configured.
+ALERT_EMAILS = [e.strip() for e in os.environ.get('ALERT_EMAILS', '').split(',') if e.strip()]
+# The ACS 2021-2025 rollover stays off until the vintage-aware code ships (plan item 9).
+ACS_ROLLOVER_ENABLED = os.environ.get('ACS_ROLLOVER_ENABLED', 'false').lower() == 'true'
+
 # Public raster endpoint; never place a private provider credential here.
 MAP_TILE_URL = os.environ.get('MAP_TILE_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
 # Raster provider policy requires a Referer; send only our origin cross-origin.

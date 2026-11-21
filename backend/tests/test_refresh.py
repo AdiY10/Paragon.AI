@@ -46,10 +46,11 @@ def test_handlers_recompute_each_monitored_location_and_survive_failures(monkeyp
             raise SourceError('SOURCE_ERROR')
         return []
     monkeypatch.setattr('apps.area.service.compute_area', fake)
-    assert refresh.refresh_economy(Ctx()) == (1, 1)
+    out = refresh.refresh_economy(Ctx())
+    assert (out.done, out.failed) == (1, 1) and list(out.failures.values()) == ['SOURCE_ERROR']
     assert calls == [('economy',), ('economy',)]
     calls.clear()
-    assert refresh.refresh_hazards(Ctx())[0] == 1 and calls[0] == ('hazards',)
+    assert refresh.refresh_hazards(Ctx()).done == 1 and calls[0] == ('hazards',)
 
 
 class Probe:
@@ -87,7 +88,8 @@ def test_overture_check_records_release_health(monkeypatch):
     locations()
     monkeypatch.setattr(refresh.overture, 'available_releases', lambda opener=None: ['2026-10-21.0', '2026-11-18.0'])
     monkeypatch.setattr('apps.area.service.compute_area', lambda *a, **k: [])
-    assert refresh.refresh_businesses(Ctx()) == (2, 0, '2026-11-18.0')
+    out = refresh.refresh_businesses(Ctx())
+    assert (out.done, out.failed, out.info['release']) == (2, 0, '2026-11-18.0')
     assert SourceHealth.objects.get(source_id='SRC-13', scope='releases').last_success_at is not None
 
 
