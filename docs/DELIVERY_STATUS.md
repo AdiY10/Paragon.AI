@@ -19,8 +19,17 @@ Plan approved 2026-11-21 (items 1-26). Merged, PRs #52-#67:
 | 13 | Snapshot table | Summary 84 -> 15 queries, list 44 -> 9, compare 92 -> 17 |
 | 14 | Overture storage | 1,324 MB -> 77 MB; full recompute peaks ~400 MB RAM |
 | 16 | Ingestion | One-pass ACS, LODES parsed once, SEC stored only on change |
+| 17 | Home is the brief | Headline, attention items, resolved, portfolio health tiles |
+| 18 | Property page | Key-facts strip, sticky section menu, FR-08 order |
+| 19 | Readability | Text 12 px minimum (body 14 px); colour tokens; amber/red only for attention |
+| 20 | Act on alerts | Plain-English evidence, review / dismiss / reopen / useful?, All alerts page |
+| 21 | Refresh flow | One timer-based flow; "worker slow" message stays; summary refreshes itself |
+| 22 | Onboarding | "Confirm your portfolio": bulk confirm/archive with undo; key numbers on cards |
+| 23 | Accessibility | Focus and title on route change, skip map, WCAG 2.2 AA clean at 1280/375 px; main.tsx split |
 
-Remaining before deploy: items 17-23 (executive UX), then 24-26 (droplet, backups, go-live).
+Remaining: items 24-26 (DigitalOcean droplet stack, backups, go-live), which need the
+droplet's IP and SSH access, off-box backup storage, the SEC contact email and the users'
+emails from Adi.
 
 # Delivery status: Release 1 (2026-11-19)
 
