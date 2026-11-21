@@ -167,7 +167,7 @@ function Sources({ sources, computedAt }: { sources: SourceRef[]; computedAt?: s
             <a href={s.url} target="_blank" rel="noreferrer">
               {s.name}
             </a>{" "}
-            · {monthLabel(s.period)} · retrieved {dateLabel(s.retrieved_at)}
+            · {monthLabel(s.period)} · checked {dateLabel(s.checked_at ?? s.retrieved_at)}
             {s.stale && <span className="badge amber"> Stale</span>}
           </li>
         ))}

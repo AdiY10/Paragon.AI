@@ -7,6 +7,7 @@ export interface SourceRef {
   url: string;
   period: string;
   retrieved_at: string;
+  checked_at?: string;
   stale?: boolean;
   stale_reason?: string;
 }

@@ -96,3 +96,34 @@ def test_overture_check_records_release_health(monkeypatch):
 def test_scheduled_handlers_are_registered_for_schedules():
     from apps.operations.registry import REGISTRY
     assert {'bls_bps_check', 'overture_check', 'flood_recheck', 'annual_sources_check'} <= set(REGISTRY)
+
+
+def test_unchanged_refetch_counts_as_fresh_and_newest_content_wins(tmp_path, settings, monkeypatch):
+    """R2 item 3: content-addressed snapshots keep their first retrieved_at; freshness uses the last check."""
+    from datetime import timedelta
+    from django.utils import timezone
+    from apps.area.service import Run
+    from apps.sources.catalog import sync_catalog
+    from apps.sources.storage import LocalArtifactStore
+    sync_catalog()
+    store = LocalArtifactStore(tmp_path)
+    calls = []
+
+    def fetcher(body):
+        def f():
+            calls.append(body)
+            return body, 'https://example.gov', 'r', '2025'
+        return f
+    run = Run(store, None)
+    raw, first = run.cached('SRC-04', 'county:test', 30, fetcher(b'A'))
+    real_now = timezone.now
+    monkeypatch.setattr(timezone, 'now', lambda: real_now() + timedelta(days=60))
+    Run(store, None).cached('SRC-04', 'county:test', 30, fetcher(b'A'))  # stale by snapshot date: refetch
+    assert calls == [b'A', b'A']
+    Run(store, None).cached('SRC-04', 'county:test', 30, fetcher(b'A'))  # fresh by last check: no refetch
+    assert calls == [b'A', b'A']
+    # A -> B -> A: the newest check's content is served.
+    Run(store, None).cached('SRC-04', 'county:test', 0, fetcher(b'B'))
+    raw, snap = Run(store, None).cached('SRC-04', 'county:test', 0, fetcher(b'A'))
+    raw, snap = Run(store, None).cached('SRC-04', 'county:test', None, fetcher(b'Z'))
+    assert raw == b'A' and snap.pk == first.pk and calls[-1] == b'A'

@@ -413,6 +413,8 @@ def test_fetches_record_health_and_failures_fall_back_to_last_good(tmp_path, cli
     with connection.cursor() as cur:
         cur.execute('UPDATE sources_sourcesnapshot SET retrieved_at=%s WHERE source_id=%s',
             [timezone.now() - timedelta(days=30), 'SRC-07'])
+        cur.execute('UPDATE sources_sourcehealth SET last_success_at=%s, last_checked_at=%s WHERE source_id=%s',
+            [timezone.now() - timedelta(days=30), timezone.now() - timedelta(days=30), 'SRC-07'])
 
     class Down(FixtureOpener):
         def open(self, request, timeout=None):
