@@ -1,0 +1,84 @@
+# Paragon Radar on one DigitalOcean droplet (2 GB): app + Postgres + Caddy (R2 item 24).
+# Run from /srv/paragon:  docker compose -f infra/compose.yaml up -d --build
+# Secrets live in /etc/paragon/app.env (mode 0600), never in this repository.
+name: paragon
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paragon
+      POSTGRES_USER: paragon
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    # Tuned for a 2 GB box shared with the app; no published port (internal network only).
+    command: >
+      postgres -c shared_buffers=128MB -c effective_cache_size=384MB -c work_mem=8MB
+      -c maintenance_work_mem=64MB -c max_connections=40 -c wal_compression=on
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paragon -d paragon"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 384m
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "infra/start_all.py"]
+    env_file: /etc/paragon/app.env
+    environment:
+      RUN_BACKGROUND_WORKERS: "true"
+      SOURCE_ARTIFACT_ROOT: /app/var/artifacts
+      TRUST_PROXY_SSL_HEADER: "true"
+      TRUSTED_PROXY_COUNT: "1"
+      WEB_CONCURRENCY: "2"
+      OVERTURE_MEMORY_LIMIT: 512MB
+      PASSWORD_ACCESS_ENABLED: "true"
+    volumes:
+      - appdata:/app/var
+      - /srv/paragon/overture-archive:/app/var/overture-archive:ro
+    # Reachable only by Caddy, and by SSH tunnel on the droplet's loopback for checks.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    mem_limit: 1300m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["web"]  # started once a domain points at the droplet
+    environment:
+      PARAGON_DOMAIN: ${PARAGON_DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+    mem_limit: 128m
+
+secrets:
+  db_password:
+    file: /etc/paragon/db_password
+
+volumes:
+  pgdata:
+  appdata:
+  caddy_data:
+  caddy_config:

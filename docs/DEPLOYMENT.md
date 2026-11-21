@@ -1,3 +1,37 @@
+# DigitalOcean droplet runbook (Release 2.0, items 24-26)
+
+**Host:** one Ubuntu 24.04 droplet (2 GB RAM, 1 vCPU, 50 GB), SFO2. The DigitalOcean Cloud
+Firewall allows SSH only from Adi's IP, plus HTTP/HTTPS from anywhere. Hardening: 2 GB
+swap (swappiness 10), unattended security upgrades, fail2ban, key-only SSH, Docker log
+rotation (10 MB x 3).
+
+**Stack** (`infra/compose.yaml`, run from `/srv/paragon/app`):
+- `db`: Postgres 17, tuned for 2 GB, no published port, volume `pgdata`.
+- `app`: the Django image running `infra/start_all.py` (Gunicorn, both job clusters,
+  scheduler); bound to `127.0.0.1:8000` only; volume `appdata` at `/app/var`; the
+  Overture archive mounted read-only from `/srv/paragon/overture-archive`.
+- `caddy` (profile `web`): automatic HTTPS for `PARAGON_DOMAIN`, HSTS, CSP,
+  Permissions-Policy; the only service with public ports.
+
+**Secrets** stay on the droplet in `/etc/paragon` (mode 600), never in Git:
+`app.env` (Django secret, database URL, allowed hosts, SEC contact), `db_password`,
+`backup.env` (B2 keys, optional healthchecks.io URL), `compose.env` (`PARAGON_DOMAIN`).
+
+**Deploy / update** (from the Mac):
+```sh
+COPYFILE_DISABLE=1 git ls-files -co --exclude-standard -z | tar --null -T - -czf /tmp/src.tgz
+scp -i ~/.ssh/paragon_droplet /tmp/src.tgz root@DROPLET:/root/
+ssh -i ~/.ssh/paragon_droplet root@DROPLET 'cd /srv/paragon && rm -rf app.new && mkdir app.new && tar -xzf /root/src.tgz -C app.new && rm -rf app.old && mv app app.old && mv app.new app && cd app && docker compose -f infra/compose.yaml --env-file /etc/paragon/compose.env --profile web up -d --build'
+```
+
+**Backups** (`infra/backup.sh`, systemd `paragon-backup.timer`, 07:00 UTC daily): pg_dump
+plus the app volume, copied to Backblaze B2 with rclone, 14 days kept; the Overture
+archive is copied off-box once. `infra/backup.sh --restore-check` restores the newest dump
+into a scratch database and counts locations. DigitalOcean droplet backups are an
+optional second layer.
+
+---
+
 # Release 1 runbook (added 2026-11-19, batch D)
 
 **Status:** everything needed to run Release 1 on a regular host is in `main`, and the full local verification is in `docs/TEST_REPORT.md`. **Nothing has been provisioned.** Hosting needs Adi's decision and approval (below).
