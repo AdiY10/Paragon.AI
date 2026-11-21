@@ -19,6 +19,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
   Activity,
   ArrowRight,
+  Bell,
   ArrowUpRight,
   Building2,
   Check,
@@ -44,6 +45,7 @@ import AreaSections from "./AreaSections";
 import SummaryPanel from "./Summary";
 import PropertyHeader, { SectionNav } from "./PropertyHeader";
 import ThisWeek from "./ThisWeek";
+import AlertsPage from "./Alerts";
 import { ComparePage, CompareButton, ScreenBanner, ScreenPage } from "./Acquisitions";
 import TenantsPanel from "./Tenants";
 import { ApiError, api, allLocations, csrfToken, dateLabel } from "./api";
@@ -323,6 +325,7 @@ function App() {
     );
   const nav: [string, string, typeof Activity][] = [
     ["/", "This Week", Activity],
+    ["/alerts", "Alerts", Bell],
     ["/portfolio", "Portfolio", Building2],
     ["/screen", "Screen", Compass],
     ["/compare", "Compare", Layers3],
@@ -359,6 +362,7 @@ function App() {
       </>
     );
   else if (route === "/compare") body = <ComparePage />;
+  else if (route === "/alerts") body = <AlertsPage />;
   else if (route === "/admin")
     body =
       session.data.role === "admin" ? (

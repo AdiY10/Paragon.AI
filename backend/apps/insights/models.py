@@ -28,6 +28,9 @@ class Signal(models.Model):
     analysis_version = models.PositiveIntegerField()
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     review_note = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    # "Was this useful?" from the reviewer: tunes thresholds later (R2 item 20).
+    feedback = models.CharField(max_length=12, blank=True, choices=[('useful', 'Useful'), ('not_useful', 'Not useful')])
     # Evidence when the current episode began, and how many times the condition has (re)appeared.
     first_evidence = models.JSONField(default=dict, blank=True)
     episode = models.PositiveIntegerField(default=1)

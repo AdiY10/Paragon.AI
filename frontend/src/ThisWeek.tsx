@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Dialog from "@radix-ui/react-dialog";
-import { Activity, RefreshCw, X } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
+import { AlertEvidence } from "./AlertDetails";
 import { api, dateLabel } from "./api";
 import { severityTone } from "./Summary";
 
@@ -188,53 +188,9 @@ function BriefRow({ item }: { item: BriefItem }) {
           · {flagLabel(item.flag)} · {item.period}
         </small>
         <small>{item.why}</small>
-        <Evidence item={item} />
+        <AlertEvidence alert={item} />
       </div>
     </li>
   );
 }
 
-function Evidence({ item }: { item: BriefItem }) {
-  const link = item.evidence.source_link as string | undefined;
-  return (
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
-        <button className="text-button small">Evidence</button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="overlay" />
-        <Dialog.Content className="drawer">
-          <div className="drawer-head">
-            <Dialog.Title>{item.title}</Dialog.Title>
-            <Dialog.Close className="icon-button" aria-label="Close evidence">
-              <X />
-            </Dialog.Close>
-          </div>
-          <Dialog.Description className="muted">
-            Rule {item.rule_id} · {item.location.name}
-          </Dialog.Description>
-          <p>{item.why}</p>
-          <dl className="facts">
-            <dt>Severity</dt>
-            <dd>{item.severity}</dd>
-            <dt>Data period</dt>
-            <dd>{item.period}</dd>
-            {Object.entries(item.evidence)
-              .filter(([k, v]) => k !== "source_link" && v !== null && typeof v !== "object")
-              .map(([k, v]) => (
-                <div key={k} style={{ display: "contents" }}>
-                  <dt>{k.replaceAll("_", " ")}</dt>
-                  <dd>{String(v)}</dd>
-                </div>
-              ))}
-          </dl>
-          {link && (
-            <a className="text-button" href={link} target="_blank" rel="noreferrer">
-              Open the source
-            </a>
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}

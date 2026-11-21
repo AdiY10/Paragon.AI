@@ -315,6 +315,8 @@ def serialize(s):
         'status': s.status, 'detected_at': s.first_detected_at.isoformat(), 'changed_at': s.last_changed_at.isoformat(),
         'episode': s.episode, 'episode_started_at': (s.episode_started_at or s.first_detected_at).isoformat(),
         'first_evidence': s.first_evidence, 'subject': s.subject,
+        'reviewed': s.reviewed_by_id is not None, 'reviewed_at': s.reviewed_at.isoformat() if s.reviewed_at else None,
+        'review_note': s.review_note, 'feedback': s.feedback, 'resolved_reason': s.resolved_reason,
         'location': {'id': str(s.location_id), 'name': s.location.name, 'city': s.location.city, 'state': s.location.state}}
 
 

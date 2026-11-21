@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Gauge } from "lucide-react";
 import { api } from "./api";
+import { AlertEvidence } from "./AlertDetails";
 import type { Location } from "./types";
 
 export interface SummaryMetric {
@@ -106,6 +107,7 @@ export default function SummaryPanel({ location }: { location: Location }) {
               <div>
                 <strong>{s.title}</strong>
                 <small>{s.why}</small>
+                <AlertEvidence alert={{ ...s, location: { id: location.id, name: location.name } }} />
               </div>
             </li>
           ))}
