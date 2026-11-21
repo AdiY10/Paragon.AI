@@ -105,11 +105,12 @@ if os.environ.get('GDAL_LIBRARY_PATH'):
 
 Q_CLUSTER = {
     'name': 'paragon-maintenance', 'orm': 'default', 'workers': 1,
-    'timeout': 1800, 'retry': 2100, 'max_attempts': 3,
+    # retry must exceed timeout, or django-q re-delivers a task that is still running.
+    'timeout': 7200, 'retry': 7500, 'max_attempts': 3,
     'queue_limit': 1, 'bulk': 1, 'poll': 1, 'save_limit': 250,
     'scheduler': False, 'catch_up': False,
     'ALT_CLUSTERS': {'paragon-foreground': {
-        'workers': 2, 'timeout': 90, 'retry': 150, 'queue_limit': 2,
+        'workers': 2, 'timeout': 1200, 'retry': 1500, 'queue_limit': 2,
     }},
 }
 

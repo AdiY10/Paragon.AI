@@ -50,6 +50,16 @@ def capture(lat, lon, release, radius=3.0):
         raise SourceError('SCHEMA_ERROR', 'invalid release')
     ext = Path(settings.SOURCE_ARTIFACT_ROOT).parent / 'duckdb-extensions'
     ext.mkdir(parents=True, exist_ok=True)
+    from .locks import overture_capture_lock
+    with overture_capture_lock():
+        rows = _scan(duckdb, ext, lat, lon, release, radius)
+    records = [dict(zip(COLUMNS, r)) for r in rows]
+    records = [r for r in records if haversine_miles(lat, lon, r['lat'], r['lon']) <= radius]
+    records.sort(key=lambda r: r['id'])
+    return json.dumps(records, sort_keys=True, default=str).encode()
+
+
+def _scan(duckdb, ext, lat, lon, release, radius):
     con = duckdb.connect(config={'extension_directory': str(ext)})
     try:
         con.execute("INSTALL httpfs; LOAD httpfs; INSTALL spatial; LOAD spatial;")
@@ -69,7 +79,4 @@ def capture(lat, lon, release, radius=3.0):
         raise SourceError('SOURCE_ERROR', type(exc).__name__) from None
     finally:
         con.close()
-    records = [dict(zip(COLUMNS, r)) for r in rows]
-    records = [r for r in records if haversine_miles(lat, lon, r['lat'], r['lon']) <= radius]
-    records.sort(key=lambda r: r['id'])
-    return json.dumps(records, sort_keys=True, default=str).encode()
+    return rows

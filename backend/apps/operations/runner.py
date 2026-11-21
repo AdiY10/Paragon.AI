@@ -14,9 +14,12 @@ log=logging.getLogger(__name__)
 class JobContext:
     job_id: uuid.UUID
     attempt_token: uuid.UUID
+    lease_seconds: int=600
     def heartbeat(self):
+        """Renew the lease; a fenced (recovered) attempt stops here instead of running twice."""
+        now=timezone.now()
         updated=JobRun.objects.filter(pk=self.job_id,attempt_token=self.attempt_token,
-            status=JobRun.Status.RUNNING).update(heartbeat_at=timezone.now())
+            status=JobRun.Status.RUNNING).update(heartbeat_at=now,lease_expires_at=now+timedelta(seconds=self.lease_seconds))
         if not updated:
             raise JobFailure('SOURCE_ERROR',retryable=False)
 
@@ -40,10 +43,10 @@ def execute_job(job_id):
             return {'status':job.status}
         job.attempts+=1;job.attempt_token=uuid.uuid4()
         job.status=JobRun.Status.RUNNING;job.started_at=now;job.heartbeat_at=now
-        job.lease_expires_at=now+timedelta(seconds=spec.timeout_seconds+30)
+        job.lease_expires_at=now+timedelta(seconds=spec.lease_seconds)
         job.next_attempt_at=None;job.error_code='';job.save()
         token=job.attempt_token
-    context=JobContext(job.id,token)
+    context=JobContext(job.id,token,spec.lease_seconds)
     error=None
     try:
         result=spec.handler(context,job.parameters)
