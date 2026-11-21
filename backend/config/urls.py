@@ -2,6 +2,7 @@ from django.urls import path, include
 from . import views
 from apps.accounts import views as accounts
 from apps.accounts import password_access
+from apps.accounts import views as accounts_views
 from apps.sources.views import source_list
 from apps.operations import views as operations
 from apps.locations import views as locations
@@ -22,6 +23,7 @@ urlpatterns = [
     path('api/admin/jobs/', operations.jobs),
     path('api/admin/jobs/<uuid:job_id>/rerun/', operations.rerun),
     path('api/admin/alerts/', operations.alerts),
+    path('api/admin/access-log/', accounts_views.access_log),
     path('api/locations/', locations.locations),
     path('api/locations/search/', locations.search),
     path('api/locations/<uuid:location_id>/', locations.location_detail),

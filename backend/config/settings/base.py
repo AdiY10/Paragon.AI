@@ -65,6 +65,9 @@ SESSION_ABSOLUTE_SECONDS = 60 * 60 * 24 * 14
 # Number of trusted reverse proxies in front of the app (Caddy on the droplet = 1). 0 = use REMOTE_ADDR.
 TRUSTED_PROXY_COUNT = int(os.environ.get('TRUSTED_PROXY_COUNT', '0'))
 LOCAL_PREVIEW = False
+# Guest-list sign-in: an allowed member's email alone opens the workspace (for knowing who
+# visited, not for secrecy); administrators still need their password. Every entry is logged.
+EMAIL_ONLY_ACCESS = os.environ.get('EMAIL_ONLY_ACCESS', 'false').lower() == 'true'
 LOCAL_SHARED_PASSWORD = ''
 SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_HTTPONLY = True

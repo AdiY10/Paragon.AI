@@ -27,6 +27,27 @@ export function Admin() {
         resolved: { key: string; summary: string; resolved_at: string }[];
       }>("/api/admin/alerts/"),
   });
+  const access = useQuery({
+    queryKey: ["access-log"],
+    queryFn: () =>
+      api<{
+        people: { email: string; role: string; active: boolean; last_seen_at: string | null }[];
+        events: { email: string; action: string; method: string | null; at: string }[];
+      }>("/api/admin/access-log/"),
+  });
+  const when = (v: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/New_York",
+    }).format(new Date(v));
+  const actionText: Record<string, string> = {
+    password_login: "Signed in",
+    password_login_failed: "Failed sign-in",
+    logout: "Signed out",
+  };
   return (
     <>
       <PageHead
@@ -34,6 +55,48 @@ export function Admin() {
         title="Keep the workspace reliable."
         description="Problems that need attention, then recorded job activity."
       />
+      <section className="panel" aria-labelledby="access-title">
+        <h2 id="access-title">Who is using the workspace</h2>
+        {access.error ? (
+          <ErrorNotice error={access.error} />
+        ) : !access.data ? (
+          <p className="muted">Loading…</p>
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Person</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Last active (Eastern)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {access.data.people.map((p) => (
+                    <tr key={p.email}>
+                      <td>{p.email}</td>
+                      <td>{p.active ? (p.role === "admin" ? "Admin" : "Member") : "Removed"}</td>
+                      <td>{p.last_seen_at ? when(p.last_seen_at) : "Never"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <details className="area-sources">
+              <summary>Recent sign-ins ({access.data.events.length})</summary>
+              <ul className="evidence-list">
+                {access.data.events.map((e, i) => (
+                  <li key={`${i}-${e.at}`}>
+                    {when(e.at)} · {e.email} · {actionText[e.action] ?? e.action}
+                    {e.method === "email_only" ? " (email)" : e.method === "password" ? " (password)" : ""}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </>
+        )}
+      </section>
       <section className="panel" aria-labelledby="alerts-title">
         <h2 id="alerts-title">Open alerts</h2>
         {alerts.error ? (

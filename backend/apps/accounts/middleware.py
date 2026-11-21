@@ -21,6 +21,10 @@ class ActiveMembershipMiddleware:
                     return redirect_to_login(request.get_full_path())
                 return JsonResponse({'detail': 'Your session expired. Please sign in again.'}, status=401)
             request.membership = Membership.objects.filter(user=request.user, active=True).first()
+            m = request.membership
+            if m is not None and (m.last_seen_at is None or time.time() - m.last_seen_at.timestamp() > 600):
+                from django.utils import timezone
+                Membership.objects.filter(pk=m.pk).update(last_seen_at=timezone.now())
             if request.membership is None:
                 logout(request)
                 return JsonResponse({'detail': 'Access has been removed. Contact your administrator.'}, status=403)

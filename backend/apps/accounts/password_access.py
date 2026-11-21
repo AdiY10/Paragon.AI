@@ -20,7 +20,7 @@ WINDOW=timedelta(minutes=15)
 
 class AccessForm(forms.Form):
     email=forms.EmailField(max_length=254,label='Email',widget=forms.EmailInput(attrs={'autocomplete':'username'}))
-    password=forms.CharField(max_length=1024,strip=False,label='Password',widget=forms.PasswordInput(attrs={'autocomplete':'current-password'}))
+    password=forms.CharField(max_length=1024,strip=False,label='Password',required=False,widget=forms.PasswordInput(attrs={'autocomplete':'current-password'}))
 
 
 @transaction.atomic
@@ -93,6 +93,22 @@ def local_shared_login(request,email,password):
     return user,membership
 
 
+def email_only_login(email):
+    """Guest-list entry for an active *member*; administrators always use their password."""
+    from django.contrib.auth import get_user_model
+    membership=Membership.objects.select_related('user').filter(email=email,active=True).first()
+    if membership is None or membership.role!=Membership.Role.MEMBER:return None
+    user=membership.user
+    if user is None:
+        User=get_user_model()
+        user,created=User.objects.get_or_create(username=email,defaults={'email':email})
+        if created:
+            user.set_unusable_password();user.save(update_fields=['password'])
+        membership.user=user;membership.save(update_fields=['user'])
+    if not user.is_active:return None
+    return user,membership
+
+
 def return_path(value):
     return value if isinstance(value,str) and value.startswith('/') and not value.startswith('//') and '\\' not in value and not any(ord(c)<32 for c in value) else '/'
 
@@ -113,6 +129,17 @@ def sign_in(request):
         retry_after=reserve_attempt(email,client_ip(request))
         if retry_after:
             status=429;error='Too many sign-in attempts. Please try again later.'
+        elif form.is_valid() and settings.EMAIL_ONLY_ACCESS and not form.cleaned_data['password'] and \
+                (guest:=email_only_login(email)):
+            user,membership=guest
+            _signed_in(request,user,membership,'email_only',email)
+            return redirect(next_path)
+        elif form.is_valid() and settings.EMAIL_ONLY_ACCESS and not form.cleaned_data['password']:
+            known=Membership.objects.filter(email=email,active=True).first()
+            if known and known.role==Membership.Role.ADMIN:
+                status=401;error='Administrators sign in with their password.'
+            else:
+                status=401;error='This email does not have access. Ask your administrator to add it.'
         elif form.is_valid() and local_shared_password_enabled(request) and \
                 (shared:=local_shared_login(request,email,form.cleaned_data['password'])):
             user,membership=shared
@@ -134,7 +161,8 @@ def sign_in(request):
         else:
             status=401;error='The email or password is incorrect, or access is unavailable.'
     response=render(request,'account/password_login.html',{'form':form,'error':error,'next':next_path,
-        'oidc_available':bool(settings.SOCIALACCOUNT_PROVIDERS),'local_shared':local_shared_password_enabled(request)},status=status)
+        'oidc_available':bool(settings.SOCIALACCOUNT_PROVIDERS),'local_shared':local_shared_password_enabled(request),
+        'email_only':settings.EMAIL_ONLY_ACCESS},status=status)
     if retry_after:response['Retry-After']=str(retry_after)
     return response
 

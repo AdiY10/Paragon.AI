@@ -19,6 +19,8 @@ class Membership(models.Model):
         on_delete=models.SET_NULL, related_name='issued_invitations')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Last request by this person (updated at most every 10 minutes) for the Admin sign-in log.
+    last_seen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(Lower('email'), name='membership_email_unique'),
