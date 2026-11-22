@@ -33,7 +33,17 @@ def create_location(*,name,address,actor=None,status='candidate',asset_type='oth
         method=pin_method,actor=actor,context=dict(pin_context or {}))
     location.current_revision=revision;location.save(update_fields=['current_revision','updated_at'])
     audit(location,actor,'created',{}, {'origin':origin,'status':status,'revision':str(revision.pk)})
+    # Owned means confirmed (redesign B1). Public-listing seeds stay unconfirmed until
+    # `confirm_portfolio` runs, so the one-time workspace import still sees clean seeds.
+    if status==Location.Status.OWNED and origin!='public_seed':
+        _mark_confirmed(location,actor,'created as owned')
     return location
+
+
+def _mark_confirmed(location,actor,reason):
+    location.confirmed=True;location.confirmed_at=timezone.now();location.confirmed_by=actor
+    location.save(update_fields=['confirmed','confirmed_at','confirmed_by','updated_at'])
+    audit(location,actor,'confirmed',{'confirmed':False},{'confirmed':True,'reason':reason})
 
 
 def locked_location(location_id,expected_version):
@@ -64,16 +74,22 @@ def update_location(*,location_id,expected_version,attributes,actor):
             matched_address='',confirmed=False,actor=actor,
             context={'reason':'Address changed; pin placement requires review',
                 'previous_revision_id':str(previous_revision.pk)})
-        location.confirmed=False;location.confirmed_at=None;location.confirmed_by=None
+        if location.status!=Location.Status.OWNED:
+            # Owned properties stay confirmed through an address correction (B1); the new pin
+            # revision still starts unconfirmed.
+            location.confirmed=False;location.confirmed_at=None;location.confirmed_by=None
         location.source_context={**location.source_context,'address_override':{
             'original_address':location.source_context.get('address_override',{}).get('original_address',previous_address),
             'changed_at':timezone.now().isoformat(),'nature':'User-edited address'}}
         before.update(revision=str(previous_revision.pk),confirmed=previous_confirmed)
-        after.update(revision=str(location.current_revision.pk),confirmed=False,
-            analysis_version=location.analysis_version,reason='Address changed; pin and ownership require review')
+        after.update(revision=str(location.current_revision.pk),confirmed=location.confirmed,
+            analysis_version=location.analysis_version,reason='Address changed; pin requires review')
+    became_owned=attributes.get('status')==Location.Status.OWNED and before.get('status')!=Location.Status.OWNED
     location.version+=1
     location.full_clean();location.save()
     audit(location,actor,'address_changed' if address_changed else 'attributes_changed',before,after)
+    if became_owned and not location.confirmed:
+        _mark_confirmed(location,actor,'status changed to owned')
     return location
 
 
