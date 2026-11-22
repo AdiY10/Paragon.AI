@@ -1,15 +1,15 @@
 import { type ReactNode } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
-import AlertsPage from "../Alerts";
-import { ComparePage } from "../Acquisitions";
+import { AlertsPage } from "../pages/AlertsPage";
+import { ComparePage } from "../pages/ComparePage";
 import { AnalyzePage } from "../pages/AnalyzePage";
 import { useLocations, useSession, useSources } from "../api/hooks";
 import { Empty, ErrorNotice } from "../components/ui";
-import { Admin } from "../pages/Admin";
+import { AdminPage } from "../pages/AdminPage";
 import { AnalysisPage } from "../pages/AnalysisPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { PropertiesPage } from "../pages/PropertiesPage";
-import { Sources } from "../pages/Sources";
+import { SourcesPage } from "../pages/SourcesPage";
 import { AppShell } from "./AppShell";
 import { type Route, useRoute } from "./router";
 
@@ -87,11 +87,11 @@ export function App() {
         body = <ComparePage />;
         break;
       case "sources":
-        body = <Sources sources={sources.data} error={sources.error} />;
+        body = <SourcesPage />;
         break;
       case "admin":
         body = isAdmin ? (
-          <Admin />
+          <AdminPage />
         ) : (
           <Empty title="Administrator access required">
             Your account can manage properties. User and system controls are restricted to administrators.
