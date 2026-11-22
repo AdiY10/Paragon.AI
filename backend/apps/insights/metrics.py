@@ -35,9 +35,32 @@ def refresh_snapshot(location):
     from .models import LocationMetrics
     from .signals import attention
     values = extract(location, fresh=True)
+    values['_list'] = list_numbers(location)
     row, _ = LocationMetrics.objects.update_or_create(location=location, defaults={
         'analysis_version': location.analysis_version, 'values': values, 'attention': attention(location.pk)})
     return row
+
+
+def list_numbers(location):
+    """Properties-list extras (redesign B9): flood status, nearest supermarket, active alerts."""
+    from apps.area.models import AreaSection
+    from .models import Signal
+    from .signals import risk_badges
+    rows = {}
+    for row in (AreaSection.objects.filter(location=location, analysis_version=location.analysis_version,
+            section__in=['hazards', 'businesses']).order_by('computed_at')):
+        rows[row.section] = row
+    flood = None
+    if rows.get('hazards') is not None and rows['hazards'].status == 'available':
+        badge = next((b for b in risk_badges(location) if b['kind'] == 'flood'), None)
+        flood = badge['level'] if badge else 'none'
+    market = None
+    biz = rows.get('businesses')
+    if biz is not None and biz.status == 'available' and biz.data.get('nearest_supermarket'):
+        m = biz.data['nearest_supermarket']
+        market = {'name': m.get('brand') or m.get('name'), 'distance_mi': m.get('distance_mi')}
+    return {'flood': flood, 'nearest_supermarket': market,
+        'active_alerts': Signal.objects.filter(location=location, status='active').count()}
 
 
 def snapshots(locations):
