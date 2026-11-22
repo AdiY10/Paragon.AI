@@ -17,7 +17,7 @@ DEFAULT_ACS_YEAR = 2024
 AUTO_INGEST = True  # tests turn this off; jobs ingest a missing state's ACS rows on demand
 BASELINE_ACS_YEAR = acs.LEGACY_YEAR
 # Bump when the ring computation changes; the analysis sweep recomputes older results (B3a).
-LOGIC_VERSION = 1
+LOGIC_VERSION = 2  # 2: depth metrics (age, tenure, home value, rent, $100k+ households; redesign B8)
 RADII = {'1/3/5': (1, 3, 5), '3/5/10': (3, 5, 10)}
 
 
@@ -58,7 +58,16 @@ def ingested_states(year):
         source_id='SRC-03', release=str(year)).values_list('scope', flat=True)}
 
 
-def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None, batch_limit=30_000,
+def current_states(year):
+    """States whose snapshot has the current table set (B8: older table-based snapshots lack the depth
+    tables and are re-ingested; the 2019 legacy vintage keeps its base tables)."""
+    if year == acs.LEGACY_YEAR:
+        return ingested_states(year)
+    return {scope.rsplit(':', 1)[1] for scope in SourceSnapshot.objects.filter(source_id='SRC-03', release=str(year),
+        adapter_version=acs.ADAPTER_VERSION).values_list('scope', flat=True)}
+
+
+def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None, batch_limit=15_000,
         skip_existing=True, heartbeat=None):
     """Ingest every state (or ``states``) for a vintage with bounded memory (B4a).
 
@@ -70,7 +79,7 @@ def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None
     store = _store(store)
     wanted = set(states or FIPS.values())
     if skip_existing:
-        wanted -= ingested_states(year)
+        wanted -= current_states(year)
     published = []
     if not wanted:
         return published
@@ -135,12 +144,13 @@ def _vintage_rings(lat, lon, radii, year, decennial, store, opener):
     geo_snapshot, capture = _geography(lat, lon, max(radii), year, store, opener, decennial)
     blocks, totals, mapping, unresolved = geography.parse_geography(capture)
     rows, acs_ids, missing = {}, [], []
+    wanted_geoids = set(mapping.values())  # only the ring's block groups are parsed (B8)
     for state in sorted({b.geoid[:2] for b in blocks}):
         snapshot = _latest('SRC-03', acs.scope_for(year, state))
         if snapshot is None:
             missing.append(state)
             continue
-        rows.update(acs.load_rows(snapshot, store))
+        rows.update(acs.load_rows(snapshot, store, geoids=wanted_geoids))
         acs_ids.append(str(snapshot.pk))
     if missing and AUTO_INGEST:
         # Never download inside an analysis (B4a): a background job ingests the state, then wakes
