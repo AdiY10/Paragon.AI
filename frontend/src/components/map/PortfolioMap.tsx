@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clusterPoints } from "../../lib/cluster";
-import { formatInt, formatUsd } from "../../lib/format/numbers";
+import { formatIncome, formatInt } from "../../lib/format/numbers";
 import type { Location } from "../../types";
 import { AttentionBadge, type Attention } from "../ui/Badge";
 import { Missing } from "../ui/Stat";
@@ -298,7 +298,7 @@ export function PortfolioMap({
               <dt>People within 3 mi</dt>
               <dd>{formatInt(numbers.population) ?? <Missing />}</dd>
               <dt>Median household income</dt>
-              <dd>{formatUsd(numbers.median_household_income) ?? <Missing />}</dd>
+              <dd>{formatIncome(numbers.median_household_income) ?? <Missing />}</dd>
               <dt>Main-road traffic</dt>
               <dd>{numbers.aadt != null ? `${formatInt(numbers.aadt)}/day` : <Missing />}</dd>
               <dt>Active alerts</dt>
