@@ -240,13 +240,39 @@ describe("bundle endpoint detection", () => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   it("uses the bundle when the server has it", async () => {
-    const bundle = { location: location(), analysis: { state: "complete" }, sections: {} };
+    const bundle = {
+      location: location(),
+      analysis: { state: "complete" },
+      sections: {},
+      kpis: [{ key: "population", label: "People", value: 1, unit: "people" }],
+      takeaways: [{ text: "t", tone: "neutral", section: "overview", source: null, period: null }],
+    };
     const fetcher = vi.fn().mockResolvedValue(json(bundle));
     vi.stubGlobal("fetch", fetcher);
     const result = await fetchAnalysis(ID);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher.mock.calls[0][0]).toBe(`/api/locations/${ID}/analysis/`);
-    expect(result.kpis).toEqual([]);
+    expect(result.kpis).toHaveLength(1);
+    expect(result.legacy).toBeUndefined();
+  });
+  it("fills KPIs and takeaways from the summary while the bundle has none (before B6b)", async () => {
+    const sections = buildLegacyBundle(location(), demographics, area, null).sections;
+    const bundle = { location: location(), analysis: { state: "partial" }, sections, kpis: [], takeaways: [] };
+    const fetcher = vi.fn(async (path: string) => (path.endsWith("/summary/") ? json(summary) : json(bundle)));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await fetchAnalysis(ID);
+    expect(fetcher.mock.calls.map(([p]) => p)).toEqual([`/api/locations/${ID}/analysis/`, `/api/locations/${ID}/summary/`]);
+    expect(result.kpis[0]).toMatchObject({ key: "population", value: 84000, percentile: 91 });
+    expect(result.takeaways.map((t) => t.tone)).toEqual(["caution", "positive"]);
+    expect(result.portfolio).toMatchObject({ size: 35, ready: true });
+  });
+  it("returns B5's 503 body (geocoder down) instead of throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(json({ location: location(), geocode: { status: "unavailable" }, next: "place_pin" }, 503)),
+    );
+    const result = await createAnalysis({ address: "1 Main St, Anywhere, CT" });
+    expect(result).toMatchObject({ geocode: { status: "unavailable" }, next: "place_pin" });
   });
   it("falls back to the legacy endpoints on a bare 404 and remembers it", async () => {
     const fetcher = vi.fn(async (path: string) => {

@@ -5,7 +5,7 @@ import type { Location, Session, Source } from "../types";
 import { isBusy, newlyReady, POLL_GIVE_UP_MS, pollDelay, readyMessage } from "./analysis";
 import { allLocations, api, ApiError } from "./client";
 import { keys } from "./keys";
-import { fetchLegacyBundle } from "./legacyAnalysis";
+import { fetchLegacyBundle, legacyKpis, legacyTakeaways, type LegacySummary } from "./legacyAnalysis";
 import type {
   AnalysisBundle,
   AnalysisListItem,
@@ -24,13 +24,36 @@ export function resetRouteDetection() {
   analysesRoute = null;
 }
 
+/**
+ * Until the bundle carries KPIs and takeaways (B6b), build them from its sections plus the
+ * existing /summary/ (portfolio percentiles and the deterministic strengths/concerns).
+ */
+async function withSummaryFallback(bundle: AnalysisBundle): Promise<AnalysisBundle> {
+  if (bundle.kpis.length && bundle.takeaways.length) return bundle;
+  const summary = await api<LegacySummary>(`/api/locations/${bundle.location.id}/summary/`).catch(() => null);
+  return {
+    ...bundle,
+    kpis: bundle.kpis.length ? bundle.kpis : legacyKpis(bundle.sections, summary),
+    takeaways: bundle.takeaways.length ? bundle.takeaways : legacyTakeaways(summary),
+    portfolio:
+      bundle.portfolio ??
+      (summary ? { size: summary.portfolio_size, min: summary.min_portfolio, ready: summary.benchmark_ready, note: summary.note } : undefined),
+  };
+}
+
 /** GET the PART C bundle; falls back to the legacy adapter until B3b is deployed. */
 export async function fetchAnalysis(id: string): Promise<AnalysisBundle> {
   if (bundleRoute !== false) {
     try {
       const bundle = await api<AnalysisBundle>(`/api/locations/${id}/analysis/`);
       bundleRoute = true;
-      return { ...bundle, kpis: bundle.kpis ?? [], takeaways: bundle.takeaways ?? [], signals: bundle.signals ?? [], risk_badges: bundle.risk_badges ?? [] };
+      return withSummaryFallback({
+        ...bundle,
+        kpis: bundle.kpis ?? [],
+        takeaways: bundle.takeaways ?? [],
+        signals: bundle.signals ?? [],
+        risk_badges: bundle.risk_badges ?? [],
+      });
     } catch (error) {
       if (!isMissingRoute(error)) throw error;
       bundleRoute = false;
@@ -151,6 +174,9 @@ export async function createAnalysis(body: CreateAnalysisBody): Promise<CreateAn
       analysesRoute = true;
       return result;
     } catch (error) {
+      // Geocoder down: the record exists and the answer says to place the pin by hand.
+      if (error instanceof ApiError && error.status === 503 && (error.body as CreateAnalysisResponse | null)?.location)
+        return error.body as CreateAnalysisResponse;
       if (!isMissingRoute(error)) throw error;
       analysesRoute = false;
     }

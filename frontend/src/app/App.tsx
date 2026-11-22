@@ -1,7 +1,8 @@
 import { type ReactNode } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import AlertsPage from "../Alerts";
-import { ComparePage, ScreenPage } from "../Acquisitions";
+import { ComparePage } from "../Acquisitions";
+import { AnalyzePage } from "../pages/AnalyzePage";
 import { useLocations, useSession, useSources } from "../api/hooks";
 import { Empty, ErrorNotice } from "../components/ui";
 import { Admin } from "../pages/Admin";
@@ -70,7 +71,6 @@ export function App() {
       case "properties":
         body = <PropertiesPage locations={portfolio.data ?? []} />;
         break;
-      // Interim page until WI-7 (Analyze) replaces it.
       case "property":
         body = <AnalysisPage key={route.id} id={route.id} mode="property" />;
         break;
@@ -78,7 +78,7 @@ export function App() {
         body = <AnalysisPage key={route.id} id={route.id} mode="place" />;
         break;
       case "analyze":
-        body = <ScreenPage />;
+        body = <AnalyzePage />;
         break;
       case "alerts":
         body = <AlertsPage />;

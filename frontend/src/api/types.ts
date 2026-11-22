@@ -124,9 +124,10 @@ export type CreateAnalysisBody = { address: string; name?: string } | { lat: num
 export interface CreateAnalysisResponse {
   location: Location;
   geocode?: {
-    status: "matched" | "ambiguous" | "no_match" | "unavailable";
+    status: "matched" | "ambiguous" | "no_match" | "unavailable" | "map_point";
     matched_address?: string;
     lookup_id?: string;
+    expected_version?: number;
     candidates?: { index: number; matched_address: string; lat: number; lon: number }[];
   };
   analysis?: { state: AnalysisState; job_id?: string };
