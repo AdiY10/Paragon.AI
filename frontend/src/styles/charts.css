@@ -1,0 +1,370 @@
+/* Custom charts (src/components/charts). Bars ≤24 px, 4 px rounded data end, square at the zero
+   baseline; values printed in text colours, never in series colours; hairline recessive tracks. */
+.bar-list,
+.dumbbell-list,
+.chart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bar-list {
+  display: grid;
+  gap: var(--s-2);
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 24px;
+}
+.bar-row.sub {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 18px;
+}
+.bar-label {
+  color: var(--text);
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bar-label small {
+  display: block;
+  color: var(--text-2);
+}
+.bar-track {
+  position: relative;
+  display: block;
+  height: 12px;
+  border-left: 1px solid var(--border-strong);
+}
+.bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+.bar-fill-b {
+  background: var(--accent-2);
+}
+.bar-value {
+  color: var(--text);
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.bar-missing {
+  grid-column: 2 / -1;
+  color: var(--text-2);
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+  font-style: italic;
+}
+.bar-median {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.bar-median-note {
+  display: block;
+  color: var(--text-2);
+}
+
+/* Grouped rows: label above (narrow) or beside (wide) a stack of series bars. */
+.grouped-bars {
+  display: grid;
+  gap: var(--s-3);
+}
+.grouped-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);
+  gap: var(--s-3);
+  align-items: start;
+}
+.grouped-series {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* ---- Legend ---- */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+  color: var(--text-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-mark {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.legend-a {
+  background: var(--accent);
+}
+.legend-b {
+  background: var(--accent-2);
+}
+.legend-tick {
+  width: 2px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--text);
+}
+.legend-before,
+.legend-after {
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+}
+.legend-before {
+  background: var(--bg);
+  border: 2px solid var(--text-3);
+}
+.legend-after {
+  background: var(--accent);
+}
+
+/* ---- Dumbbell ---- */
+.dumbbell {
+  display: grid;
+  gap: var(--s-3);
+}
+.dumbbell-list {
+  display: grid;
+  gap: var(--s-3);
+}
+.dumbbell-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 26%) minmax(80px, 1fr) minmax(0, 34%);
+  align-items: center;
+  gap: var(--s-3);
+}
+.dumbbell-track {
+  position: relative;
+  height: 14px;
+  border-left: 1px solid var(--border-strong);
+}
+.dumbbell-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--border);
+}
+.dumbbell-link {
+  position: absolute;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: var(--text-3);
+}
+.dumbbell-dot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.dumbbell-dot.before {
+  background: var(--bg);
+  border: 2px solid var(--text-3);
+}
+.dumbbell-dot.after {
+  background: var(--accent);
+}
+.dumbbell-values {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--s-1);
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+  font-variant-numeric: tabular-nums;
+}
+.dumbbell-values .change {
+  margin-left: var(--s-1);
+}
+.dumbbell-values small {
+  width: 100%;
+  color: var(--text-2);
+}
+
+/* ---- Percentile bullet ---- */
+.bullet {
+  display: grid;
+  gap: 6px;
+}
+.bullet-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.bullet-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bullet-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+}
+.bullet-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+}
+.bullet-median {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-3);
+}
+.bullet-marker {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.bullet-scale,
+.index-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.bullet-text {
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+  color: var(--text);
+}
+
+/* ---- Index bar (diverging from 100) ---- */
+.index-bar {
+  display: grid;
+  grid-template-columns: minmax(96px, 26%) minmax(80px, 1fr) minmax(0, 34%);
+  align-items: center;
+  gap: var(--s-3);
+  min-height: 24px;
+}
+.index-track {
+  position: relative;
+  height: 12px;
+  background: var(--surface-2);
+  border-radius: 2px;
+}
+.index-center {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-3);
+}
+.index-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+}
+.index-fill.above {
+  border-radius: 0 4px 4px 0;
+}
+.index-fill.below {
+  border-radius: 4px 0 0 4px;
+  background: var(--accent-2);
+}
+.index-fill.overflow-high::after,
+.index-fill.overflow-low::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 0;
+  border-style: solid;
+}
+.index-fill.overflow-high::after {
+  right: -6px;
+  border-width: 8px 0 8px 6px;
+  border-color: transparent transparent transparent var(--accent);
+}
+.index-fill.overflow-low::after {
+  left: -6px;
+  border-width: 8px 6px 8px 0;
+  border-color: transparent var(--accent-2) transparent transparent;
+}
+.index-bar .bar-value {
+  font-weight: 500;
+  text-align: left;
+  white-space: normal;
+}
+
+/* ---- Sparkline ---- */
+.sparkline path {
+  stroke: var(--text-3);
+}
+.sparkline circle {
+  fill: var(--accent);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+@media (max-width: 640px) {
+  .bar-row,
+  .grouped-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .bar-row > .bar-label,
+  .grouped-row > .bar-label {
+    grid-column: 1 / -1;
+  }
+  .grouped-series {
+    grid-column: 1 / -1;
+  }
+  .bar-row .bar-missing {
+    grid-column: 1 / -1;
+  }
+  .dumbbell-row,
+  .index-bar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+@media (forced-colors: active) {
+  .bar-fill,
+  .index-fill,
+  .bullet-marker,
+  .dumbbell-dot.after,
+  .legend-mark {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+}

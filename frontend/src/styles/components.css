@@ -1,0 +1,322 @@
+/* UI kit (src/components/ui). */
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  padding: 0 var(--s-4);
+  border-radius: var(--r-card);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: var(--fs-body);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn:hover {
+  text-decoration: none;
+}
+.btn-sm {
+  min-height: 32px;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-table);
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+.btn-primary:active {
+  background: var(--accent-press);
+}
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover {
+  background: var(--surface-2);
+}
+.btn-ghost {
+  background: none;
+  color: var(--accent);
+}
+.btn-ghost:hover {
+  background: var(--accent-soft);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  background: var(--surface-3);
+  color: var(--text-3);
+  border-color: var(--border);
+}
+.btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---- Badges ---- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-badge);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ui-badge-neutral {
+  background: var(--clear-bg);
+  color: var(--clear-text);
+}
+.ui-badge-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ui-badge-high {
+  background: var(--high-bg);
+  color: var(--high-text);
+}
+.ui-badge-watch {
+  background: var(--watch-bg);
+  color: var(--watch-text);
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: var(--s-5);
+  min-width: 0;
+}
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.card-title {
+  font-size: var(--fs-sub);
+  line-height: var(--lh-sub);
+}
+.card-actions {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.card-footer {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+
+/* ---- Skeleton ---- */
+.skeleton-stack {
+  display: grid;
+  gap: var(--s-2);
+}
+.skeleton {
+  display: block;
+  border-radius: var(--r-badge);
+  background: linear-gradient(90deg, var(--surface-3) 0%, var(--surface-2) 50%, var(--surface-3) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--surface-3);
+  }
+}
+
+/* ---- Empty and error states ---- */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  padding: var(--s-8) var(--s-4);
+  text-align: center;
+  color: var(--text-2);
+}
+.empty-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--fs-sub);
+  line-height: var(--lh-sub);
+}
+.empty-body {
+  max-width: 48ch;
+}
+.error-state {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid #f5c2bd;
+  border-radius: var(--r-card);
+  background: var(--high-bg);
+  color: var(--high-text);
+}
+.error-state > div {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: start;
+}
+.error-title {
+  font-weight: 600;
+}
+.error-body {
+  color: var(--text);
+}
+
+/* ---- Drawer ---- */
+.ui-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 81;
+  width: min(480px, 100vw);
+  background: var(--bg);
+  box-shadow: var(--shadow-3);
+  border-radius: var(--r-map) 0 0 var(--r-map);
+  display: flex;
+  flex-direction: column;
+}
+.ui-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5) 0;
+}
+.ui-drawer-title {
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  font-weight: 600;
+}
+.ui-drawer-desc {
+  padding: var(--s-1) var(--s-5) 0;
+  color: var(--text-2);
+}
+.ui-drawer-body {
+  padding: var(--s-4) var(--s-5) var(--s-6);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ---- Segmented control ---- */
+.segmented {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.segmented-legend {
+  padding: 0;
+  margin-bottom: var(--s-1);
+  font-size: var(--fs-caption);
+  color: var(--text-2);
+  font-weight: 500;
+}
+.segmented-options {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  padding: 2px;
+  gap: 2px;
+  background: var(--bg);
+}
+.segmented label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-weight: 500;
+  cursor: pointer;
+}
+.segmented label.selected {
+  background: var(--accent);
+  color: #fff;
+}
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- Stat ---- */
+.stat-ui {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.stat-label {
+  color: var(--text-2);
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+}
+.stat-value {
+  font-size: var(--fs-kpi);
+  line-height: var(--lh-kpi);
+  font-weight: 600;
+  color: var(--text);
+}
+.stat-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-table);
+  line-height: var(--lh-table);
+  font-weight: 600;
+}
+.stat-sub,
+.stat-foot {
+  color: var(--text-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.change-good {
+  color: var(--accent);
+}
+.change-bad {
+  color: var(--bad);
+}
+.change-neutral {
+  color: var(--text-2);
+}
+
+@media (forced-colors: active) {
+  .ui-badge,
+  .card,
+  .segmented label.selected {
+    border: 1px solid CanvasText;
+  }
+}
