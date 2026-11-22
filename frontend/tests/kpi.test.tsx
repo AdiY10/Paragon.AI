@@ -23,6 +23,26 @@ describe("KPI values", () => {
   });
 });
 
+describe("KPI cards from the B6b bundle", () => {
+  it("handles the flood level, vehicles, places, the supermarket, notes and the US index", () => {
+    const flood = kpi({ key: "flood", unit: null, value: "inside", detail: "Inside FEMA high-risk flood zone AE (base flood elevation 9 ft)" });
+    expect(kpiValue(flood)).toBe("Inside high-risk zone");
+    expect(kpiSub(flood)).toBe("Inside FEMA high-risk flood zone AE (base flood elevation 9 ft)");
+    expect(kpiValue(kpi({ key: "flood", unit: null, value: "none" }))).toBe("Not in a high-risk zone");
+    expect(kpiValue(kpi({ key: "flood", unit: null, value: null }))).toBeNull();
+    expect(kpiRank(flood, "property")).toBeNull();
+    const road = kpi({ key: "aadt", unit: "vehicles", value: 25000, detail: "Cypress Lake Drive", note: "Estimate carried forward (no newer count)" });
+    expect(kpiValue(road)).toBe("25,000");
+    expect(kpiSub(road)).toBe("vehicles/day on Cypress Lake Drive · Estimate carried forward (no newer count)");
+    expect(kpiValue(kpi({ unit: "places", value: 940 }))).toBe("940");
+    const market = kpi({ key: "nearest_supermarket_mi", unit: "mi", value: 0.5, detail: "Publix" });
+    expect(kpiValue(market)).toBe("0.5 mi");
+    expect(kpiSub(market)).toBe("Publix");
+    expect(kpiSub(kpi({ unit: "usd", value: 67968, index_vs_us: 84 }))).toBe("US index 84 (100 = US average)");
+    expect(kpiRank(kpi({ rank: 3, of: 36, hypothetical: true }), "property")).toBe("Would rank 3 of 36 owned properties");
+  });
+});
+
 describe("KPI change colour", () => {
   it("colours only significant changes on metrics with a good direction", () => {
     expect(kpiChange(kpi({ direction: "up", change: { value: 0.031, unit: "pct", since: "2015–2019", significant: true } }))).toEqual({

@@ -7,7 +7,7 @@ import { queryClient } from "./app/queryClient";
 import { installRouter } from "./app/router";
 import "./styles/tokens.css";
 import "./styles/base.css";
-import "./styles/legacy.css";
+import "./styles/forms.css";
 import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/charts.css";

@@ -1,5 +1,6 @@
 import { AlertTriangle, CircleCheck, Info } from "lucide-react";
 import type { Takeaway } from "../../api/types";
+import { periodLabel } from "../../lib/format/dates";
 import { sourceName } from "../../lib/format/sources";
 import { isSectionId } from "./sections";
 import { goToSection } from "./useActiveSection";
@@ -28,7 +29,7 @@ export function TakeawayList({ takeaways }: { takeaways: Takeaway[] }) {
               </span>
               <p className="takeaway-text">{t.text}</p>
               <p className="takeaway-meta">
-                {[sourceName(t.source), t.period].filter(Boolean).join(" · ")}
+                {[sourceName(t.source), periodLabel(t.period)].filter(Boolean).join(" · ")}
                 {target && target !== "overview" && (
                   <>
                     {(t.source || t.period) && " · "}

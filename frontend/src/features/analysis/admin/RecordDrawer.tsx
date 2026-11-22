@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight } from "lucide-react";
 import { api } from "../../../api/client";
 import { Drawer } from "../../../components/ui/Drawer";
-import { ErrorNotice, titleCase } from "../../../components/ui";
+import { InlineError } from "../../../components/ui/ErrorState";
+import { titleCase } from "../../../lib/format/text";
 import { dateLabel } from "../../../lib/format/dates";
 import type { Audit, Location, Page } from "../../../types";
 
@@ -115,7 +116,7 @@ export function History({ locationId }: { locationId: string }) {
     <section className="history">
       <h3>Change history</h3>
       {query.error ? (
-        <ErrorNotice error={query.error} />
+        <InlineError error={query.error} />
       ) : (
         query.data?.results.map((item) => (
           <article key={item.id}>

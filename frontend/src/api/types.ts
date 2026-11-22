@@ -38,8 +38,10 @@ export type Sections = { [K in SectionKey]: SectionResult<K> };
 export interface Kpi {
   key: string;
   label: string;
-  value: number | null;
-  unit: "people" | "households" | "usd" | "pct" | "pts" | "count" | "per_day" | "mi" | "text" | string;
+  /** A number, or for the flood card its level ("inside" | "near" | "none"). */
+  value: number | string | null;
+  /** B6b: people, households, jobs, vehicles, places, usd, mi; null for the flood badge. */
+  unit: string | null;
   /** Pre-formatted value for text KPIs (e.g. "Publix", "Inside zone AE"). */
   display?: string | null;
   detail?: string | null;
@@ -52,6 +54,12 @@ export interface Kpi {
   source?: string | null;
   /** Flood status and similar badges are never ranked. */
   ranked?: boolean;
+  /** e.g. "Estimate carried forward (no newer count)". */
+  note?: string | null;
+  /** Income vs the US (100 = US average). */
+  index_vs_us?: number | null;
+  /** A new place: its rank is where it would sit among the owned properties. */
+  hypothetical?: boolean;
 }
 export interface Takeaway {
   text: string;

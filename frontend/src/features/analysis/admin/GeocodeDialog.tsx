@@ -113,7 +113,7 @@ export default function GeocodeDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       {!controlled && (
         <Dialog.Trigger asChild>
-          <button className="button secondary small-button">
+          <button className="btn btn-secondary btn-sm">
             <Compass size={15} />
             Find address pin
           </button>
@@ -149,7 +149,7 @@ export default function GeocodeDialog({
           <p className="lookup-address">{snapshot.address}</p>
           {!data && (
             <button
-              className="button"
+              className="btn btn-primary btn-md"
               disabled={lookup.isPending}
               onClick={() => lookup.mutate()}
             >
@@ -171,7 +171,7 @@ export default function GeocodeDialog({
           )}
           {error instanceof ApiError && error.status === 409 && (
             <button
-              className="button secondary"
+              className="btn btn-secondary btn-md"
               onClick={() => {
                 cache.invalidateQueries({
                   queryKey: ["location", location.id],
@@ -266,7 +266,7 @@ export default function GeocodeDialog({
               </details>
               {data.candidates.length > 0 && (
                 <button
-                  className="button"
+                  className="btn btn-primary btn-md"
                   disabled={choice === null || accept.isPending}
                   onClick={() => accept.mutate()}
                 >

@@ -8,7 +8,9 @@ import {
   formatChange,
   formatMoe,
   formatValue,
+  DEPTH_ROWS,
   METRIC_ROWS,
+  metricLabel,
   reliabilityLabel,
   ringLabel,
   significanceText,
@@ -19,7 +21,6 @@ import {
 import { formatInt, formatUsd } from "../../../lib/format/numbers";
 import { SectionShell } from "../SectionShell";
 
-const titleCase = (key: string) => key.replaceAll("_", " ").replace(/^\w/, (c) => c.toUpperCase());
 type IndexedRing = Ring & { index_vs_us?: Record<string, number | null> };
 
 function MetricCell({ metric }: { metric: Metric | undefined }) {
@@ -62,9 +63,9 @@ export function TradeAreaSection({ bundle }: { bundle: AnalysisBundle }) {
   const rings = (data?.rings ?? []) as IndexedRing[];
   const [radius, setRadius] = useState<number>(rings.find((r) => r.radius_miles === 3) ? 3 : (rings[0]?.radius_miles ?? 3));
   const ring = rings.find((r) => r.radius_miles === radius) ?? rings[0];
-  const extraKeys = [...new Set(rings.flatMap((r) => Object.keys(r.metrics)))].filter(
-    (key) => !METRIC_ROWS.some((row) => row.key === key),
-  );
+  const present = new Set(rings.flatMap((r) => Object.keys(r.metrics)));
+  const depthRows = DEPTH_ROWS.filter((row) => present.has(row.key));
+  const otherKeys = [...present].filter((key) => ![...METRIC_ROWS, ...DEPTH_ROWS].some((row) => row.key === key));
   const index = ring?.index_vs_us ?? null;
   const indexEntries = index ? Object.entries(index) : [];
   const baselinePeriod = ring?.baseline?.acs_period ?? "Earlier period";
@@ -95,11 +96,7 @@ export function TradeAreaSection({ bundle }: { bundle: AnalysisBundle }) {
                 </tr>
               </thead>
               <tbody>
-                {[...METRIC_ROWS.map((row) => ({ key: row.key, label: row.label, hint: row.hint })), ...extraKeys.map((key) => ({
-                  key,
-                  label: rings.find((r) => r.metrics[key])?.metrics[key]?.label ?? titleCase(key),
-                  hint: "",
-                }))].map((row) => (
+                {[...METRIC_ROWS, ...depthRows, ...otherKeys.map((key) => ({ key, label: metricLabel(key), hint: "" }))].map((row) => (
                   <tr key={row.key}>
                     <th scope="row">
                       {row.label}
@@ -126,10 +123,10 @@ export function TradeAreaSection({ bundle }: { bundle: AnalysisBundle }) {
             <div className="subsection">
               <h3>Compared with the US (100 = US average), {ringLabel(radius)}</h3>
               <div className="index-list">
-                {indexEntries.map(([key, value]) => (
+                {indexEntries.filter(([, value]) => value !== null).map(([key, value]) => (
                   <IndexBar
                     key={key}
-                    label={ring?.metrics[key]?.label ?? METRIC_ROWS.find((m) => m.key === key)?.label ?? titleCase(key)}
+                    label={metricLabel(key)}
                     index={value}
                   />
                 ))}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   checkedLabel,
+  periodLabel,
   count,
   dateLabel,
   distanceMi,
@@ -33,10 +34,6 @@ import {
   type Metric,
   type Trend,
 } from "../src/lib/format";
-// Old import paths keep working until WI-9.
-import { count as legacyCount } from "../src/area";
-import { formatValue as legacyFormatValue } from "../src/demographics";
-import { dateLabel as legacyDateLabel } from "../src/api";
 
 const metric = (m: Partial<Metric>): Metric => ({
   metric_id: "MET-01",
@@ -104,6 +101,9 @@ describe("dates", () => {
     expect(dateLabel("2026-11-21")).toBe("Nov 21, 2026");
     expect(checkedLabel(null)).toBe("not checked yet");
     expect(checkedLabel("2026-11-21")).toBe("checked Nov 21, 2026");
+    expect(periodLabel("Overture 2026-11-18.0")).toBe("Overture Nov 2026");
+    expect(periodLabel("ACS 2020–2024 5-year")).toBe("ACS 2020–2024 5-year");
+    expect(periodLabel(null)).toBeNull();
   });
 });
 
@@ -173,13 +173,5 @@ describe("summary metric formatting", () => {
     expect(favourable({ direction: "up", percentile: 80 })).toBe(80);
     expect(favourable({ direction: "down", percentile: 80 })).toBe(20);
     expect(favourable({ direction: "up", percentile: null })).toBeNull();
-  });
-});
-
-describe("re-export stubs", () => {
-  it("keep the old import paths working", () => {
-    expect(legacyCount(5)).toBe("5");
-    expect(legacyFormatValue(metric({ value: 10 }))).toBe("10");
-    expect(legacyDateLabel("2026-01-02")).toBe("Jan 2, 2026");
   });
 });

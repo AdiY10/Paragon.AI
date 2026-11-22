@@ -1,6 +1,6 @@
 import { ChevronDown, Database, LogOut, Settings2 } from "lucide-react";
 import { MenuButton } from "../components/ui/MenuButton";
-import { csrfToken } from "../api";
+import { csrfToken } from "../api/client";
 import type { Session } from "../types";
 import { accountLinks } from "./nav";
 

@@ -2,9 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowRight, Check, Plus, Settings2, X } from "lucide-react";
-import { ApiError, api } from "../api";
+import { ApiError, api } from "../api/client";
 import { type Location } from "../types";
-import { ErrorNotice } from "./ui";
+import { InlineError } from "./ui/ErrorState";
 
 export function AddLocation() {
   const [open, setOpen] = useState(false);
@@ -30,7 +30,7 @@ export function AddLocation() {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button className="button">
+        <button className="btn btn-primary btn-md">
           <Plus size={17} /> Add location
         </button>
       </Dialog.Trigger>
@@ -66,8 +66,8 @@ export function AddLocation() {
                 <option value="owned">Owned</option>
               </select>
             </label>
-            {mutation.error && <ErrorNotice error={mutation.error} />}
-            <button className="button" disabled={mutation.isPending}>
+            {mutation.error && <InlineError error={mutation.error} />}
+            <button className="btn btn-primary btn-md" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save record"}
               <ArrowRight size={16} />
             </button>
@@ -143,7 +143,7 @@ export function EditLocation({
     >
       {!controlled && (
         <Dialog.Trigger asChild>
-          <button className="button secondary">
+          <button className="btn btn-secondary btn-md">
             Edit record <Settings2 size={16} />
           </button>
         </Dialog.Trigger>
@@ -198,11 +198,11 @@ export function EditLocation({
               Team notes
               <textarea name="notes" defaultValue={snapshot.notes} rows={4} />
             </label>
-            {mutation.error && <ErrorNotice error={mutation.error} />}
+            {mutation.error && <InlineError error={mutation.error} />}
             {mutation.error instanceof ApiError &&
               mutation.error.status === 409 && (
                 <button
-                  className="button secondary"
+                  className="btn btn-secondary btn-md"
                   type="button"
                   onClick={() => {
                     cache.invalidateQueries({
@@ -214,7 +214,7 @@ export function EditLocation({
                   Reload record
                 </button>
               )}
-            <button className="button" disabled={mutation.isPending}>
+            <button className="btn btn-primary btn-md" disabled={mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save changes"}
               <Check size={16} />
             </button>

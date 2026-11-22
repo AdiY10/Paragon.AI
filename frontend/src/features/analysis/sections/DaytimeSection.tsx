@@ -6,13 +6,19 @@ import { Segmented } from "../../../components/ui/Segmented";
 import { formatInt } from "../../../lib/format/numbers";
 import { SectionShell } from "../SectionShell";
 
-type SectorRing = { sectors?: Record<string, number | null> };
+type SectorRing = { sectors?: Record<string, number | null>; earnings?: Record<string, number | null> };
 const SECTOR_LABELS: Record<string, string> = {
   retail: "Retail",
   food_service: "Food service",
   health: "Health care",
   office: "Office & professional",
-  other: "Other",
+  office_professional: "Office & professional",
+  other: "All other sectors",
+};
+const EARNING_LABELS: Record<string, string> = {
+  under_1250_month: "$1,250 a month or less",
+  "1251_to_3333_month": "$1,251 to $3,333 a month",
+  over_3333_month: "More than $3,333 a month",
 };
 
 /** Residents vs people who work in each ring (LODES), and jobs by sector. Never "visitors". */
@@ -24,6 +30,7 @@ export function DaytimeSection({ bundle }: { bundle: AnalysisBundle }) {
   const ring = rings.find((r) => r.radius_miles === radius) ?? rings[0];
   const residents = (miles: number) => demo?.rings.find((r) => r.radius_miles === miles)?.metrics.population?.value ?? null;
   const sectors = (ring as (typeof ring & SectorRing) | undefined)?.sectors;
+  const earnings = (ring as (typeof ring & SectorRing) | undefined)?.earnings;
   const sectorItems = ring
     ? sectors
       ? Object.entries(sectors).map(([key, value]) => ({
@@ -90,6 +97,20 @@ export function DaytimeSection({ bundle }: { bundle: AnalysisBundle }) {
               )}
             </div>
             <BarList label={`Jobs by sector within ${radius} mi`} items={sectorItems} />
+            {earnings && (
+              <>
+                <h3>Jobs by monthly earnings within {radius} mi</h3>
+                <BarList
+                  label={`Jobs by monthly earnings within ${radius} mi`}
+                  items={Object.entries(earnings).map(([key, value]) => ({
+                    key,
+                    label: EARNING_LABELS[key] ?? key.replaceAll("_", " "),
+                    value: value ?? null,
+                    display: formatInt(value) ?? undefined,
+                  }))}
+                />
+              </>
+            )}
             {ring && ring.change_pct !== null && jobs.data.prior_year && (
               <p className="fine-print">
                 Total jobs changed {ring.change_pct > 0 ? "+" : ring.change_pct < 0 ? "−" : ""}

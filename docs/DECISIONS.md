@@ -133,3 +133,31 @@ shared-database HMAC throttles. Keep OIDC available. Provision/rotate through hi
 prompt or stdin, never password arguments. Rotation revokes prior sessions without
 code changes. Continue data migration and host preparation before asking for paid
 provisioning approval; the regular-host priority is not complete at local verification.
+
+## D-033 — Top navigation and hash routes (redesign WI-1)
+
+The Release 2.0 sidebar and weekly-brief home were replaced by a top bar with four pages
+(Properties, Analyze, Alerts, Compare) and an account menu (Data sources, Admin, Sign out), as
+Adi chose on 2026-11-21. Routing stays hash-based (no library, ~150 lines) so Django keeps
+serving one page and old bookmarks redirect with `replaceState`: `#/portfolio` → `#/`,
+`#/locations/:id` → `#/p/:id`, `#/screen` → `#/analyze`, `#/setup` → `#/`. Ids are validated as
+UUIDs. Search text and addresses never enter the URL; filters and sort do.
+
+## D-034 — Custom charts, HTML map pins and a self-hosted font (redesign WI-2/WI-3)
+
+Charts are small HTML/CSS and SVG components with every value printed as text, bars from zero
+and no chart library (smaller bundle, full control of accessibility). Map pins are HTML buttons
+with screen-space clustering instead of symbol layers, because the CSP allows no glyph or
+sprite host and buttons give native focus, names and ≥24 px targets. Inter is bundled from
+`@fontsource-variable/inter` (Latin subset, about 48 KB) and served from this origin.
+
+## D-035 — Residential rent and home value from ACS (redesign B8/WI-6)
+
+Doc 05 §6.4 forbids the words rent and value for external data so that area figures are never
+read as this property's rent or value. The ACS depth tables add median gross rent and
+owner-estimated home value for the people living in each radius ring. They are shown only in
+the Trade area section, labelled "Median gross rent" / "Median home value" with the note
+"about the area, not this property", next to the US index; they are never on property cards,
+the Properties table or alerts. This keeps the intent of §6.4 (no property-level rent or value
+claims) while giving the household context the redesign asked for.
+

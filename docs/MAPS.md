@@ -1,17 +1,31 @@
 # Interactive location maps
 
-Portfolio filters drive both the map and the property list. The public seed has
-35 reference pins and one unplaced record; the unplaced record remains in the list.
-Markers open linked property popups. A property map shows the selected 1/3/5 or
-3/5/10-mile preset. Pin confirmation is separate from ownership confirmation. **Correct / confirm pin**
-opens an unsaved preview: drag its marker or enter coordinates, then save explicitly.
-The verification checkbox resets on movement. Unplaced records support coordinate
-entry; automatic geocoding remains pending. Cancel leaves the saved revision intact.
+Four map components share one frame (`src/components/map/`): a "Skip map" link, a labelled
+region described by its text alternative (the properties table, the retail list), messages for
+missing WebGL, failed tiles or a disabled basemap, OSM attribution and a privacy line.
+
+- **PortfolioMap** (Properties): every owned property as an HTML `<button>` pin (High: red
+  circle with "!", Watch: amber diamond with "!", Clear: slate dot; 24 px hit area), merged
+  into cluster buttons within 40 px on screen ("4 properties (1 High): …. Zoom in"). Pins are
+  created once; filters toggle visibility and re-fit the view; one hover card is reused.
+- **AnalysisMap** (analysis pages): the pin, dashed radius rings (display only), nearby
+  businesses as circles (selected category in accent, anchors larger, possible closures hollow
+  red) and the flood polygon when available; layer checkboxes sit outside the map.
+- **PickMap** (Analyze): a click drops a draggable draft pin with "Analyze this point";
+  "Use map center" is the keyboard path.
+- **PreviewMap** (pin editor, Census review): one pin; typed coordinates are the dragging
+  alternative.
+
+No map uses glyphs, sprites or symbol layers: the CSP allows only this origin and
+tile.openstreetmap.org, so all text on maps is HTML. Pin confirmation is separate from
+ownership. **Correct pin** opens an unsaved preview: drag the marker or enter coordinates,
+then save explicitly; Cancel leaves the saved revision intact.
 
 MapLibre GL JS is lazy-loaded only on screens that show a map. Its v6 module worker
 is bundled using Vite's `?worker&url` integration, then served from the application's
 own static origin. A successful marker overlay alone does not prove the worker or
-basemap loaded: browser verification waits for map load and all three ring layers.
+basemap loaded: browser verification waits for `data-ready`, the pin count (`data-pins`) and
+the three rings (`data-rings`).
 See [MapLibre installation](https://maplibre.org/maplibre-gl-js/docs/).
 
 ## Basemap provider and privacy

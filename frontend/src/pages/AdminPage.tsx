@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, dateLabel } from "../api";
+import { api } from "../api/client";
+import { dateLabel } from "../lib/format/dates";
 import { type Page } from "../types";
-import { titleCase, Badge, ErrorNotice } from "../components/ui";
+import { Badge } from "../components/ui/Badge";
+import { InlineError } from "../components/ui/ErrorState";
+import { titleCase } from "../lib/format/text";
 import { AddLocation } from "../components/LocationForms";
 
 export function AdminPage() {
@@ -61,7 +64,7 @@ export function AdminPage() {
       <section className="panel" aria-labelledby="access-title">
         <h2 id="access-title">Who is using the workspace</h2>
         {access.error ? (
-          <ErrorNotice error={access.error} />
+          <InlineError error={access.error} />
         ) : !access.data ? (
           <p className="muted">Loading…</p>
         ) : (
@@ -103,7 +106,7 @@ export function AdminPage() {
       <section className="panel" aria-labelledby="alerts-title">
         <h2 id="alerts-title">Open alerts</h2>
         {alerts.error ? (
-          <ErrorNotice error={alerts.error} />
+          <InlineError error={alerts.error} />
         ) : !alerts.data ? (
           <p className="muted">Loading alerts…</p>
         ) : alerts.data.open.length === 0 ? (
@@ -128,7 +131,7 @@ export function AdminPage() {
       <section className="panel" aria-labelledby="jobs-title">
         <h2 id="jobs-title">Recent job runs</h2>
         {jobs.error ? (
-          <ErrorNotice error={jobs.error} />
+          <InlineError error={jobs.error} />
         ) : jobs.isPending ? (
           <p className="muted">Loading recorded job activity…</p>
         ) : jobs.data?.results.length ? (
@@ -148,7 +151,7 @@ export function AdminPage() {
                   <tr key={job.id}>
                     <td>{titleCase(job.kind)}</td>
                     <td>
-                      <Badge tone={job.status === "failed" ? "red" : job.status === "succeeded" ? "green" : "neutral"}>
+                      <Badge tone={job.status === "succeeded" ? "accent" : "neutral"}>
                         {titleCase(job.status)}
                         {job.error_code ? ` · ${job.error_code}` : ""}
                       </Badge>

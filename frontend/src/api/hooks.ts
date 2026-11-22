@@ -1,11 +1,10 @@
 /** Data hooks against the PART C contract (docs/REDESIGN_PLAN.md F3). */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Location, Session, Source } from "../types";
+import type { Session, Source } from "../types";
 import { isBusy, newlyReady, POLL_GIVE_UP_MS, pollDelay, readyMessage } from "./analysis";
 import { allLocations, api, ApiError } from "./client";
 import { keys } from "./keys";
-import { fetchLegacyBundle, legacyKpis, legacyTakeaways, type LegacySummary } from "./legacyAnalysis";
 import type {
   AnalysisBundle,
   AnalysisListItem,
@@ -14,52 +13,16 @@ import type {
   SignalsResponse,
 } from "./types";
 
-/** A bare 404 (no JSON detail) means the route is not deployed yet, not that the record is missing. */
-export const isMissingRoute = (error: unknown) => error instanceof ApiError && error.status === 404 && !error.detail;
-
-let bundleRoute: boolean | null = null;
-/** For tests: forget whether the bundle endpoint exists. */
-export function resetRouteDetection() {
-  bundleRoute = null;
-  analysesRoute = null;
-}
-
-/**
- * Until the bundle carries KPIs and takeaways (B6b), build them from its sections plus the
- * existing /summary/ (portfolio percentiles and the deterministic strengths/concerns).
- */
-async function withSummaryFallback(bundle: AnalysisBundle): Promise<AnalysisBundle> {
-  if (bundle.kpis.length && bundle.takeaways.length) return bundle;
-  const summary = await api<LegacySummary>(`/api/locations/${bundle.location.id}/summary/`).catch(() => null);
+/** GET the PART C bundle (one request for the whole analysis page). */
+export async function fetchAnalysis(id: string): Promise<AnalysisBundle> {
+  const bundle = await api<AnalysisBundle>(`/api/locations/${id}/analysis/`);
   return {
     ...bundle,
-    kpis: bundle.kpis.length ? bundle.kpis : legacyKpis(bundle.sections, summary),
-    takeaways: bundle.takeaways.length ? bundle.takeaways : legacyTakeaways(summary),
-    portfolio:
-      bundle.portfolio ??
-      (summary ? { size: summary.portfolio_size, min: summary.min_portfolio, ready: summary.benchmark_ready, note: summary.note } : undefined),
+    kpis: bundle.kpis ?? [],
+    takeaways: bundle.takeaways ?? [],
+    signals: bundle.signals ?? [],
+    risk_badges: bundle.risk_badges ?? [],
   };
-}
-
-/** GET the PART C bundle; falls back to the legacy adapter until B3b is deployed. */
-export async function fetchAnalysis(id: string): Promise<AnalysisBundle> {
-  if (bundleRoute !== false) {
-    try {
-      const bundle = await api<AnalysisBundle>(`/api/locations/${id}/analysis/`);
-      bundleRoute = true;
-      return withSummaryFallback({
-        ...bundle,
-        kpis: bundle.kpis ?? [],
-        takeaways: bundle.takeaways ?? [],
-        signals: bundle.signals ?? [],
-        risk_badges: bundle.risk_badges ?? [],
-      });
-    } catch (error) {
-      if (!isMissingRoute(error)) throw error;
-      bundleRoute = false;
-    }
-  }
-  return fetchLegacyBundle(id);
 }
 
 export function useSession() {
@@ -128,64 +91,24 @@ export function useAnalysisTransitions(bundle: AnalysisBundle | undefined) {
   return message;
 }
 
-// ---- New places (B5). Until /api/analyses/ is deployed, the screens API stands in. ----
-let analysesRoute: boolean | null = null;
-interface LegacyScreen extends Location {
-  screening?: boolean;
-}
-function fromScreen(l: LegacyScreen): AnalysisListItem {
-  return {
-    id: l.id,
-    name: l.name,
-    display_label: null,
-    address: l.address,
-    lat: l.current_revision.lat,
-    lon: l.current_revision.lon,
-    created_at: l.created_at,
-    kept: false,
-    expires_at: null,
-    // The screens API has no run state; key numbers appear once the analysis has finished.
-    state: l.current_revision.lat === null ? "unplaced" : l.key_numbers && Object.keys(l.key_numbers).length ? "complete" : "running",
-    key_numbers: l.key_numbers,
-  };
-}
+// ---- New places (B5) ----
 export async function fetchAnalyses(): Promise<AnalysisListItem[]> {
-  if (analysesRoute !== false) {
-    try {
-      const rows = await api<AnalysisListItem[] | { results: AnalysisListItem[] }>("/api/analyses/");
-      analysesRoute = true;
-      return Array.isArray(rows) ? rows : rows.results;
-    } catch (error) {
-      if (!isMissingRoute(error)) throw error;
-      analysesRoute = false;
-    }
-  }
-  const screens = await api<{ results: LegacyScreen[] }>("/api/screens/");
-  return screens.results.map(fromScreen);
+  const rows = await api<AnalysisListItem[] | { results: AnalysisListItem[] }>("/api/analyses/");
+  return Array.isArray(rows) ? rows : rows.results;
 }
 export function useAnalyses() {
   return useQuery({ queryKey: keys.analyses, queryFn: fetchAnalyses });
 }
 
 export async function createAnalysis(body: CreateAnalysisBody): Promise<CreateAnalysisResponse> {
-  if (analysesRoute !== false) {
-    try {
-      const result = await api<CreateAnalysisResponse>("/api/analyses/", "POST", body);
-      analysesRoute = true;
-      return result;
-    } catch (error) {
-      // Geocoder down: the record exists and the answer says to place the pin by hand.
-      if (error instanceof ApiError && error.status === 503 && (error.body as CreateAnalysisResponse | null)?.location)
-        return error.body as CreateAnalysisResponse;
-      if (!isMissingRoute(error)) throw error;
-      analysesRoute = false;
-    }
+  try {
+    return await api<CreateAnalysisResponse>("/api/analyses/", "POST", body);
+  } catch (error) {
+    // Geocoder down (503): the record exists and the answer says to place the pin by hand.
+    if (error instanceof ApiError && error.status === 503 && (error.body as CreateAnalysisResponse | null)?.location)
+      return error.body as CreateAnalysisResponse;
+    throw error;
   }
-  if (!("address" in body))
-    throw new ApiError(400, "Analyzing a map point needs the latest server update. Type an address instead.");
-  const legacy = await api<{ location: Location; geocode_status: string }>("/api/screens/", "POST", body);
-  const status = legacy.geocode_status === "matched" ? "matched" : legacy.geocode_status === "ambiguous" ? "ambiguous" : "no_match";
-  return { location: legacy.location, geocode: { status }, ...(status === "matched" ? {} : { next: "place_pin" as const }) };
 }
 export function useCreateAnalysis() {
   const cache = useQueryClient();
