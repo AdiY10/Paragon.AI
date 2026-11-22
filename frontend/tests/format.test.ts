@@ -15,6 +15,7 @@ import {
   formatMetric,
   formatMoe,
   formatShare,
+  formatIncome,
   formatUsd,
   formatValue,
   indexText,
@@ -59,6 +60,9 @@ describe("numbers", () => {
     expect(formatCompact(12940)).toBe("12.9K");
     expect(formatCompact(4_200_000)).toBe("4.2M");
     expect(formatCompact(-25_000)).toBe("−25K");
+    expect(formatIncome(133405)).toBe("$133,405");
+    expect(formatIncome(200000)).toBe("≥ $200,000");
+    expect(formatIncome(null)).toBeNull();
   });
   it("formats signed changes with a true minus sign", () => {
     expect(formatChangePct(0.031)).toBe("+3.1%");

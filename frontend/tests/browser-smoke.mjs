@@ -159,9 +159,30 @@ try {
       throw new Error(`Map overflows at ${width}`);
   }
   await page.setViewportSize({ width: 1280, height: 1000 });
+  // WI-4 Properties table: 36 owned rows, sortable headers, filters and compare selection in the URL.
+  const ownedTable = page.getByRole("table", { name: "Owned properties" });
+  if ((await ownedTable.locator("tbody tr").count()) !== 36)
+    throw new Error("Expected 36 owned property rows");
+  await ownedTable.getByRole("button", { name: "People within 3 mi" }).click();
+  if ((await ownedTable.locator("th[aria-sort]").getAttribute("aria-sort")) !== "descending")
+    throw new Error("Sorting did not set aria-sort");
+  if (!page.url().includes("sort=population"))
+    throw new Error("Sort is not in the URL");
   await page.getByLabel("State", { exact: true }).selectOption("CT");
-  const property = page.locator(".property-card").first();
-  const name = await property.locator("h3").innerText();
+  await page.waitForFunction(() => location.hash.includes("state=CT"));
+  if ((await ownedTable.locator("tbody tr td:nth-child(3)").allInnerTexts()).some((state) => state !== "CT"))
+    throw new Error("State filter left other states in the table");
+  const compareBoxes = ownedTable.getByRole("checkbox", { name: /^Compare / });
+  await compareBoxes.nth(0).check();
+  await compareBoxes.nth(1).check();
+  const tray = page.getByRole("complementary", { name: "Compare selection" });
+  await tray.getByRole("link", { name: "Compare 2 properties" }).click();
+  await page.waitForFunction(() => location.hash.startsWith("#/compare?ids="));
+  await page.goBack();
+  await page.getByRole("table", { name: "Owned properties" }).waitFor();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  const property = ownedTable.locator("tbody tr").first().getByRole("rowheader").getByRole("link");
+  const name = await property.innerText();
   const propertyHref = await property.getAttribute("href");
   await page.goto(`${base}/${propertyHref.replace("#/p/", "#/locations/")}`);
   await page.waitForFunction((hash) => location.hash === hash, propertyHref);
@@ -467,7 +488,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
+    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
   );
 } finally {
   await browser.close();

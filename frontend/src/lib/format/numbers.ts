@@ -30,6 +30,14 @@ export function formatCompact(n: Num): string | null {
 /** 183031.9 → "$183,032". */
 export const formatUsd = (n: Num) => (isNum(n) ? usd.format(n) : null);
 
+/**
+ * Median household income. ACS's top income bracket is "$200,000 or more", so a median in that
+ * bracket is reported at its floor: show it as "≥ $200,000", never as an exact figure.
+ */
+export const ACS_INCOME_TOP = 200_000;
+export const formatIncome = (n: Num) =>
+  !isNum(n) ? null : n >= ACS_INCOME_TOP ? `≥ ${usd.format(ACS_INCOME_TOP)}` : usd.format(n);
+
 /** 0.5004 → "50.0%" (a share, not a change). */
 export const formatShare = (n: Num, digits = 1) => (isNum(n) ? `${(n * 100).toFixed(digits)}%` : null);
 

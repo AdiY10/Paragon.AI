@@ -8,7 +8,7 @@ import { Empty, ErrorNotice } from "../components/ui";
 import { Admin } from "../pages/Admin";
 import { LocationPage } from "../pages/LocationPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
-import { Portfolio } from "../pages/Portfolio";
+import { PropertiesPage } from "../pages/PropertiesPage";
 import { Sources } from "../pages/Sources";
 import type { Session, Source } from "../types";
 import { AppShell } from "./AppShell";
@@ -38,7 +38,7 @@ export function App() {
     queryFn: () => api<Source[]>("/api/sources/"),
     enabled: !!session.data,
   });
-  const needsPortfolio = route.name === "properties" || route.name === "analyze";
+  const needsPortfolio = route.name === "properties";
   const portfolio = useQuery({
     queryKey: ["locations"],
     queryFn: allLocations,
@@ -80,24 +80,16 @@ export function App() {
     );
   else
     switch (route.name) {
-      // Interim pages until WI-4 (Properties), WI-6 (analysis) and WI-7 (Analyze) replace them.
       case "properties":
-        body = <Portfolio locations={portfolio.data ?? []} />;
+        body = <PropertiesPage locations={portfolio.data ?? []} />;
         break;
+      // Interim pages until WI-6 (analysis) and WI-7 (Analyze) replace them.
       case "property":
       case "place":
         body = <LocationPage id={route.id} />;
         break;
       case "analyze":
-        body = (
-          <>
-            <ScreenPage />
-            <Portfolio
-              locations={(portfolio.data ?? []).filter((item) => item.status === "candidate")}
-              candidates
-            />
-          </>
-        );
+        body = <ScreenPage />;
         break;
       case "alerts":
         body = <AlertsPage />;

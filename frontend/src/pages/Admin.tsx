@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, dateLabel } from "../api";
 import { type Page } from "../types";
 import { titleCase, Badge, ErrorNotice, PageHead } from "../components/ui";
+import { AddLocation } from "../components/LocationForms";
 
 export function Admin() {
   const jobs = useQuery({
@@ -54,6 +55,7 @@ export function Admin() {
         eyebrow="Workspace administration"
         title="Keep the workspace reliable."
         description="Problems that need attention, then recorded job activity."
+        action={<AddLocation />}
       />
       <section className="panel" aria-labelledby="access-title">
         <h2 id="access-title">Who is using the workspace</h2>

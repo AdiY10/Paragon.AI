@@ -5,42 +5,27 @@ import { api, allLocations, dateLabel } from "./api";
 import type { Location } from "./types";
 import { formatMetric } from "./Summary";
 import { takePendingAddress } from "./app/nav";
+import { navigate, parseHash } from "./app/router";
+import { LIMIT_MESSAGE, parseIds, readSelection, useCompareSelection, writeSelection } from "./features/compare/selection";
 
-// ---- compare selection (per-viewer convenience; never required for correctness) ----
-const KEY = "paragon.compare";
-export function readCompare(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 4) : [];
-  } catch {
-    return [];
-  }
-}
-export function writeCompare(ids: string[]) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(ids.slice(0, 4)));
-  } catch {
-    /* storage unavailable: selection lasts for this page only */
-  }
-}
-export function toggleCompare(ids: string[], id: string): string[] {
-  return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id].slice(-4);
-}
-
+// ---- compare selection: src/features/compare/selection.ts (up to 4, a fifth is refused) ----
 export function CompareButton({ id }: { id: string }) {
-  const [ids, setIds] = useState(readCompare());
+  const { ids, toggle } = useCompareSelection();
+  const [message, setMessage] = useState("");
   const on = ids.includes(id);
   return (
-    <button
-      className="button secondary small-button"
-      onClick={() => {
-        const next = toggleCompare(ids, id);
-        writeCompare(next);
-        setIds(next);
-      }}
-    >
-      <Layers3 size={14} /> {on ? "Remove from compare" : "Add to compare"} ({(on ? ids.length : Math.min(4, ids.length + 1))}/4)
-    </button>
+    <>
+      <button
+        className="button secondary small-button"
+        aria-pressed={on}
+        onClick={() => setMessage(toggle(id) ? "" : LIMIT_MESSAGE)}
+      >
+        <Layers3 size={14} /> {on ? "Remove from compare" : "Add to compare"} ({ids.length}/4)
+      </button>
+      <span className="sr-only" role="status">
+        {message}
+      </span>
+    </>
   );
 }
 
@@ -180,7 +165,11 @@ interface CompareData {
 }
 
 export function ComparePage() {
-  const [ids, setIds] = useState(readCompare());
+  // ?ids= wins (links from the Properties tray); otherwise the stored selection.
+  const [ids, setIds] = useState(() => {
+    const fromUrl = parseIds(parseHash(window.location.hash).query.get("ids"));
+    return fromUrl.length ? fromUrl : readSelection();
+  });
   const all = useQuery({ queryKey: ["locations", "all-for-compare"], queryFn: allLocations });
   const data = useQuery({
     queryKey: ["compare", ids.join(",")],
@@ -188,8 +177,9 @@ export function ComparePage() {
     queryFn: () => api<CompareData>(`/api/compare/?ids=${ids.join(",")}`),
   });
   const update = (next: string[]) => {
-    writeCompare(next);
+    writeSelection(next);
     setIds(next);
+    navigate(next.length ? "/compare?ids=" + next.join(",") : "/compare", { replace: true });
   };
   const options = (all.data ?? []).filter((l) => l.status !== "archived" && !ids.includes(l.id) && l.current_revision.lat !== null);
   const groups = [...new Set((data.data?.rows ?? []).map((r) => r.group))];

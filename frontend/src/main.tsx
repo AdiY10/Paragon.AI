@@ -12,6 +12,7 @@ import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/charts.css";
 import "./styles/map.css";
+import "./styles/properties.css";
 
 installRouter();
 createRoot(document.getElementById("root")!).render(
