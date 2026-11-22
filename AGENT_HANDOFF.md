@@ -172,3 +172,6 @@ CEO of Paragon Realty Group. This repository contains a complete product and dat
    production, and TESTING_GUIDE.md, KNOWN_LIMITATIONS.md, TEST_REPORT.md and DELIVERY_REPORT.md are committed.
    End with the delivery report: URL, what was built, test results, monthly cost, limitations, blockers, next steps.
 ```
+
+## Current work (2026-11-21): the redesign
+The approved plan is [docs/REDESIGN_PLAN.md](docs/REDESIGN_PLAN.md): a backend track (B0-B9) and a frontend track (WI-1-WI-9) that build against one API contract (PART C). Build items in the order given there, one PR per item, with the acceptance numbers in each PR.
