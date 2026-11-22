@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/admin/jobs/<uuid:job_id>/rerun/', operations.rerun),
     path('api/admin/alerts/', operations.alerts),
     path('api/admin/access-log/', accounts_views.access_log),
+    path('api/admin/alert-quality/', insights.alert_quality),
     path('api/locations/', locations.locations),
     path('api/locations/search/', locations.search),
     path('api/locations/<uuid:location_id>/', locations.location_detail),

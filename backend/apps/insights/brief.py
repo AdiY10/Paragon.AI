@@ -67,8 +67,8 @@ def generate(*, kind='weekly', now=None):
             'properties_with_active_signals': owned})
 
 
-COUNTY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'}
-SHARED_SUBJECT_RULES = COUNTY_RULES | {'SIG-09', 'SIG-10'}
+COUNTY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07', 'SIG-15'}
+SHARED_SUBJECT_RULES = COUNTY_RULES | {'SIG-09', 'SIG-10', 'SIG-14'}
 
 
 def group_by_subject(items):
