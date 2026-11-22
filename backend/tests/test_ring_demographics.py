@@ -418,12 +418,15 @@ def test_post_enqueues_one_job_per_analysis_version_and_worker_computes(tmp_path
     from apps.demographics.models import RingDemographics
     location, store, _ = setup_location(tmp_path, client, with_acs=True, with_baseline=True)
     settings.SOURCE_ARTIFACT_ROOT = tmp_path / 'artifacts'
+    from apps.accounts.models import Membership
+    Membership.objects.filter(email='member@example.org').update(role='admin')  # admins may recompute one part
     url = f'/api/locations/{location.pk}/demographics/'
     first, second = client.post(url), client.post(url)
     assert first.status_code == second.status_code == 202
-    assert first.json()['job_id'] == second.json()['job_id'] and second.json()['created'] is False
-    job = JobRun.objects.get(kind='compute_ring_demographics')
-    assert job.parameters == {'location_id': str(location.pk), 'analysis_version': location.analysis_version}
+    assert first.json()['job_id'] == second.json()['job_id']
+    job = JobRun.objects.get(kind='analyze_location')
+    assert job.parameters == {'location_id': str(location.pk), 'analysis_version': location.analysis_version,
+        'sections': ['demographics']}
     execute_job(str(job.pk))
     job.refresh_from_db()
     assert job.status == JobRun.Status.SUCCEEDED and RingDemographics.objects.count() == 1

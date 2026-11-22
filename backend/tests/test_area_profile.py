@@ -250,7 +250,10 @@ def test_post_enqueues_one_job_per_analysis_version(tmp_path, client, settings):
     url = f'/api/locations/{location.pk}/area/'
     first, second = client.post(url), client.post(url)
     assert first.status_code == 202 and first.json()['job_id'] == second.json()['job_id']
-    assert JobRun.objects.get(kind='compute_area_profile').parameters['analysis_version'] == location.analysis_version
+    job = JobRun.objects.get(kind='analyze_location')
+    # A member only makes sure the missing parts are queued (B3a): the whole analysis here.
+    assert job.parameters['analysis_version'] == location.analysis_version
+    assert set(job.parameters['sections']) == {'demographics', 'economy', 'traffic', 'hazards', 'businesses', 'jobs'}
 
 
 # ---- nearby businesses (Overture) -------------------------------------------------

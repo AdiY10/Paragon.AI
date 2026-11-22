@@ -122,21 +122,10 @@ def screens(request):
 @api_view(['POST'])
 def screen_save(request, location_id):
     from apps.locations.serializers import LocationSerializer
-    from .screens import save_screen, start_computations
+    from .screens import save_screen
     location = get_object_or_404(Location, pk=location_id)
     location = save_screen(location, request.user)
     return Response(LocationSerializer(location).data)
-
-
-@api_view(['POST'])
-@throttle_classes([ExpensiveThrottle])
-def location_compute(request, location_id):
-    """Queue demographics and all area sections for a placed location."""
-    from .screens import start_computations
-    location = get_object_or_404(Location.objects.select_related('current_revision'), pk=location_id)
-    if location.current_revision is None or location.current_revision.lat is None:
-        return Response({'detail': 'Place the pin first.'}, status=400)
-    return Response({'jobs': start_computations(location, request.user)}, status=202)
 
 
 @api_view(['GET'])

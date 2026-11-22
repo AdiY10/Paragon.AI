@@ -49,6 +49,20 @@ def compute_area_profile(context,parameters):
     unavailable={r.section:r.data.get('reason','UNAVAILABLE') for r in rows if r.status!='available'}
     return JobResult(records=len(rows)-len(unavailable),failed=len(unavailable),detail=unavailable)
 
+def analyze_location(context,parameters):
+    """Automatic analysis of one location (redesign B3a); same body on both queues."""
+    from apps.area.analysis import Heartbeat,Stale,RETRYABLE,run_analysis
+    context.heartbeat()
+    try:
+        with Heartbeat(context) as beat:
+            outcome=run_analysis(parameters['location_id'],parameters['analysis_version'],parameters['sections'],check=beat.check)
+    except Stale:
+        return JobResult(records=0,detail={'stale':'STALE'})
+    unavailable={k:v for k,v in outcome.items() if v!='available'}
+    # Only transient source failures count as failed items; "not covered here" is a valid answer.
+    return JobResult(records=len(outcome)-len(unavailable),
+        failed=sum(1 for v in unavailable.values() if v in RETRYABLE),detail=unavailable)
+
 def _refresh(fn):
     def handler(context,parameters):
         from .contracts import JobFailure
@@ -134,6 +148,11 @@ REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,MAINTENANCE,1800),
     'compute_area_profile':JobSpec(compute_area_profile,FOREGROUND,900,
         frozenset({'location_id','analysis_version'})),
     'brief_weekly':JobSpec(brief_weekly,FOREGROUND,600),
+    # Automatic analysis (B3a): user-facing on foreground; seeds, bulk and sweep work in the background.
+    'analyze_location':JobSpec(analyze_location,FOREGROUND,900,
+        frozenset({'location_id','analysis_version','sections'}),lease_seconds=300),
+    'analyze_location_bg':JobSpec(analyze_location,MAINTENANCE,900,
+        frozenset({'location_id','analysis_version','sections'}),lease_seconds=300),
     # Maintenance: scheduled refreshes (config/schedules.yaml), one location at a time.
     'bls_bps_check':JobSpec(bls_bps_check,MAINTENANCE,3600),
     'overture_check':JobSpec(overture_check,MAINTENANCE,7200),

@@ -38,7 +38,7 @@ def test_screen_with_exact_match_pins_and_queues_computations(client, tmp_path, 
         actor=user, geocoder=census('norwalk'))
     assert status == 'matched' and location.screening is True and location.status == 'candidate'
     assert location.current_revision.lat == pytest.approx(41.12661, abs=1e-4)
-    assert {j.kind for j in JobRun.objects.all()} == {'compute_ring_demographics', 'compute_area_profile'}
+    assert [j.kind for j in JobRun.objects.all()] == ['analyze_location'] and jobs == [str(JobRun.objects.get().pk)]
     # Unsaved screens are not monitored and not in the portfolio list.
     from apps.area.refresh import monitored
     assert location not in list(monitored())
@@ -55,7 +55,8 @@ def test_ambiguous_or_missing_address_needs_a_pin_and_queues_nothing(client, tmp
         actor=user, geocoder=census('mount_kisco'))
     assert status == 'ambiguous' and location.current_revision.lat is None and jobs == []
     assert not JobRun.objects.exists()
-    assert client.post(f'/api/locations/{location.pk}/compute/').status_code == 400
+    assert client.post(f'/api/locations/{location.pk}/compute/').status_code == 404  # manual compute removed (B3a)
+    assert client.post(f'/api/locations/{location.pk}/area/').status_code == 400
 
 
 def test_old_unsaved_screens_expire(client):

@@ -27,7 +27,7 @@ from .models import AreaSection
 
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
-SECTION_LOGIC = {'businesses': 8, 'hazards': 3}
+SECTION_LOGIC = {'economy': 1, 'traffic': 1, 'hazards': 3, 'businesses': 8, 'jobs': 1}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 SOURCE_META = {
@@ -394,42 +394,50 @@ BUILDERS = {'economy': economy_section, 'traffic': traffic_section, 'hazards': h
     'businesses': businesses_section, 'jobs': jobs_section}
 
 
-def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, capturer=None):
+def compute_section(location, revision, version, name, *, store, opener=None, capturer=None):
+    """Compute and store one section for the location's current pin (B3a: one step of an analysis)."""
+    run = Run(store, opener)
+    try:
+        if name == 'businesses':
+            data, ok = businesses_section(run, revision.lat, revision.lon, location=location, capturer=capturer)
+        elif name == 'jobs':
+            data, ok = jobs_section(run, revision.lat, revision.lon, location=location)
+        else:
+            data, ok = BUILDERS[name](run, revision.lat, revision.lon)
+    except SourceError as exc:
+        data, ok = {'reason': exc.code}, False
+    stale = sorted(k for k, v in run.sources.items() if v.get('stale'))
+    logic = SECTION_LOGIC[name]
+    # Sections first versioned in B3a (logic 1) keep their original hash input, so existing rows still match.
+    key = [name, run.snapshots, stale] + ([logic] if logic > 1 else [])
+    inputs = hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
+    with transaction.atomic():
+        if Location.objects.select_for_update().get(pk=location.pk).analysis_version != version:
+            raise SourceError('STALE', 'Pin changed during computation')
+        try:
+            with transaction.atomic():
+                row = AreaSection.objects.create(location=location, revision=revision, analysis_version=version,
+                    section=name, status='available' if ok else 'unavailable', data=data,
+                    sources=list(run.sources.values()), snapshot_ids=run.snapshots, inputs_sha256=inputs,
+                    logic_version=logic)
+        except IntegrityError:
+            row = AreaSection.objects.get(location=location, analysis_version=version, section=name,
+                inputs_sha256=inputs)
+    return row
+
+
+def compute_area(location_id, *, sections=SECTIONS, store=None, opener=None, capturer=None, evaluate=True):
     store = _store(store)
     location = Location.objects.select_related('current_revision').get(pk=location_id)
     revision = location.current_revision
     if revision is None or revision.lat is None:
         raise SourceError('NOT_PROVIDED', 'Place the pin first')
     version = location.analysis_version
-    results = []
-    for name in sections:
-        run = Run(store, opener)
-        try:
-            if name == 'businesses':
-                data, ok = businesses_section(run, revision.lat, revision.lon, location=location, capturer=capturer)
-            elif name == 'jobs':
-                data, ok = jobs_section(run, revision.lat, revision.lon, location=location)
-            else:
-                data, ok = BUILDERS[name](run, revision.lat, revision.lon)
-        except SourceError as exc:
-            data, ok = {'reason': exc.code}, False
-        stale = sorted(k for k, v in run.sources.items() if v.get('stale'))
-        key = [name, run.snapshots, stale] + ([SECTION_LOGIC[name]] if name in SECTION_LOGIC else [])
-        inputs = hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
-        with transaction.atomic():
-            if Location.objects.select_for_update().get(pk=location.pk).analysis_version != version:
-                raise SourceError('STALE', 'Pin changed during computation')
-            try:
-                with transaction.atomic():
-                    row = AreaSection.objects.create(location=location, revision=revision, analysis_version=version,
-                        section=name, status='available' if ok else 'unavailable', data=data,
-                        sources=list(run.sources.values()), snapshot_ids=run.snapshots, inputs_sha256=inputs)
-            except IntegrityError:
-                row = AreaSection.objects.get(location=location, analysis_version=version, section=name,
-                    inputs_sha256=inputs)
-        results.append(row)
-    from apps.insights.signals import safe_evaluate
-    safe_evaluate(location.pk)
+    results = [compute_section(location, revision, version, name, store=store, opener=opener, capturer=capturer)
+        for name in sections]
+    if evaluate:
+        from apps.insights.signals import safe_evaluate
+        safe_evaluate(location.pk)
     return results
 
 

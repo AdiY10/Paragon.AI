@@ -19,6 +19,8 @@ class AreaSection(models.Model):
     sources = models.JSONField()
     snapshot_ids = models.JSONField(default=list)
     inputs_sha256 = models.CharField(max_length=64)
+    # apps.area.service.SECTION_LOGIC at compute time; the analysis sweep recomputes older rows.
+    logic_version = models.PositiveSmallIntegerField(default=1)
     computed_at = models.DateTimeField(auto_now_add=True)
     objects = ImmutableQuerySet.as_manager()
 

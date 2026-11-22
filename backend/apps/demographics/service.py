@@ -15,6 +15,8 @@ from . import vintage
 DEFAULT_ACS_YEAR = 2024
 AUTO_INGEST = True  # tests turn this off; jobs ingest a missing state's ACS rows on demand
 BASELINE_ACS_YEAR = acs.LEGACY_YEAR
+# Bump when the ring computation changes; the analysis sweep recomputes older results (B3a).
+LOGIC_VERSION = 1
 RADII = {'1/3/5': (1, 3, 5), '3/5/10': (3, 5, 10)}
 
 
@@ -107,7 +109,7 @@ def _cpi(years, store, opener):
 
 
 def compute_for_location(location_id, *, year=None, baseline_year=BASELINE_ACS_YEAR,
-        store=None, opener=None):
+        store=None, opener=None, evaluate=True):
     store = _store(store)
     year = year or vintage.current_acs_year()
     location = Location.objects.select_related('current_revision').get(pk=location_id)
@@ -145,12 +147,14 @@ def compute_for_location(location_id, *, year=None, baseline_year=BASELINE_ACS_Y
                 result = RingDemographics.objects.create(location=location, revision=revision,
                     analysis_version=analysis_version, ring_preset=location.ring_preset, acs_year=year,
                     data_period=acs.vintage_period(year), geography_snapshot=geo_snapshot,
-                    acs_snapshot_ids=acs_ids, baseline=baseline, inputs_sha256=inputs_sha, rings=rings)
+                    acs_snapshot_ids=acs_ids, baseline=baseline, inputs_sha256=inputs_sha, rings=rings,
+                    logic_version=LOGIC_VERSION)
         except IntegrityError:
             result = RingDemographics.objects.get(location=location, analysis_version=analysis_version,
                 acs_year=year, inputs_sha256=inputs_sha)
-    from apps.insights.signals import safe_evaluate
-    transaction.on_commit(lambda: safe_evaluate(location.pk))
+    if evaluate:
+        from apps.insights.signals import safe_evaluate
+        transaction.on_commit(lambda: safe_evaluate(location.pk))
     return result
 
 
