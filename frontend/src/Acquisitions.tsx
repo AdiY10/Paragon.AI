@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Layers3, Plus, Search, X } from "lucide-react";
 import { api, allLocations, dateLabel } from "./api";
 import type { Location } from "./types";
-import { formatMetric } from "./Summary";
+import { formatMetric } from "./lib/format/metrics";
 import { takePendingAddress } from "./app/nav";
 import { navigate, parseHash } from "./app/router";
 import { LIMIT_MESSAGE, parseIds, readSelection, useCompareSelection, writeSelection } from "./features/compare/selection";

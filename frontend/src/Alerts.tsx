@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, dateLabel } from "./api";
 import { AlertEvidence, type AlertLike } from "./AlertDetails";
 import { RULE_NAMES } from "./alertText";
-import { severityTone } from "./Summary";
+import { severityTone } from "./lib/format/metrics";
 
 type Alert = AlertLike & { category: string; status: string; changed_at: string; location: { id: string; name: string; city: string; state: string } };
 

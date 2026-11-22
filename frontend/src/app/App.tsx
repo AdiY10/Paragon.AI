@@ -5,7 +5,7 @@ import { ComparePage, ScreenPage } from "../Acquisitions";
 import { useLocations, useSession, useSources } from "../api/hooks";
 import { Empty, ErrorNotice } from "../components/ui";
 import { Admin } from "../pages/Admin";
-import { LocationPage } from "../pages/LocationPage";
+import { AnalysisPage } from "../pages/AnalysisPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { PropertiesPage } from "../pages/PropertiesPage";
 import { Sources } from "../pages/Sources";
@@ -14,9 +14,10 @@ import { type Route, useRoute } from "./router";
 
 const TITLES: Record<Route["name"], string> = {
   properties: "Properties",
-  property: "Property analysis",
+  // Analysis pages set their own title (the property's name).
+  property: "",
   analyze: "Analyze a place",
-  place: "Place analysis",
+  place: "",
   alerts: "Alerts",
   compare: "Compare",
   sources: "Data sources",
@@ -69,10 +70,12 @@ export function App() {
       case "properties":
         body = <PropertiesPage locations={portfolio.data ?? []} />;
         break;
-      // Interim pages until WI-6 (analysis) and WI-7 (Analyze) replace them.
+      // Interim page until WI-7 (Analyze) replaces it.
       case "property":
+        body = <AnalysisPage key={route.id} id={route.id} mode="property" />;
+        break;
       case "place":
-        body = <LocationPage id={route.id} />;
+        body = <AnalysisPage key={route.id} id={route.id} mode="place" />;
         break;
       case "analyze":
         body = <ScreenPage />;
@@ -99,7 +102,13 @@ export function App() {
         body = <NotFoundPage />;
     }
   return (
-    <AppShell session={session.data} sources={sources.data} path={path} title={TITLES[route.name]}>
+    <AppShell
+      session={session.data}
+      sources={sources.data}
+      path={path}
+      title={TITLES[route.name]}
+      wide={route.name === "property" || route.name === "place"}
+    >
       {body}
     </AppShell>
   );

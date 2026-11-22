@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { api, dateLabel } from "./api";
 import type { Location } from "./types";
 
@@ -69,16 +69,9 @@ export default function TenantsPanel({ location, isAdmin }: { location: Location
   }
   const rows = (q.data?.results ?? []).filter((t) => !t.archived);
   return (
-    <section className="panel" aria-labelledby="tenants-title">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">TENANTS</span>
-          <h2 id="tenants-title">Tenants and tenant watch</h2>
-        </div>
-        <Store size={22} />
-      </div>
+    <div className="tenants-panel">
       <p className="small muted">
-        Tenants imported from the public listing are unverified claims; confirm or archive each one. Public-company
+        Tenants imported from the public listing are unverified claims; verify or archive each one. Public-company
         tenants mapped to their SEC filer are checked daily for bankruptcy and closure filings (company-level, not
         store-level).
       </p>
@@ -98,16 +91,24 @@ export default function TenantsPanel({ location, isAdmin }: { location: Location
                 <span className="card-badges">
                   {t.is_anchor && <span className="badge">Anchor</span>}
                   <span className={`badge ${t.confirmed ? "green" : "unverified"}`}>
-                    {t.confirmed ? "Confirmed" : presenceLabel(t.presence)}
+                    {t.confirmed ? "Verified" : presenceLabel(t.presence)}
                   </span>
                 </span>
                 <span className="tenant-actions">
                   {!t.confirmed && (
-                    <button className="text-button small" onClick={() => act.mutate({ t, kind: "confirm" })}>
-                      Confirm
+                    <button
+                      className="text-button small"
+                      aria-label={`Verify ${t.name} is a tenant`}
+                      onClick={() => act.mutate({ t, kind: "confirm" })}
+                    >
+                      Verify
                     </button>
                   )}
-                  <button className="text-button small" onClick={() => act.mutate({ t, kind: "archive" })}>
+                  <button
+                    className="text-button small"
+                    aria-label={`Archive ${t.name}`}
+                    onClick={() => act.mutate({ t, kind: "archive" })}
+                  >
                     Archive
                   </button>
                 </span>
@@ -127,7 +128,7 @@ export default function TenantsPanel({ location, isAdmin }: { location: Location
           <Plus size={14} /> Add
         </button>
       </form>
-    </section>
+    </div>
   );
 }
 

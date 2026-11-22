@@ -116,8 +116,12 @@ export interface Place {
   evidence?: string;
   tenant_match?: boolean;
   confirmed?: boolean;
+  lat?: number;
+  lon?: number;
 }
 export interface Businesses {
+  /** Every place within 3 mi with coordinates (bundle, B3b); absent from the older /area/ payload. */
+  places?: Place[];
   release: string;
   prior_release: string | null;
   counts: Record<string, Record<string, number>>;

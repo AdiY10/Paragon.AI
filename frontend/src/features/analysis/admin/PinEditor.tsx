@@ -1,13 +1,26 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, MapPin, X } from "lucide-react";
-import { api, ApiError } from "./api";
-import type { Location } from "./types";
-import { PreviewMap } from "./components/map/lazy";
+import { api, ApiError } from "../../../api/client";
+import type { Location } from "../../../types";
+import { PreviewMap } from "../../../components/map/lazy";
 
-export default function PinEditor({ location }: { location: Location }) {
-  const [open, setOpen] = useState(false),
+export default function PinEditor({
+  location,
+  open: openProp,
+  onOpenChange,
+  returnFocus,
+}: {
+  location: Location;
+  /** Controlled from the "Property actions" menu (no own trigger button). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Where focus goes when the dialog closes (the menu button). */
+  returnFocus?: () => void;
+}) {
+  const controlled = openProp !== undefined;
+  const [openState, setOpen] = useState(false),
     [snapshot, setSnapshot] = useState(location);
   const [latitude, setLatitude] = useState(""),
     [longitude, setLongitude] = useState(""),
@@ -19,19 +32,28 @@ export default function PinEditor({ location }: { location: Location }) {
       cache.invalidateQueries({ queryKey: ["location", location.id] });
       cache.invalidateQueries({ queryKey: ["locations"] });
       cache.invalidateQueries({ queryKey: ["history", location.id] });
-      setOpen(false);
+      cache.invalidateQueries({ queryKey: ["analysis", location.id] });
+      openChange(false);
     },
   });
-  function openChange(next: boolean) {
-    if (next) {
-      setSnapshot(location);
-      setLatitude(location.current_revision.lat?.toFixed(6) ?? "");
-      setLongitude(location.current_revision.lon?.toFixed(6) ?? "");
-      setConfirmed(false);
-      mutation.reset();
-    }
-    setOpen(next);
+  const open = controlled ? openProp : openState;
+  function init() {
+    setSnapshot(location);
+    setLatitude(location.current_revision.lat?.toFixed(6) ?? "");
+    setLongitude(location.current_revision.lon?.toFixed(6) ?? "");
+    setConfirmed(false);
+    mutation.reset();
   }
+  function openChange(next: boolean) {
+    if (next) init();
+    if (controlled) onOpenChange?.(next);
+    else setOpen(next);
+  }
+  useEffect(() => {
+    if (controlled && openProp) init();
+    // Initialise once each time the menu opens the dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlled, openProp]);
   const lat = latitude.trim() ? Number(latitude) : NaN,
     lon = longitude.trim() ? Number(longitude) : NaN;
   const valid = Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
@@ -57,15 +79,27 @@ export default function PinEditor({ location }: { location: Location }) {
   }
   return (
     <Dialog.Root open={open} onOpenChange={openChange}>
-      <Dialog.Trigger asChild>
-        <button className="button secondary small-button">
-          <MapPin size={15} />
-          {location.current_revision.lat === null ? "Place pin" : "Correct / confirm pin"}
-        </button>
-      </Dialog.Trigger>
+      {!controlled && (
+        <Dialog.Trigger asChild>
+          <button className="button secondary small-button">
+            <MapPin size={15} />
+            {location.current_revision.lat === null ? "Place pin" : "Correct / confirm pin"}
+          </button>
+        </Dialog.Trigger>
+      )}
       <Dialog.Portal>
         <Dialog.Overlay className="overlay" />
-        <Dialog.Content className="modal pin-editor">
+        <Dialog.Content
+          className="modal pin-editor"
+          onCloseAutoFocus={
+            returnFocus
+              ? (event) => {
+                  event.preventDefault();
+                  returnFocus();
+                }
+              : undefined
+          }
+        >
           <div className="drawer-head">
             <Dialog.Title>Review the property pin</Dialog.Title>
             <Dialog.Close className="icon-button" aria-label="Close pin editor">
