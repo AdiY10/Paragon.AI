@@ -474,7 +474,7 @@ def test_portfolio_switches_vintage_only_when_every_state_is_in(tmp_path, client
     # The monthly refresh recomputes anyone not on the current vintage, reusing the 2020-era geography.
     monkeypatch.setattr(refresh, 'newest_acs_year', lambda opener=None: 2025)
     monkeypatch.setattr('apps.demographics.service._store', lambda s: store)
-    monkeypatch.setattr('apps.demographics.service.ingest_acs', lambda *a, **k: [])
+    monkeypatch.setattr('apps.demographics.service.ingest_acs_all', lambda *a, **k: [])
     monkeypatch.setattr(refresh, '_each', lambda *a, **k: refresh.Outcome())
     from apps.demographics import cpi
 

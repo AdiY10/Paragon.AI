@@ -63,6 +63,19 @@ def analyze_location(context,parameters):
     return JobResult(records=len(outcome)-len(unavailable),
         failed=sum(1 for v in unavailable.values() if v in RETRYABLE),detail=unavailable)
 
+def ingest_acs_state(context,parameters):
+    """Background ACS ingest for one state (B4a), then wake the analyses that waited for it."""
+    from apps.demographics.acs import AcsError
+    from apps.demographics.service import ingest_acs_all
+    from apps.area.analysis import wake_demographics
+    from .contracts import JobFailure
+    context.heartbeat()
+    try:
+        published=ingest_acs_all(parameters['year'],states=[parameters['state']],heartbeat=context.heartbeat)
+    except (AcsError,OSError):
+        raise JobFailure('SOURCE_ERROR') from None
+    return JobResult(records=len(published),detail={'woken':wake_demographics()})
+
 def _refresh(fn):
     def handler(context,parameters):
         from .contracts import JobFailure
@@ -159,4 +172,5 @@ REGISTRY={'sync_source_catalog':JobSpec(sync_source_catalog,MAINTENANCE,1800),
     'flood_recheck':JobSpec(flood_recheck,MAINTENANCE,3600),
     'annual_sources_check':JobSpec(annual_sources_check,MAINTENANCE,7200),
     'sec_daily':JobSpec(sec_daily,MAINTENANCE,1800),
+    'ingest_acs_state':JobSpec(ingest_acs_state,MAINTENANCE,3600,frozenset({'year','state'})),
     'maintenance_daily':JobSpec(maintenance_daily,MAINTENANCE,600)}

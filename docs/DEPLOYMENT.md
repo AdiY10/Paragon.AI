@@ -72,6 +72,20 @@ All of them are needed because the private evidence disk attaches to one service
 ## Memory note
 DuckDB Overture captures and the worker run beside the web process. On the 512 MB plan, keep `OVERTURE_MEMORY_LIMIT=256MB`. Captures still complete but are slower, and very dense areas (Manhattan: about 145,000 places within 3 miles) may need a 1 GB+ plan. Confirm current pricing before choosing a larger plan.
 
+## ACS for all states (redesign B4a)
+New places can be anywhere in the US, so ACS block-group data is ingested for all 50 states and DC:
+```sh
+python backend/manage.py ingest_acs --all-states --year 2024
+python backend/manage.py ingest_acs --all-states --year 2019
+```
+2024 (table-based) downloads five national files once to `var/acs-cache/2024/` (246 MB, resumable,
+excluded from backups) and parses them from disk in batches of at most 30,000 block groups. 2019 reads
+one state at a time with HTTP range requests. States already ingested are skipped. Measured on the
+preview (18 missing states each): 2024 in 10 s, peak 276 MB; 2019 in 106 s, peak 371 MB.
+
+Analyses never download ACS themselves: a state that is missing queues a background `ingest_acs_state`
+job, the demographics section shows "loading", and the job wakes the waiting analyses when it is done.
+
 ## First-time data bootstrap (one command, re-runnable)
 ```sh
 python backend/manage.py bootstrap_data --overture-archive /app/var/overture-archive

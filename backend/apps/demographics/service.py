@@ -1,5 +1,6 @@
 """Compute and read ring demographics for a location (FR-09, MET-01..05)."""
 import hashlib
+from pathlib import Path
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from apps.locations.models import Location
@@ -47,6 +48,69 @@ def ingest_acs(states, *, year=DEFAULT_ACS_YEAR, store=None, opener=None, line_s
     return published
 
 
+def acs_cache_dir(year):
+    """National ACS files on disk, next to the artifact store (excluded from backups: re-downloadable)."""
+    return Path(settings.SOURCE_ARTIFACT_ROOT).parent / 'acs-cache' / str(year)
+
+
+def ingested_states(year):
+    return {scope.rsplit(':', 1)[1] for scope in SourceSnapshot.objects.filter(
+        source_id='SRC-03', release=str(year)).values_list('scope', flat=True)}
+
+
+def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None, batch_limit=30_000,
+        skip_existing=True, heartbeat=None):
+    """Ingest every state (or ``states``) for a vintage with bounded memory (B4a).
+
+    Table-based vintages: the five national files are downloaded once to ``cache_dir``, then parsed
+    from disk in batches of at most ``batch_limit`` block groups. The 2019 legacy vintage is read
+    one state per call (HTTP range requests). States absent from the files are skipped.
+    """
+    from apps.demographics.management.commands.ingest_acs import FIPS
+    store = _store(store)
+    wanted = set(states or FIPS.values())
+    if skip_existing:
+        wanted -= ingested_states(year)
+    published = []
+    if not wanted:
+        return published
+    if year == acs.LEGACY_YEAR:
+        for state in sorted(wanted):
+            if heartbeat:
+                heartbeat()
+            published += ingest_acs([state], year=year, store=store, opener=opener)
+        return published
+    paths = acs.download_tables(year, cache_dir or acs_cache_dir(year), opener=opener)
+    counts = {s: n for s, n in acs.count_block_groups(acs.file_lines(paths['B01003'])).items() if s in wanted}
+    for batch in acs.plan_batches(counts, batch_limit):
+        if heartbeat:
+            heartbeat()
+        published += ingest_acs(batch, year=year, store=store,
+            line_source=lambda table: acs.file_lines(paths[table]))
+    return published
+
+
+def queue_acs_ingest(year, state):
+    """Queue a background ingest of one state's ACS rows; returns the live or new job, or None (backing off)."""
+    from datetime import timedelta
+    from django.db.models import Q
+    from django.utils import timezone
+    from apps.operations.models import JobRun
+    from apps.operations.service import enqueue_job
+    key = f'acs:{year}:{state}'
+    jobs = JobRun.objects.filter(kind='ingest_acs_state', scope=f'acs:{year}').filter(
+        Q(dedup_key=key) | Q(dedup_key__startswith=key + ':'))
+    live = jobs.filter(status__in=['queued', 'running', 'retrying']).first()
+    if live is not None:
+        return live
+    if jobs.filter(status='failed', finished_at__gte=timezone.now() - timedelta(hours=1)).exists():
+        return None
+    count = jobs.count()
+    job, _ = enqueue_job(kind='ingest_acs_state', scope=f'acs:{year}', dedup_key=key if not count else f'{key}:{count + 1}',
+        parameters={'year': year, 'state': state})
+    return job
+
+
 def _geography(lat, lon, radius, year, store, opener, decennial=2020):
     year = vintage.geography_year(year) if decennial == 2020 else year
     snapshot = _latest('SRC-04', geography.scope_for(lat, lon, radius, decennial))
@@ -70,25 +134,24 @@ def _geography(lat, lon, radius, year, store, opener, decennial=2020):
 def _vintage_rings(lat, lon, radii, year, decennial, store, opener):
     geo_snapshot, capture = _geography(lat, lon, max(radii), year, store, opener, decennial)
     blocks, totals, mapping, unresolved = geography.parse_geography(capture)
-    rows, acs_ids = {}, []
+    rows, acs_ids, missing = {}, [], []
     for state in sorted({b.geoid[:2] for b in blocks}):
         snapshot = _latest('SRC-03', acs.scope_for(year, state))
-        if snapshot is None and AUTO_INGEST:
-            # Screens can be anywhere in the US. Each bulk table is national, so one pass ingests
-            # every missing state at the same download cost: at most once per vintage, never per screen.
-            try:
-                from apps.demographics.management.commands.ingest_acs import FIPS
-                have = {s.rsplit(':', 1)[1] for s in SourceSnapshot.objects.filter(
-                    source_id='SRC-03', release=str(year)).values_list('scope', flat=True)}
-                ingest_acs(sorted(set(FIPS.values()) - have), year=year, store=store)
-            except (acs.AcsError, OSError):
-                pass
-            snapshot = _latest('SRC-03', acs.scope_for(year, state))
         if snapshot is None:
-            raise DemographicsUnavailable('NOT_COVERED',
-                f'ACS {acs.vintage_period(year)} data for state {state} has not been ingested yet.')
+            missing.append(state)
+            continue
         rows.update(acs.load_rows(snapshot, store))
         acs_ids.append(str(snapshot.pk))
+    if missing and AUTO_INGEST:
+        # Never download inside an analysis (B4a): a background job ingests the state, then wakes
+        # the analyses waiting for it. Production ingests all 51 states up front (ingest_acs --all-states).
+        for state in missing:
+            queue_acs_ingest(year, state)
+        raise DemographicsUnavailable('INGESTING',
+            f'ACS {acs.vintage_period(year)} data for this area is loading; the analysis completes by itself.')
+    if missing:
+        raise DemographicsUnavailable('NOT_COVERED',
+            f'ACS {acs.vintage_period(year)} data for state {missing[0]} has not been ingested yet.')
     rings = compute_rings((lat, lon), radii, blocks, totals, mapping, unresolved, rows)
     return geo_snapshot, acs_ids, rings
 
@@ -133,6 +196,8 @@ def compute_for_location(location_id, *, year=None, baseline_year=BASELINE_ACS_Y
         baseline = {'acs_year': baseline_year, 'geography_snapshot_id': str(base_geo.pk),
             'acs_snapshot_ids': base_ids, 'cpi_snapshot_id': str(cpi_snapshot.pk), 'cpi_ratio': cpi_ratio}
     except DemographicsUnavailable as exc:
+        if exc.code == 'INGESTING':
+            raise  # wait for the baseline too, so trends are never silently missing (woken after ingest)
         for ring in rings:
             ring['trends'] = unavailable(exc.code, exc.message)
     inputs = [str(geo_snapshot.pk), *acs_ids, *(baseline and [baseline['geography_snapshot_id'],

@@ -47,22 +47,30 @@ def fetch_wac(state_fips, year, *, opener=None):
     return fetch(url, opener=opener, max_bytes=64 * 1024 * 1024, timeout=60), url
 
 
-def parse_wac(raw_gz):
-    """block GEOID -> (total, retail, food_service)."""
+def parse_wac(raw_gz, keep=None):
+    """block GEOID -> (total, retail, food_service), streamed; only blocks in ``keep`` when given.
+
+    Streaming with a filter keeps a large state (California: ~600k workplace blocks) from being
+    held in memory just to read the few thousand blocks inside one property's rings (B4a).
+    """
     try:
-        text = gzip.decompress(raw_gz).decode('utf-8')
-    except (OSError, EOFError, UnicodeDecodeError):
+        reader = csv.reader(io.TextIOWrapper(gzip.GzipFile(fileobj=io.BytesIO(raw_gz)), encoding='utf-8', newline=''))
+        header = next(reader)
+        if not {'w_geocode', *COLUMNS} <= set(header):
+            raise SourceError('SCHEMA_ERROR', 'unexpected LODES columns')
+        at = header.index('w_geocode')
+        columns = [header.index(c) for c in COLUMNS]
+        out = {}
+        for row in reader:
+            geoid = row[at]
+            if keep is not None and geoid not in keep:
+                continue
+            if len(geoid) != 15 or not geoid.isdigit():
+                raise SourceError('SCHEMA_ERROR', 'invalid workplace block')
+            out[geoid] = tuple(int(row[i]) for i in columns)
+        return out
+    except (OSError, EOFError, UnicodeDecodeError, StopIteration, ValueError, IndexError):
         raise SourceError('SCHEMA_ERROR', 'not a LODES gzip file') from None
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames or not {'w_geocode', *COLUMNS} <= set(reader.fieldnames):
-        raise SourceError('SCHEMA_ERROR', 'unexpected LODES columns')
-    out = {}
-    for row in reader:
-        geoid = row['w_geocode']
-        if len(geoid) != 15 or not geoid.isdigit():
-            raise SourceError('SCHEMA_ERROR', 'invalid workplace block')
-        out[geoid] = tuple(int(row[c]) for c in COLUMNS)
-    return out
 
 
 def ring_jobs(blocks, wac, center, radii):
