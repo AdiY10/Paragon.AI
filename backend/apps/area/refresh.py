@@ -87,6 +87,15 @@ def refresh_businesses(context, *, opener=None, **kwargs):
     store = LocalArtifactStore(dj.SOURCE_ARTIFACT_ROOT)
     capturer = kwargs.get('capturer')
     targets = [r for r in releases[-2:]]
+    if capturer is None:
+        # B4b: one local US extract per release, then every pin reads it locally (S3 if a build fails).
+        from . import overture_extract
+        for release in targets:
+            context.heartbeat()
+            try:
+                overture_extract.build(release)
+            except SourceError as exc:
+                log.warning('Overture US extract for %s not built (%s); pins read S3', release, exc.code)
     for release in targets:
         missing = []
         for location in monitored():
@@ -96,8 +105,11 @@ def refresh_businesses(context, *, opener=None, **kwargs):
         for i in range(0, len(missing), 8):
             context.heartbeat()
             chunk = missing[i:i + 8]
+            from . import overture_extract
+            local = capturer is None and release in overture_extract.available()
             try:
-                payloads = ({p: capturer(*p, release) for p in chunk} if capturer
+                payloads = ({p: capturer(*p, release) for p in chunk} if capturer else
+                    {p: overture_extract.capture_local(*p, release) for p in chunk} if local
                     else overture.capture_many(chunk, release))
             except SourceError as exc:
                 log.warning('Overture capture failed for %s pins (%s)', len(chunk), exc.code)
