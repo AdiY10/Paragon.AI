@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 from apps.locations.models import Location
 from apps.sources.models import SourceDefinition
-from apps.demographics.service import ingest_acs, DEFAULT_ACS_YEAR
+from apps.demographics.service import ingest_acs, ingest_acs_all, DEFAULT_ACS_YEAR
 from apps.demographics.acs import AcsError
 
 # State postal code -> FIPS, for the states a location can be in.
@@ -24,10 +24,20 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--states', help='Comma-separated postal codes; default: states of non-archived locations plus neighbours')
         parser.add_argument('--year', type=int, default=DEFAULT_ACS_YEAR)
+        parser.add_argument('--all-states', action='store_true',
+            help='All 50 states and DC: national files downloaded once, parsed in memory-bounded batches; '
+                 'states already ingested are skipped')
 
     def handle(self, *args, **options):
         if not SourceDefinition.objects.filter(pk='SRC-03').exists():
             raise CommandError('Run sync_sources first.')
+        if options['all_states']:
+            try:
+                results = ingest_acs_all(options['year'], heartbeat=lambda: self.stdout.write('.', ending=''))
+            except (AcsError, OSError) as exc:
+                raise CommandError(f'ACS ingestion failed: {exc}') from exc
+            self.stdout.write(f'\nACS {options["year"]}: {len(results)} state snapshots ingested (all states).')
+            return
         if options['states']:
             codes = {c.strip().upper() for c in options['states'].split(',') if c.strip()}
         else:

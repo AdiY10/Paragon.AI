@@ -67,7 +67,8 @@ def test_disappearance_alerts_only_after_two_releases(tmp_path, client, settings
         for rel, has in zip(releases[:upto], present):
             ostore.store_capture(41.0, -73.0, rel, keep + ([regal] if has else []), store)
         import unittest.mock as um
-        with um.patch.object(overture, 'available_releases', lambda opener=None: releases[:upto]):
+        # The release listing is a cached probe (1 day, B4a); a new release mid-day is stubbed directly.
+        with um.patch('apps.area.service.overture_releases', lambda run: releases[:upto]):
             return compute_area(loc.pk, sections=('businesses',), store=store)[0]
     row = run(2, [True, False])
     assert row.data['changes']['closures'][0]['confirmed'] is False

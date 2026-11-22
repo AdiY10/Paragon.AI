@@ -61,7 +61,12 @@ def _each(context, sections, **kwargs):
 
 
 def refresh_economy(context, **kwargs):
-    """Weekly: QCEW quarter, LAUS month and BPS month (cached 7 days, so a weekly run re-checks)."""
+    """Weekly: QCEW quarter, LAUS month and BPS month (cached 6 days, so a weekly run re-checks).
+
+    LAUS for all counties is fetched first in batched requests (B4a): BLS allows few keyless calls a day.
+    """
+    from .service import prefetch_laus
+    prefetch_laus(opener=kwargs.get('opener'), store=kwargs.get('store'))
     return _each(context, ('economy',), **kwargs)
 
 
@@ -130,27 +135,21 @@ def newest_acs_year(*, opener=None, today=None):
     return None
 
 
-def ingested_acs_states(year):
-    return {scope.rsplit(':', 1)[1] for scope in SourceSnapshot.objects.filter(
-        source_id='SRC-03', release=str(year)).values_list('scope', flat=True)}
-
-
 def refresh_annual(context, *, opener=None, acs_opener=None, **kwargs):
     """Monthly: new ACS vintage -> ingest and recompute demographics; then traffic and jobs (new HPMS/LODES years)."""
-    from apps.demographics.service import ingest_acs, compute_for_location
+    from apps.demographics.service import ingest_acs_all, compute_for_location
     from apps.demographics.acs import LEGACY_YEAR
     from apps.demographics.vintage import required_states, current_acs_year
     from apps.demographics.service import current_result
     states = required_states()
     out = Outcome()
     year = newest_acs_year(opener=acs_opener)
-    # Ingest every required state for the newest vintage once; the portfolio switches only
-    # when all of them are in (current_acs_year), never per screen.
-    if year and states - ingested_acs_states(year):
-        context.heartbeat()
-        ingest_acs(sorted(states - ingested_acs_states(year)), year=year, opener=acs_opener)
-    if states - ingested_acs_states(LEGACY_YEAR):
-        ingest_acs(sorted(states - ingested_acs_states(LEGACY_YEAR)), year=LEGACY_YEAR, opener=acs_opener)
+    # A new vintage is ingested for all 51 states at once (B4a: national files downloaded once, parsed
+    # in bounded batches), so new places anywhere work. The portfolio switches only when every
+    # required state is in (current_acs_year), never per screen.
+    if year:
+        ingest_acs_all(year, opener=acs_opener, heartbeat=context.heartbeat)
+    ingest_acs_all(LEGACY_YEAR, opener=acs_opener, heartbeat=context.heartbeat)
     current = current_acs_year(states)
     for location in monitored():
         result = current_result(location)

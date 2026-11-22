@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import io
 import json
+from pathlib import Path
 import re
 from urllib.request import Request
 from apps.area.http import default_opener
@@ -139,6 +140,72 @@ def extract_states(year, states, *, opener=None, timeout=120, line_source=None):
             for key in keys:
                 values.setdefault(key, None)
     return [AcsExtract(year, s, rows[s], tuple(urls), retrieved) for s in states]
+
+
+# ---- all-states ingest (redesign B4a) ------------------------------------------
+# Each table-based file is national (every state, every geography level). Download it once to
+# disk, then parse it from disk in batches of states, so memory stays bounded by the batch.
+
+def download_tables(year, directory, *, opener=None, timeout=120, tables=None):
+    """Stream each national table to ``directory`` once; an interrupted download resumes. {table: Path}."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    out = {}
+    for table in (tables or TABLES):
+        final = directory / f'{table.lower()}.dat'
+        if not final.exists():
+            part = directory / f'{table.lower()}.dat.part'
+            have = part.stat().st_size if part.exists() else 0
+            headers = dict(_HEADERS)
+            if have:
+                headers['Range'] = f'bytes={have}-'
+            response = (opener or default_opener()).open(
+                Request(BASE_URL.format(year=year, table=table.lower()), headers=headers), timeout=timeout)
+            if response.status == 200:
+                have, mode = 0, 'wb'   # the server ignored the range: start over
+            elif response.status == 206 and have:
+                mode = 'ab'
+            else:
+                raise AcsError(f'HTTP {response.status}')
+            with open(part, mode) as handle:
+                while chunk := response.read(1 << 20):
+                    have += len(chunk)
+                    if have > MAX_TABLE_BYTES:
+                        raise AcsError('ACS table exceeds size limit')
+                    handle.write(chunk)
+            part.rename(final)
+        out[table] = final
+    return out
+
+
+def file_lines(path):
+    with open(path, encoding='utf-8', newline='') as handle:
+        yield from handle
+
+
+def count_block_groups(lines):
+    """{state FIPS: block groups} from one national table file."""
+    counts = {}
+    start = len(BG_PREFIX)
+    for line in lines:
+        if line.startswith(BG_PREFIX):
+            state = line[start:start + 2]
+            counts[state] = counts.get(state, 0) + 1
+    return counts
+
+
+def plan_batches(counts, limit=30_000):
+    """Group states (FIPS order) into batches of at most ``limit`` block groups; a bigger state goes alone."""
+    batches, current, size = [], [], 0
+    for state in sorted(counts):
+        if current and size + counts[state] > limit:
+            batches.append(current)
+            current, size = [], 0
+        current.append(state)
+        size += counts[state]
+    if current:
+        batches.append(current)
+    return batches
 
 
 def scope_for(year, state):

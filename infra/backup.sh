@@ -40,7 +40,7 @@ mv "$DEST/db/paragon-$STAMP.dump.part" "$DEST/db/paragon-$STAMP.dump"
 # 2. App files (artifacts are content-addressed; one rolling archive is enough locally)
 volume=$(docker volume ls -q --filter name=paragon_appdata | head -1)
 docker run --rm -v "$volume":/data:ro -v "$DEST":/out alpine \
-  tar -czf /out/files.tar.gz.part -C /data --exclude=./overture-archive --exclude=./duckdb-extensions .
+  tar -czf /out/files.tar.gz.part -C /data --exclude=./overture-archive --exclude=./duckdb-extensions --exclude=./acs-cache .
 mv "$DEST/files.tar.gz.part" "$DEST/files.tar.gz"
 
 # 3. Off-box copy

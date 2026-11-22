@@ -30,6 +30,8 @@ ADAPTER = 'area-v1'
 SECTION_LOGIC = {'economy': 1, 'traffic': 1, 'hazards': 3, 'businesses': 8, 'jobs': 1}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
+# Economy sources are refreshed weekly; 6 days (not 7) so the weekly run always re-checks them (B4a).
+ECONOMY_MAX_AGE = 6
 SOURCE_META = {
     'SRC-04': ('U.S. Census Bureau, TIGERweb counties', 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html'),
     'SRC-06': ('U.S. Bureau of Labor Statistics, Quarterly Census of Employment and Wages', 'https://www.bls.gov/cew/'),
@@ -115,9 +117,85 @@ class Run:
             entry.update(stale=True, stale_reason=stale_error)
         return raw, snap
 
+    def probe(self, source_id, scope, max_age_days, fetch_value):
+        """A cached "what is the newest release?" answer, shared by every process (B4a).
+
+        ``fetch_value`` returns (JSON-able value, url, release). The answer is stored as a snapshot
+        (provenance) but is not a data citation, so it is left out of the section's sources.
+        """
+        snapshots, sources = list(self.snapshots), {k: dict(v) for k, v in self.sources.items()}
+
+        def fetcher():
+            value, url, release = fetch_value()
+            return json.dumps(value).encode(), url, release, f'Newest release check ({release})'
+        try:
+            raw, _ = self.cached(source_id, scope, max_age_days, fetcher)
+        finally:
+            self.snapshots, self.sources = snapshots, sources
+        return json.loads(raw)
+
+
+def latest_lodes_year(run, state):
+    """Newest LODES year for a state, checked at most weekly (HEAD probes, not per pin)."""
+    return run.probe('SRC-05', f'lodes:latest:{state}', 7, lambda: (
+        lambda y: (y, lodes.url_for(state, y), str(y)))(lodes.latest_year(state, opener=run.opener)))
+
+
+def latest_hpms_year(run, state, lat, lon):
+    """Newest HPMS year for a state, checked at most monthly."""
+    def fetch():
+        _, url, year = th.fetch_hpms_latest(state, lat, lon, opener=run.opener)
+        return year, url.split('?')[0], str(year)
+    return run.probe('SRC-10', f'hpms:latest:{state}', 30, fetch)
+
+
+def latest_qcew_quarter(run):
+    """Newest published QCEW quarter (national file), checked at most weekly: [year, quarter]."""
+    def fetch():
+        _, year, quarter, url = econ.fetch_qcew_latest('US000', opener=run.opener, probe=True)
+        return [year, quarter], url, f'{year}Q{quarter}'
+    return run.probe('SRC-06', 'qcew:latest', 7, fetch)
+
+
+def overture_releases(run):
+    """Overture release listing, checked at most daily."""
+    return run.probe('SRC-13', 'releases', 1, lambda: (
+        lambda r: (r, overture.BUCKET, r[-1]))(overture.available_releases(opener=run.opener)))
+
 
 def _pin_key(lat, lon):
     return f'{lat:.6f},{lon:.6f}'
+
+
+def prefetch_laus(opener=None, store=None):
+    """Weekly refresh helper: fetch LAUS for every monitored county in a few batched requests and
+    publish one snapshot per county, so each economy section then finds a fresh copy (B4a).
+
+    Only counties already resolved for a pin are included; never raises (an optimization).
+    """
+    from .refresh import monitored
+    try:
+        store = _store(store)
+        fips = set()
+        for location in monitored():
+            rev = location.current_revision
+            snap = (SourceSnapshot.objects.filter(source_id='SRC-04', scope=f'county:{_pin_key(rev.lat, rev.lon)}')
+                .order_by('-retrieved_at').first())
+            if snap is not None:
+                with store.open_verified(snap.artifact_key) as handle:
+                    fips.add(econ.parse_county(handle.read())['fips'])
+        if not fips:
+            return 0
+        raws, url = econ.fetch_laus_many(sorted(fips), opener=opener)
+        run = Run(store, opener)
+        for county, raw in raws.items():
+            parsed = econ.parse_laus(raw, county)
+            label = parsed['period'] + (' (preliminary)' if parsed['preliminary'] else '')
+            run.cached('SRC-07', f'laus:{county}', 0, lambda raw=raw, p=parsed['period'], l=label: (raw, url, p, l))
+        return len(raws)
+    except Exception:
+        log.exception('batched LAUS prefetch failed; economy sections fetch per county')
+        return 0
 
 
 def county_for(run, lat, lon):
@@ -139,9 +217,13 @@ def economy_section(run, lat, lon):
 
     def employment():
         def fetch():
-            raw, y, q, url = econ.fetch_qcew_latest(fips, opener=run.opener)
+            try:
+                start = tuple(latest_qcew_quarter(run))
+            except SourceError:
+                start = None
+            raw, y, q, url = econ.fetch_qcew_latest(fips, opener=run.opener, start=start)
             return raw, url, f'{y}Q{q}', f'{y} Q{q}'
-        raw, snap = run.cached('SRC-06', f'qcew:{fips}', 7, fetch)
+        raw, snap = run.cached('SRC-06', f'qcew:{fips}', ECONOMY_MAX_AGE, fetch)
         return {'period': snap.data_period, **{('private' if k == '10' else 'retail'): v
             for k, v in econ.parse_qcew(raw, fips).items()}}
 
@@ -150,14 +232,14 @@ def economy_section(run, lat, lon):
             raw, url = econ.fetch_laus(fips, opener=run.opener)
             parsed = econ.parse_laus(raw, fips)
             return raw, url, parsed['period'], parsed['period'] + (' (preliminary)' if parsed['preliminary'] else '')
-        raw, _ = run.cached('SRC-07', f'laus:{fips}', 7, fetch)
+        raw, _ = run.cached('SRC-07', f'laus:{fips}', ECONOMY_MAX_AGE, fetch)
         return econ.parse_laus(raw, fips)
 
     def permits():
         def latest():
             yyyymm, raw, url = econ.latest_bps_month(opener=run.opener)
             return raw, url, str(yyyymm), f'Year to date, {yyyymm // 100}-{yyyymm % 100:02d}'
-        _, latest_snap = run.cached('SRC-09', 'bps:county:latest', 7, latest)
+        _, latest_snap = run.cached('SRC-09', 'bps:county:latest', ECONOMY_MAX_AGE, latest)
         yyyymm = int(latest_snap.release)
         files = {}
         for key, (y, m) in econ.bps_months(yyyymm).items():
@@ -181,7 +263,14 @@ def traffic_section(run, lat, lon):
     state = county['fips'][:2]
 
     def latest():
-        raw, url, year = th.fetch_hpms_latest(state, lat, lon, opener=run.opener)
+        year = latest_hpms_year(run, state, lat, lon)
+        try:
+            raw, url = th.fetch_hpms(state, year, lat, lon, opener=run.opener)
+            th.arcgis_json(raw)
+        except SourceError as exc:
+            if exc.code not in ('NOT_COVERED', 'SOURCE_ERROR'):
+                raise
+            raw, url, year = th.fetch_hpms_latest(state, lat, lon, opener=run.opener)
         return raw, url, str(year), f'HPMS {year}'
     # 'hpms2' scopes carry road geometry (distance to the pin); older captures did not.
     raw, snap = run.cached('SRC-10', f'hpms2:{_pin_key(lat, lon)}', 30, latest)
@@ -247,23 +336,11 @@ def hazards_section(run, lat, lon):
     return data, any(v.get('reason') is None for v in (at_pin, nearby, data['nri']))
 
 
-_WAC = {}
-
-
-def _parsed_wac(sha, raw):
-    """A state's LODES file is parsed once per process, not once per property (keep the last 4)."""
-    if sha not in _WAC:
-        if len(_WAC) >= 4:
-            _WAC.pop(next(iter(_WAC)))
-        _WAC[sha] = lodes.parse_wac(raw)
-    return _WAC[sha]
-
-
 def businesses_section(run, lat, lon, *, location=None, capturer=None):
     from . import overture_store as ostore
     capturer = capturer or overture.capture
     try:
-        releases = overture.available_releases(opener=run.opener)
+        releases = overture_releases(run)
     except SourceError as exc:
         log.warning('Overture release listing unavailable (%s); using stored releases', exc.code)
         releases = sorted(set(ostore.OvertureCapture.objects.values_list('release', flat=True)) |
@@ -367,7 +444,8 @@ def jobs_section(run, lat, lon, *, location=None):
         'url': 'https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_restmapservice.html',
         'period': '2020 Census blocks', 'retrieved_at': geo_snap.retrieved_at.isoformat()})
     states = sorted({b.geoid[:2] for b in blocks})
-    year = min(lodes.latest_year(st, opener=run.opener) for st in states)
+    keep = {b.geoid for b in blocks}
+    year = min(latest_lodes_year(run, st) for st in states)
 
     def wac(year):
         combined = {}
@@ -376,7 +454,7 @@ def jobs_section(run, lat, lon, *, location=None):
                 raw, url = lodes.fetch_wac(st, year, opener=run.opener)
                 return raw, url, str(year), f'LODES {year} (workplace jobs)'
             raw, snap = run.cached('SRC-05', f'lodes:wac:{st}:{year}', None, fetch)
-            combined.update(_parsed_wac(snap.sha256, raw))
+            combined.update(lodes.parse_wac(raw, keep))
         return combined
 
     current = lodes.ring_jobs(blocks, wac(year), (lat, lon), radii)

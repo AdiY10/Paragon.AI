@@ -246,6 +246,21 @@ def sweep(now=None, limit=2):
     return {'queued': queued}
 
 
+def wake_demographics(limit=50):
+    """After an ACS ingest: queue demographics for placed locations still waiting for them."""
+    woken = 0
+    for location in (Location.objects.exclude(status=Location.Status.ARCHIVED)
+            .exclude(current_revision__isnull=True).exclude(current_revision__lat__isnull=True)
+            .select_related('current_revision').order_by('-created_at')):
+        if woken >= limit:
+            break
+        if 'demographics' not in missing_sections(location) or _attempts(location).filter(status__in=LIVE).exists():
+            continue
+        if ensure_analysis(location.pk, ['demographics'], interactive=location.screening) is not None:
+            woken += 1
+    return woken
+
+
 def analyze_after_commit(location_id, actor=None):
     """Hook for location changes: queue the analysis once the change is committed (``AUTO_ANALYZE``)."""
     from django.conf import settings

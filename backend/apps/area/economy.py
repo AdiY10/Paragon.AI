@@ -48,12 +48,20 @@ def quarters_back(today, count=8):
             year, quarter = year - 1, 4
 
 
-def fetch_qcew_latest(fips, *, today=None, opener=None):
-    """Return (raw, year, quarter, url) for the newest published quarter."""
-    for year, quarter in quarters_back(today or date.today()):
+def fetch_qcew_latest(fips, *, today=None, opener=None, start=None, probe=False):
+    """Return (raw, year, quarter, url) for the newest published quarter.
+
+    ``start`` (year, quarter), from the cached national probe, is tried first, so a county does not
+    walk back through unpublished quarters. ``probe`` reads only the first bytes (existence check).
+    """
+    candidates = list(quarters_back(today or date.today()))
+    if start in candidates:
+        candidates = candidates[candidates.index(start):]
+    for year, quarter in candidates:
         url = QCEW_URL.format(year=year, quarter=quarter, fips=fips)
         try:
-            return fetch(url, opener=opener, retries=1), year, quarter, url
+            raw = fetch(url, opener=opener, retries=1, **({'headers': {'Range': 'bytes=0-1023'}} if probe else {}))
+            return raw, year, quarter, url
         except SourceError as exc:
             if exc.code != 'NOT_COVERED':
                 raise
@@ -119,6 +127,35 @@ def fetch_laus(fips, *, today=None, opener=None):
     if key:
         body['registrationkey'] = key
     return fetch(LAUS_V2 if key else LAUS_V1, body=body, opener=opener), (LAUS_V2 if key else LAUS_V1)
+
+
+def fetch_laus_many(fips_list, *, today=None, opener=None):
+    """Batched LAUS for many counties (B4a): ({fips: raw in the single-county response shape}, url).
+
+    County and state series share requests (25 series per request keyless, 50 with BLS_API_KEY), so a
+    weekly refresh of the whole portfolio is a couple of requests instead of one per county.
+    """
+    today = today or date.today()
+    key = os.environ.get('BLS_API_KEY')
+    url, per = (LAUS_V2, 50) if key else (LAUS_V1, 25)
+    fips_list = sorted(set(fips_list))
+    series = list(dict.fromkeys(s for f in fips_list for s in (laus_series(f), state_laus_series(f))))
+    by_id = {}
+    for i in range(0, len(series), per):
+        body = {'seriesid': series[i:i + per], 'startyear': str(today.year - 2), 'endyear': str(today.year)}
+        if key:
+            body['registrationkey'] = key
+        data = json.loads(fetch(url, body=body, opener=opener))
+        if data.get('status') != 'REQUEST_SUCCEEDED':
+            raise SourceError('SOURCE_ERROR', 'BLS request not successful')
+        by_id.update({s.get('seriesID'): s for s in data['Results']['series']})
+    out = {}
+    for f in fips_list:
+        county, state = by_id.get(laus_series(f)), by_id.get(state_laus_series(f))
+        if county is not None:
+            out[f] = json.dumps({'status': 'REQUEST_SUCCEEDED', 'Results': {'series': [county] + ([state] if state else [])}},
+                sort_keys=True).encode()
+    return out, url
 
 
 def parse_laus(raw, fips):
