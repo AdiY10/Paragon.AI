@@ -116,35 +116,108 @@ def ensure_analysis(location_id, sections=None, *, interactive=True, requested_b
         return job
 
 
-def run_analysis(location_id, analysis_version, sections, *, check=None, store=None, opener=None, capturer=None):
-    """Compute the requested sections; returns {section: 'available' | reason code}.
+# Sections that need the 2020 block geography (and demographics also the 2010 one), fetched once
+# in the first wave so parallel sections never download the same geography twice (B3b).
+NEEDS_GEOGRAPHY = frozenset({'demographics', 'jobs'})
+THREADS = 4
 
-    ``check`` is called between sections (heartbeat / cancellation); it raises to stop the run.
-    Raises ``Stale`` when the location moved on to a newer analysis version.
-    """
+
+def _run_section(name, location_id, analysis_version, store, opener, capturer):
+    """One section; returns 'available' or a reason code. Raises Stale."""
     from apps.demographics.service import compute_for_location, DemographicsUnavailable
     from .http import SourceError
-    from .service import compute_section, _store
+    from .service import compute_section
+    location = Location.objects.select_related('current_revision').get(pk=location_id)
+    if location.analysis_version != analysis_version or not _placed(location):
+        raise Stale()
+    try:
+        if name == 'demographics':
+            compute_for_location(location.pk, store=store, opener=opener, evaluate=False)
+            return 'available'
+        row = compute_section(location, location.current_revision, analysis_version, name,
+            store=store, opener=opener, capturer=capturer)
+        return 'available' if row.status == 'available' else (row.data or {}).get('reason', 'UNAVAILABLE')
+    except (DemographicsUnavailable, SourceError) as exc:
+        if exc.code == 'STALE':
+            raise Stale() from None
+        return exc.code
+
+
+def _prefetch_geographies(location_id, store, opener, need_2010):
+    """Warm the shared 2020 (and 2010) block geographies; failures surface in the sections later."""
+    from apps.demographics.service import _geography, RADII, BASELINE_ACS_YEAR, DemographicsUnavailable
+    from apps.demographics.vintage import current_acs_year
+    location = Location.objects.select_related('current_revision').get(pk=location_id)
+    if not _placed(location):
+        return
+    lat, lon, radius = location.current_revision.lat, location.current_revision.lon, max(RADII[location.ring_preset])
+    try:
+        _geography(lat, lon, radius, current_acs_year(), store, opener, 2020)
+        if need_2010:
+            _geography(lat, lon, radius, BASELINE_ACS_YEAR, store, opener, 2010)
+    except (DemographicsUnavailable, OSError):
+        pass
+
+
+def _in_thread(fn, *args):
+    try:
+        return fn(*args)
+    finally:
+        connection.close()  # each worker thread has its own DB connection
+
+
+def run_analysis(location_id, analysis_version, sections, *, check=None, store=None, opener=None, capturer=None,
+        parallel=None):
+    """Compute the requested sections; returns {section: 'available' | reason code}.
+
+    Parallel on a real database (B3b): wave 1 runs hazards, traffic, economy and businesses together
+    with the geography prefetch; demographics and jobs start once the geography is in. Serial on
+    SQLite (tests), whose in-memory database other threads cannot see. ``check`` runs between
+    completions (heartbeat / cancellation) and raises to stop. Raises ``Stale`` when the location
+    moved on to a newer analysis version. Alerts are evaluated once, at the end.
+    """
+    from .service import _store
     store = _store(store)
+    names = [s for s in ORDER if s in set(sections)]
+    if parallel is None:
+        parallel = connection.vendor != 'sqlite'
     outcome = {}
-    for name in [s for s in ORDER if s in set(sections)]:
-        if check is not None:
-            check()
-        location = Location.objects.select_related('current_revision').get(pk=location_id)
-        if location.analysis_version != analysis_version or not _placed(location):
+    if not parallel:
+        for name in names:
+            if check is not None:
+                check()
+            outcome[name] = _run_section(name, location_id, analysis_version, store, opener, capturer)
+    else:
+        from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+        later = [n for n in names if n in NEEDS_GEOGRAPHY]
+        stale = False
+        with ThreadPoolExecutor(max_workers=THREADS, thread_name_prefix='analysis') as pool:
+            futures = {pool.submit(_in_thread, _run_section, n, location_id, analysis_version, store, opener, capturer): n
+                for n in names if n not in NEEDS_GEOGRAPHY}
+            if later:
+                futures[pool.submit(_in_thread, _prefetch_geographies, location_id, store, opener,
+                    'demographics' in later)] = None
+            pending = set(futures)
+            while pending:
+                done, pending = wait(pending, timeout=30, return_when=FIRST_COMPLETED)
+                if check is not None:
+                    check()
+                for future in done:
+                    name = futures[future]
+                    if name is None:  # geography ready: start the second wave
+                        for n in later:
+                            f = pool.submit(_in_thread, _run_section, n, location_id, analysis_version, store,
+                                opener, capturer)
+                            futures[f] = n
+                            pending.add(f)
+                        continue
+                    try:
+                        outcome[name] = future.result()
+                    except Stale:
+                        stale = True
+        if stale:
             raise Stale()
-        try:
-            if name == 'demographics':
-                compute_for_location(location.pk, store=store, opener=opener, evaluate=False)
-                outcome[name] = 'available'
-            else:
-                row = compute_section(location, location.current_revision, analysis_version, name,
-                    store=store, opener=opener, capturer=capturer)
-                outcome[name] = 'available' if row.status == 'available' else (row.data or {}).get('reason', 'UNAVAILABLE')
-        except (DemographicsUnavailable, SourceError) as exc:
-            if exc.code == 'STALE':
-                raise Stale() from None
-            outcome[name] = exc.code
+        outcome = {n: outcome[n] for n in names if n in outcome}
     if any(v == 'available' for v in outcome.values()):
         from apps.insights.signals import safe_evaluate
         safe_evaluate(location_id)
