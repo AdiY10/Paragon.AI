@@ -66,6 +66,9 @@ def build(location, *, user=None, now=None, trigger=True):
     demo = current_result(location) if placed else None
     if demo is not None and 'demographics' not in missing:
         payload = serialize_demographics(location, demo)
+        from apps.insights.kpis import ring_indexes
+        indexes = ring_indexes(demo.rings, demo.acs_year)  # 100 = US average, same vintage (B6b)
+        payload = {**payload, 'rings': [{**r, 'index_vs_us': indexes.get(r['radius_miles'], {})} for r in payload['rings']]}
         three = next((r for r in demo.rings if r.get('radius_miles') == 3), demo.rings[0] if demo.rings else {})
         trends = (three.get('trends') or {})
         trend_reason = trends.get('reason') if isinstance(trends, dict) else None
@@ -118,6 +121,9 @@ def build(location, *, user=None, now=None, trigger=True):
             if screening and not kept_at else None,
         lat=location.current_revision.lat if placed else None, lon=location.current_revision.lon if placed else None)
 
+    from apps.insights.kpis import kpis, takeaways
+    signals = [] if screening else active_for(location)
+    cards = kpis(location) if placed else []
     tenants = []
     if location.status == 'owned':
         from apps.insights.tenant_views import _payload
@@ -128,8 +134,8 @@ def build(location, *, user=None, now=None, trigger=True):
         'analysis': {'state': state, 'analysis_version': location.analysis_version, 'job': _job_payload(job),
             'next_retry_at': next_retry, 'poll_after_ms': poll},
         'sections': sections,
-        'kpis': [], 'takeaways': [],  # B6b
-        'signals': [] if screening else active_for(location),
+        'kpis': cards, 'takeaways': takeaways(location, cards, signals) if placed else [],
+        'signals': signals,
         'risk_badges': risk_badges(location) if placed else [],
         'tenants': tenants,
         'sources': _sources(*(s.get('sources') for s in sections.values())),
