@@ -6,6 +6,8 @@ export class ApiError extends Error {
     message: string,
     /** The server's own `detail`, when it sent JSON (a bare 404 means the route does not exist). */
     public detail: string | null = null,
+    /** The parsed JSON error body (some endpoints return data with an error status, e.g. B5's 503). */
+    public body: unknown = null,
   ) {
     super(message);
   }
@@ -35,9 +37,10 @@ export async function api<T>(
   });
   if (!response.ok) {
     let detail = "";
+    let body: unknown = null;
     try {
-      const body = await response.clone().json();
-      if (body && typeof body.detail === "string") detail = body.detail;
+      body = await response.clone().json();
+      if (body && typeof (body as { detail?: unknown }).detail === "string") detail = (body as { detail: string }).detail;
     } catch {
       /* not JSON */
     }
@@ -51,7 +54,7 @@ export async function api<T>(
             : response.status === 429
               ? "Too many requests in a short time. Please wait a minute and try again."
               : "This request could not be completed. Please try again.";
-    throw new ApiError(response.status, message, detail || null);
+    throw new ApiError(response.status, message, detail || null, body);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

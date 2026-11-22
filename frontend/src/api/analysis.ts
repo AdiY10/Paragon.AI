@@ -29,6 +29,33 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   jobs: "Daytime population",
 };
 
+/** Plain-language text for a section's reason (codes from the server, or a sentence already). */
+export function sectionReasonText(reason: string | null | undefined): string {
+  if (!reason) return "This information is not available for this location.";
+  if (/\s/.test(reason)) return reason;
+  switch (reason) {
+    case "NOT_PROVIDED":
+      return "Needs a map pin before it can be analyzed.";
+    case "NOT_COMPUTED":
+    case "STALE":
+      return "Not analyzed yet. The server retries automatically.";
+    case "SOURCE_ERROR":
+    case "HTTP_ERROR":
+    case "TIMEOUT":
+      return "The public source did not respond. The server will try again automatically.";
+    case "NOT_COVERED":
+      return "This source does not cover this location.";
+    case "SUPPRESSED":
+      return "Not published by the source for this area.";
+    case "GEOGRAPHY_CHANGED":
+      return "Unavailable: census geography changed.";
+    case "NOT_ENOUGH_DATA":
+      return "Not enough data for this location yet.";
+    default:
+      return "This information is not available for this location.";
+  }
+}
+
 export type RunState = "ready" | "loading" | "unavailable";
 /** What a section shell shows: skeleton while running/pending, the reason when unavailable. */
 export function sectionRunState(section: SectionResult | undefined): RunState {

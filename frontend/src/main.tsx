@@ -14,6 +14,7 @@ import "./styles/charts.css";
 import "./styles/map.css";
 import "./styles/properties.css";
 import "./styles/analysis.css";
+import "./styles/analyze.css";
 
 installRouter();
 createRoot(document.getElementById("root")!).render(

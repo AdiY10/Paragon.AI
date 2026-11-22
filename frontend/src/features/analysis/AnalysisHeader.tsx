@@ -49,8 +49,11 @@ export function AnalysisHeader({
         <div className="analysis-title">
           <h1>{record.name}</h1>
           <p className="analysis-address">
-            {bundle?.location.display_label ||
-              (record.city && record.address.includes(record.city) ? record.address : [record.address, place].filter(Boolean).join(", "))}
+            {mode === "place" && bundle?.location.display_label && bundle.location.display_label !== record.name
+              ? bundle.location.display_label
+              : record.city && record.address.includes(record.city)
+                ? record.address
+                : [record.address, place].filter(Boolean).join(", ")}
           </p>
           <p className="analysis-meta">
             {mode === "property" && <AttentionBadge level={record.attention} />}

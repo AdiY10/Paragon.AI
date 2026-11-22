@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AlertCircle, Clock } from "lucide-react";
-import type { RunState } from "../../api/analysis";
+import { sectionReasonText, type RunState } from "../../api/analysis";
 import type { SourceRef } from "../../api/types";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { dateLabel } from "../../lib/format/dates";
@@ -58,7 +58,7 @@ export function SectionShell({
       ) : run === "unavailable" ? (
         <p className="section-unavailable">
           <AlertCircle size={16} aria-hidden="true" />
-          <span>{reason || "This information is not available for this location."}</span>
+          <span>{sectionReasonText(reason)}</span>
         </p>
       ) : (
         <>

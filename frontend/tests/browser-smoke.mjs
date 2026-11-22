@@ -357,6 +357,37 @@ try {
       path: `${output}/sources-1280.png`,
       fullPage: true,
     });
+  // WI-7 Analyze a place: a map click offers "Analyze this point", which opens the new place's analysis.
+  await page.goto(`${base}/#/analyze`);
+  await page.getByRole("heading", { name: "Analyze a place", level: 1 }).waitFor();
+  await page.getByRole("heading", { name: "Recent analyses" }).waitFor();
+  const pickMap = page.locator(".location-map[data-ready=true]");
+  await pickMap.waitFor();
+  for (const width of [768, 375]) {
+    await page.setViewportSize({ width, height: 1000 });
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
+      throw new Error(`Analyze page overflows at ${width}`);
+    const analyzeA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+    if (analyzeA11y.violations.length)
+      throw new Error(`Analyze page a11y at ${width}: ${analyzeA11y.violations.map((v) => v.id).join(", ")}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await page.waitForTimeout(500);
+  const pickBox = await pickMap.boundingBox();
+  await page.mouse.click(pickBox.x + pickBox.width * 0.5, pickBox.y + pickBox.height * 0.5);
+  await page.getByRole("button", { name: "Analyze this point", exact: true }).click();
+  await page.waitForFunction(() => /^#\/analyze\/[0-9a-f-]{36}/.test(location.hash), null, { timeout: 30000 });
+  await page.getByRole("heading", { level: 1 }).waitFor();
+  if ((await page.getByRole("navigation", { name: "Analysis sections" }).getByRole("link").count()) !== 9)
+    throw new Error("A new place should have 9 analysis sections (no tenants)");
+  await page.getByRole("button", { name: "Star", exact: true }).click();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".analysis-actions button[aria-pressed]")].some(
+      (b) => b.textContent.includes("Starred") && b.getAttribute("aria-pressed") === "true",
+    ),
+  );
+  await page.goto(`${base}/#/analyze`);
+  await page.locator(".recent-list .star-button[aria-pressed=true]").first().waitFor();
   await page.goto(base);
   await page.getByRole("button", { name: "Search", exact: true }).click();
   const searchDialog = page.getByRole("dialog", { name: "Search properties" });
@@ -492,7 +523,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, analysis page sections/menu/Property actions, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
+    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, analysis page sections/menu/Property actions, Analyze map point + star, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
   );
 } finally {
   await browser.close();
