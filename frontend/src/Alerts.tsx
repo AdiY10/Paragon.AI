@@ -96,7 +96,7 @@ export default function AlertsPage() {
                 <span className={`badge ${severityTone(a.severity)}`}>{a.severity}</span>
                 <div>
                   <strong>
-                    <a href={`#/locations/${a.location.id}`}>{a.location.name}</a>: {a.title}
+                    <a href={`#/p/${a.location.id}`}>{a.location.name}</a>: {a.title}
                   </strong>
                   <small>
                     {RULE_NAMES[a.rule_id] ?? a.category} · {a.location.city}, {a.location.state} · since{" "}

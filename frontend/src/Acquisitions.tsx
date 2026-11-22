@@ -4,6 +4,7 @@ import { ArrowRight, Layers3, Plus, Search, X } from "lucide-react";
 import { api, allLocations, dateLabel } from "./api";
 import type { Location } from "./types";
 import { formatMetric } from "./Summary";
+import { takePendingAddress } from "./app/nav";
 
 // ---- compare selection (per-viewer convenience; never required for correctness) ----
 const KEY = "paragon.compare";
@@ -51,6 +52,7 @@ interface ScreenResponse {
 }
 
 export function ScreenPage() {
+  const [initialAddress] = useState(takePendingAddress);
   const cache = useQueryClient();
   const [message, setMessage] = useState("");
   const recent = useQuery({ queryKey: ["screens"], queryFn: () => api<{ results: Location[] }>("/api/screens/") });
@@ -60,7 +62,7 @@ export function ScreenPage() {
       cache.invalidateQueries({ queryKey: ["screens"] });
       if (r.geocode_status !== "matched")
         setMessage("The address needs a pin. Use 'Find address pin' or 'Correct / confirm pin' on the next page.");
-      window.location.hash = `#/locations/${r.location.id}`;
+      window.location.hash = `#/analyze/${r.location.id}`;
     },
   });
   function submit(e: FormEvent<HTMLFormElement>) {
@@ -84,7 +86,7 @@ export function ScreenPage() {
         <form className="screen-form" onSubmit={submit}>
           <label>
             Address
-            <input name="address" required maxLength={500} placeholder="e.g. 1200 Ulster Avenue, Kingston, NY" />
+            <input name="address" required maxLength={500} defaultValue={initialAddress} placeholder="e.g. 1200 Ulster Avenue, Kingston, NY" />
           </label>
           <label>
             Name (optional)
@@ -115,7 +117,7 @@ export function ScreenPage() {
           <ul className="anchor-list">
             {recent.data.results.map((l) => (
               <li key={l.id}>
-                <a href={`#/locations/${l.id}`}>{l.name}</a>
+                <a href={`#/analyze/${l.id}`}>{l.name}</a>
                 <small>{dateLabel(l.created_at)}</small>
               </li>
             ))}
@@ -240,7 +242,7 @@ export function ComparePage() {
                   <th scope="col">Measure</th>
                   {data.data.locations.map((l) => (
                     <th scope="col" key={l.id}>
-                      <a href={`#/locations/${l.id}`}>{l.name}</a>
+                      <a href={`#/p/${l.id}`}>{l.name}</a>
                       <small>
                         {l.city}, {l.state}
                         {l.attention !== "Clear" ? ` · ${l.attention}` : ""}

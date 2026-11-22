@@ -47,7 +47,22 @@ try {
       .getByRole("heading", { level: 1 })
       .first()
       .waitFor();
-    await page.getByText("PORTFOLIO HEALTH", { exact: true }).waitFor();
+    await page.getByRole("heading", { name: "Properties", level: 1 }).waitFor();
+    // WI-1 shell: top navigation and account menu.
+    if (width > 640) {
+      const mainNav = page.getByRole("navigation", { name: "Main", exact: true });
+      for (const label of ["Properties", "Analyze", "Alerts", "Compare"])
+        await mainNav.getByRole("link", { name: label, exact: true }).waitFor();
+      if ((await mainNav.getByRole("link", { name: "Properties", exact: true }).getAttribute("aria-current")) !== "page")
+        throw new Error("Properties is not the current page");
+      await page.getByRole("button", { name: "Account menu", exact: true }).click();
+      for (const label of ["Data sources", "Admin"])
+        await page.getByRole("link", { name: label, exact: true }).waitFor();
+      await page.getByRole("button", { name: "Sign out", exact: true }).waitFor();
+      await page.keyboard.press("Escape");
+      if ((await page.evaluate(() => document.activeElement?.getAttribute("aria-label"))) !== "Account menu")
+        throw new Error("Account menu did not return focus");
+    }
     if (
       await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth,
@@ -84,12 +99,12 @@ try {
           throw new Error("Mobile navigation lost its focus trap");
       }
       await page.keyboard.press("Escape");
-      if (
-        (await page.evaluate(() =>
-          document.activeElement?.getAttribute("aria-label"),
-        )) !== "Open navigation"
-      )
-        throw new Error("Mobile navigation did not restore focus");
+      // Focus returns to the trigger once the dialog has unmounted (next animation frame).
+      await page
+        .waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Open navigation", null, { timeout: 2000 })
+        .catch(() => {
+          throw new Error("Mobile navigation did not restore focus");
+        });
     }
     if (output)
       await page.screenshot({
@@ -98,8 +113,12 @@ try {
       });
   }
   await page.setViewportSize({ width: 1280, height: 1000 });
-  await page.goto(`${base}/#/portfolio`);
-  await page.getByRole("heading", { name: "The portfolio." }).waitFor();
+  // Old routes redirect (WI-1): #/portfolio → #/, #/screen → #/analyze, #/setup → #/.
+  for (const [from, to] of [["#/screen", "#/analyze"], ["#/setup", "#/"], ["#/portfolio", "#/"]]) {
+    await page.goto(`${base}/${from}`);
+    await page.waitForFunction((hash) => location.hash === hash, to);
+  }
+  await page.getByRole("heading", { name: "Properties", level: 1 }).waitFor();
   await page.locator(".location-map[data-ready=true]").waitFor();
   await page.locator(".map-marker").first().waitFor();
   if (await page.locator(".map-status").count())
@@ -136,7 +155,11 @@ try {
   await page.getByLabel("State", { exact: true }).selectOption("CT");
   const property = page.locator(".property-card").first();
   const name = await property.locator("h3").innerText();
-  await property.click();
+  const propertyHref = await property.getAttribute("href");
+  await page.goto(`${base}/${propertyHref.replace("#/p/", "#/locations/")}`);
+  await page.waitForFunction((hash) => location.hash === hash, propertyHref);
+  if ((await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Properties", exact: true }).getAttribute("aria-current")) !== "page")
+    throw new Error("Properties is not current on a property analysis");
   await page.getByRole("heading", { name, exact: true }).waitFor();
   await page.getByLabel("Key facts").waitFor();
   await page.getByRole("navigation", { name: "Sections on this page" }).waitFor();
@@ -231,7 +254,7 @@ try {
     .waitFor();
   const savedPin = await page.evaluate(async () => {
     const path =
-      location.hash.slice(1).replace("/locations/", "/api/locations/") + "/";
+      location.hash.slice(1).replace("/p/", "/api/locations/") + "/";
     return (await fetch(path)).json();
   });
   if (
@@ -250,7 +273,7 @@ try {
     .fill("Stale form must not overwrite the newer record.");
   await page.evaluate(async () => {
     const path =
-      location.hash.slice(1).replace("/locations/", "/api/locations/") + "/";
+      location.hash.slice(1).replace("/p/", "/api/locations/") + "/";
     const record = await (await fetch(path)).json();
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
     const response = await fetch(path, {
@@ -272,7 +295,7 @@ try {
   await editDialog.getByRole("button", { name: "Save changes" }).click();
   await editDialog
     .getByRole("alert")
-    .filter({ hasText: "This record changed." })
+    .filter({ hasText: /record changed|location changed/i })
     .waitFor();
   await editDialog.getByRole("button", { name: "Reload record" }).click();
   await page
@@ -297,12 +320,16 @@ try {
       fullPage: true,
     });
   await page.goto(base);
-  const search = page.getByRole("textbox", {
-    name: "Search portfolio by name or address",
-  });
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  const searchDialog = page.getByRole("dialog", { name: "Search properties" });
+  const search = searchDialog.getByRole("textbox", { name: "Search by name or address" });
   await search.fill(name);
   await search.press("Enter");
-  await page.locator(".search-results").getByRole("link").first().waitFor();
+  await searchDialog.getByRole("list", { name: "Search results" }).getByRole("link").first().waitFor();
+  await searchDialog.getByRole("button", { name: "Analyze this address" }).waitFor();
+  if (page.url().includes(encodeURIComponent(name)) || page.url().includes(name))
+    throw new Error("Search text leaked into the URL");
+  await page.keyboard.press("Escape");
   const records = (
     await (
       await context.request.get(base + "/api/locations/?status=all")
@@ -317,7 +344,11 @@ try {
     const before = await (
       await context.request.get(`${base}/api/locations/${record.id}/`)
     ).json();
-    await page.goto(`${base}/#/locations/${record.id}`);
+    await page.goto(`${base}/#/p/${record.id}`);
+    // The pin tools live in the collapsed "Property record and map pin" section.
+    const recordSection = page.locator("details", { hasText: "Property record and map pin" });
+    if (!(await recordSection.evaluate((element) => element.open)))
+      await page.getByText("Property record and map pin", { exact: true }).click();
     await page
       .getByRole("button", { name: "Find address pin", exact: true })
       .click();
@@ -413,7 +444,7 @@ try {
   await page.route("https://tile.openstreetmap.org/**", (route) =>
     route.abort(),
   );
-  await page.goto(`${base}/#/portfolio`);
+  await page.goto(`${base}/#/`);
   await page
     .getByText("Basemap tiles unavailable.", { exact: false })
     .waitFor();
@@ -428,7 +459,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
+    "UI browser smoke passed: top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
   );
 } finally {
   await browser.close();

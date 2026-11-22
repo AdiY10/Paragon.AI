@@ -9,7 +9,7 @@ const LocationMap = lazy(() => import("../LocationMap"));
 export const rankAttention = (l: Location) => (l.attention === "High" ? 0 : l.attention === "Watch" ? 1 : 2);
 export function PropertyCard({ location }: { location: Location }) {
   return (
-    <a className="property-card" href={"#/locations/" + location.id}>
+    <a className="property-card" href={"#/p/" + location.id}>
       <div className="card-top">
         <span className="property-icon">
           <Building2 size={22} />
@@ -82,7 +82,7 @@ export function Portfolio({
     if (type) q.set("type", type);
     if (attention) q.set("attention", attention);
     if (onlyUnconfirmed) q.set("confirmed", "no");
-    const next = "#/portfolio" + (q.toString() ? "?" + q.toString() : "");
+    const next = "#/" + (q.toString() ? "?" + q.toString() : "");
     if (window.location.hash !== next) window.history.replaceState(null, "", next);
   }, [candidates, state, status, type, attention, onlyUnconfirmed]);
   const filtered = locations.filter(
@@ -97,8 +97,8 @@ export function Portfolio({
     <>
       {!candidates && (
         <PageHead
-          eyebrow="Location management"
-          title="The portfolio."
+          eyebrow="Portfolio"
+          title="Properties"
           description="Your locations, their source records, and what still needs confirming."
           action={<AddLocation />}
         />

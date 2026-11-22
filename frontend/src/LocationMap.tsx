@@ -123,8 +123,8 @@ export default function LocationMap({
           ? "Team-confirmed pin"
           : `${pin.method.replaceAll("_", " ")} · verify building position`;
         const link = document.createElement("a");
-        link.href = `#/locations/${item.id}`;
-        link.textContent = "Open property profile →";
+        link.href = `#/p/${item.id}`;
+        link.textContent = "Open analysis →";
         popupContent.append(label, detail);
         if (!previewOnly) popupContent.append(link);
         const marker = new maplibregl.Marker({

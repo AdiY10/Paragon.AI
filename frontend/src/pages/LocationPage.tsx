@@ -171,8 +171,8 @@ export function LocationPage({ id }: { id: string }) {
     pin = item.current_revision;
   return (
     <>
-      <a className="back-link" href="#/portfolio">
-        Portfolio <ChevronRight size={14} /> Property record
+      <a className="back-link" href="#/">
+        Properties <ChevronRight size={14} /> Property record
       </a>
       <PageHead
         eyebrow={[[item.city, item.state].filter(Boolean).join(", "), titleCase(item.status)].filter(Boolean).join(" · ")}
