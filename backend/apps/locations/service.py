@@ -37,7 +37,14 @@ def create_location(*,name,address,actor=None,status='candidate',asset_type='oth
     # `confirm_portfolio` runs, so the one-time workspace import still sees clean seeds.
     if status==Location.Status.OWNED and origin!='public_seed':
         _mark_confirmed(location,actor,'created as owned')
+    if lat is not None:
+        _analyze(location,actor)
     return location
+
+
+def _analyze(location,actor):
+    from apps.area.analysis import analyze_after_commit
+    analyze_after_commit(location.pk,actor)
 
 
 def _mark_confirmed(location,actor,reason):
@@ -90,6 +97,8 @@ def update_location(*,location_id,expected_version,attributes,actor):
     audit(location,actor,'address_changed' if address_changed else 'attributes_changed',before,after)
     if became_owned and not location.confirmed:
         _mark_confirmed(location,actor,'status changed to owned')
+    if ring_changed and not address_changed:  # an address change unplaces the pin; the re-pin analyzes
+        _analyze(location,actor)
     return location
 
 
@@ -103,6 +112,7 @@ def change_pin(*,location_id,expected_version,lat,lon,actor,method='manual',matc
     location.current_revision=revision;location.version+=1;location.analysis_version+=1
     location.save(update_fields=['current_revision','version','analysis_version','updated_at'])
     audit(location,actor,'pin_changed',{'revision':str(old.pk)},{'revision':str(revision.pk),'analysis_version':location.analysis_version})
+    _analyze(location,actor)  # also covers geocode accept_lookup, which re-pins through here
     return location
 
 

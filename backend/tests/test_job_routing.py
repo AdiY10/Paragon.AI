@@ -15,7 +15,7 @@ pytestmark = pytest.mark.django_db
 
 def test_user_triggered_work_runs_on_the_foreground_cluster():
     fg = {k for k, s in registry.REGISTRY.items() if s.queue == 'paragon-foreground'}
-    assert fg == {'compute_area_profile', 'compute_ring_demographics', 'brief_weekly'}
+    assert fg == {'compute_area_profile', 'compute_ring_demographics', 'brief_weekly', 'analyze_location'}
     clusters = {settings.Q_CLUSTER['name']: settings.Q_CLUSTER, **settings.Q_CLUSTER['ALT_CLUSTERS']}
     for spec in registry.REGISTRY.values():
         cluster = clusters[spec.queue]

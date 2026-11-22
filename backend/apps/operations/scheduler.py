@@ -90,4 +90,22 @@ def dispatch_due(*,owner,now=None):
                 dispatched+=1
             schedule.next_due_at=following;schedule.last_dispatched_at=now
             schedule.save(update_fields=['next_due_at','last_dispatched_at','updated_at'])
-    return {'leader':True,'dispatched':dispatched,'blocked':blocked,'recovery':recovery}
+    return {'leader':True,'dispatched':dispatched,'blocked':blocked,'recovery':recovery,'analysis':_maybe_sweep(now)}
+
+
+_last_sweep=None
+
+def _maybe_sweep(now):
+    """Automatic analysis sweep (B3a), at most every 5 minutes on the scheduler leader."""
+    global _last_sweep
+    from django.conf import settings
+    from apps.area import analysis
+    if not getattr(settings,'AUTO_ANALYZE',False):return None
+    if _last_sweep is not None and now-_last_sweep<analysis.SWEEP_EVERY:return None
+    _last_sweep=now
+    try:
+        return analysis.sweep(now=now)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('analysis sweep failed')
+        return {'error':True}

@@ -68,6 +68,8 @@ LOCAL_PREVIEW = False
 # Guest-list sign-in: an allowed member's email alone opens the workspace (for knowing who
 # visited, not for secrecy); administrators still need their password. Every entry is logged.
 EMAIL_ONLY_ACCESS = os.environ.get('EMAIL_ONLY_ACCESS', 'false').lower() == 'true'
+# Automatic analysis (redesign B3a): new pins queue their analysis; the scheduler sweep fills gaps.
+AUTO_ANALYZE = os.environ.get('AUTO_ANALYZE', 'true').lower() == 'true'
 LOCAL_SHARED_PASSWORD = ''
 SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_HTTPONLY = True

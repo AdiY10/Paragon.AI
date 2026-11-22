@@ -4,21 +4,8 @@ from django.db import transaction
 from django.utils import timezone
 from apps.locations.models import Location
 from apps.locations.service import create_location, audit
-from apps.operations.service import enqueue_job
 
 SCREEN_TTL_DAYS = 30
-
-
-def start_computations(location, actor=None):
-    """Queue demographics and area data for a placed location (deduplicated per analysis version)."""
-    jobs = []
-    for kind, prefix in (('compute_ring_demographics', 'ring-demographics'), ('compute_area_profile', 'area-profile')):
-        job, _ = enqueue_job(kind=kind, scope=f'location:{location.pk}',
-            dedup_key=f'{prefix}:{location.pk}:{location.analysis_version}',
-            parameters={'location_id': str(location.pk), 'analysis_version': location.analysis_version},
-            requested_by=actor)
-        jobs.append(str(job.pk))
-    return jobs
 
 
 def create_screen(*, address, name, actor, geocoder=None):
@@ -39,10 +26,9 @@ def create_screen(*, address, name, actor, geocoder=None):
     except GeocoderError as exc:
         status = f'geocoder_{exc.code.lower()}'
     location.refresh_from_db()
-    jobs = []
-    if location.current_revision and location.current_revision.lat is not None:
-        jobs = start_computations(location, actor)
-    return location, lookup, status, jobs
+    from apps.area.analysis import ensure_analysis
+    job = ensure_analysis(location.pk, requested_by=actor)  # None while unplaced
+    return location, lookup, status, [str(job.pk)] if job else []
 
 
 def save_screen(location, actor):

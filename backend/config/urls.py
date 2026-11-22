@@ -38,7 +38,6 @@ urlpatterns = [
     path('api/signals/', insights.signal_list),
     path('api/screens/', insights.screens),
     path('api/screens/<uuid:location_id>/save/', insights.screen_save),
-    path('api/locations/<uuid:location_id>/compute/', insights.location_compute),
     path('api/compare/', insights.compare_view),
     path('api/locations/<uuid:location_id>/tenants/', tenants.tenant_list),
     path('api/locations/<uuid:location_id>/tenants/<uuid:tenant_id>/', tenants.tenant_detail),

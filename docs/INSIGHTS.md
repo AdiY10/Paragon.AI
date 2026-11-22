@@ -63,7 +63,19 @@
 - The property page loads progressively and starts calculations automatically for screens.
 - Unsaved screens are not monitored, not in the portfolio list and not in briefs. `POST /api/screens/<id>/save/` makes one a monitored candidate. Unsaved screens older than 30 days are archived.
 - For addresses in states not yet ingested, the background job ingests that state's ACS rows on demand.
-- `POST /api/locations/<id>/compute/` queues everything for any placed location.
+- Analyses are automatic (redesign B3a, `backend/apps/area/analysis.py`): creating, re-pinning or re-ringing a
+  location queues one `analyze_location` job (foreground when a person made the change, `analyze_location_bg`
+  for seeds and bulk work) once the change commits. The job computes the five area sections and ring
+  demographics for the current `analysis_version`, stops as stale if the pin moves meanwhile, and evaluates
+  alerts once at the end. Job keys are `analyze:{location}:{analysis_version}:{attempt}`.
+- The scheduler sweep (every 5 minutes, at most 2 live background analyses) fills missing sections, retries
+  transient source failures (TIMEOUT, HTTP_ERROR, SOURCE_ERROR) after 10 min, 2 h, then 24 h, recomputes
+  results whose `logic_version` is older than the code's, and raises an admin alert for an owned property
+  without a pin. After 3 failed attempts in 24 hours a location is left alone until the window passes.
+- `AUTO_ANALYZE=false` (environment) turns off the hooks and the sweep. `manage.py analyze_portfolio
+  [--dry-run]` queues everything missing in one go (used after a rebuild).
+- `POST /api/locations/<id>/area/` and `/demographics/` no longer force work: for a member they only queue
+  what is missing; an administrator's POST recomputes those sections. The old `/compute/` route is gone.
 
 **Compare** (`#/compare`):
 - Pick 2–4 locations. The selection is kept in this browser, and "Add to compare" is available on every property page.

@@ -22,6 +22,8 @@ class RingDemographics(models.Model):
     baseline = models.JSONField(default=dict)
     inputs_sha256 = models.CharField(max_length=64)
     rings = models.JSONField()
+    # apps.demographics.service.LOGIC_VERSION at compute time; the analysis sweep recomputes older rows.
+    logic_version = models.PositiveSmallIntegerField(default=1)
     computed_at = models.DateTimeField(auto_now_add=True)
     objects = ImmutableQuerySet.as_manager()
 
