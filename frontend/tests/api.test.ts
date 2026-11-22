@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allLocations, api, ApiError } from "../src/api";
+import { allLocations, api, ApiError } from "../src/api/client";
 
 afterEach(() => vi.unstubAllGlobals());
 function browser() {

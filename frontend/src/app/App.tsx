@@ -1,16 +1,14 @@
 import { type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import AlertsPage from "../Alerts";
 import { ComparePage, ScreenPage } from "../Acquisitions";
-import { api, allLocations } from "../api";
+import { useLocations, useSession, useSources } from "../api/hooks";
 import { Empty, ErrorNotice } from "../components/ui";
 import { Admin } from "../pages/Admin";
 import { LocationPage } from "../pages/LocationPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { PropertiesPage } from "../pages/PropertiesPage";
 import { Sources } from "../pages/Sources";
-import type { Session, Source } from "../types";
 import { AppShell } from "./AppShell";
 import { type Route, useRoute } from "./router";
 
@@ -28,22 +26,10 @@ const TITLES: Record<Route["name"], string> = {
 
 export function App() {
   const { path, route } = useRoute();
-  const session = useQuery({
-    queryKey: ["session"],
-    queryFn: () => api<Session>("/api/session/"),
-    retry: false,
-  });
-  const sources = useQuery({
-    queryKey: ["sources"],
-    queryFn: () => api<Source[]>("/api/sources/"),
-    enabled: !!session.data,
-  });
+  const session = useSession();
+  const sources = useSources(!!session.data);
   const needsPortfolio = route.name === "properties";
-  const portfolio = useQuery({
-    queryKey: ["locations"],
-    queryFn: allLocations,
-    enabled: !!session.data && needsPortfolio,
-  });
+  const portfolio = useLocations(!!session.data && needsPortfolio);
   if (session.isPending)
     return (
       <div className="boot" role="status">
