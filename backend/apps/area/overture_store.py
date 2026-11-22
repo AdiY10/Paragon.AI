@@ -63,6 +63,8 @@ def store_capture(lat, lon, release, records, store, *, raw_snapshot=None):
 
 def _raw_snapshot(lat, lon, release):
     for snap in SourceSnapshot.objects.filter(source_id='SRC-13', release=release).order_by('-retrieved_at'):
+        if (snap.context or {}).get('format') == 'compact':
+            continue  # already compact (gzipped JSON lines), not a raw capture
         c = (snap.context or {}).get('coordinates') or {}
         if round(c.get('lat', 999), 6) == round(lat, 6) and round(c.get('lon', 999), 6) == round(lon, 6) \
                 and snap.context.get('radius_miles') == 3:
@@ -88,6 +90,8 @@ def compact_all(store):
     done = 0
     for snap in SourceSnapshot.objects.filter(source_id='SRC-13').order_by('release'):
         c = (snap.context or {}).get('coordinates') or {}
+        if (snap.context or {}).get('format') == 'compact':
+            continue
         if 'lat' not in c or OvertureCapture.objects.filter(release=snap.release,
                 pin_key=pin_key(c['lat'], c['lon'])).exists():
             continue
@@ -139,3 +143,81 @@ def prune_raw(store, keep_releases):
         OvertureCapture.objects.filter(pk=capture.pk).update(raw_pruned=True)
         pruned += 1
     return pruned
+
+
+# ---- moving the captured history to another server (redesign B2) -----------------------
+# Overture deletes releases after about two months, so captured history cannot be re-downloaded.
+
+def export_history(locations, store, out):
+    """Write a tar of the compact captures for these locations' current pins plus manifest.jsonl.
+
+    Only release, pin coordinates key, counts, summaries, checksums and provenance: no names,
+    addresses or screens.
+    """
+    import tarfile
+    pins = {pin_key(l.current_revision.lat, l.current_revision.lon) for l in locations
+        if l.current_revision_id and l.current_revision.lat is not None}
+    manifest, written, files = [], 0, set()
+    with tarfile.open(out, 'w') as tar:
+        for capture in (OvertureCapture.objects.filter(pin_key__in=pins).select_related('raw_snapshot')
+                .order_by('release', 'pin_key')):
+            with store.open_verified(capture.compact_key) as handle:
+                data = handle.read()
+            compact_sha = capture.compact_key.rsplit('/', 1)[1]
+            if compact_sha not in files:  # identical captures (content-addressed) are written once
+                info = tarfile.TarInfo(f'captures/{compact_sha}.jsonl.gz')
+                info.size, info.mtime = len(data), 0
+                tar.addfile(info, io.BytesIO(data))
+                files.add(compact_sha)
+            raw = capture.raw_snapshot
+            manifest.append({'release': capture.release, 'pin_key': capture.pin_key, 'record_count': capture.record_count,
+                'summary': capture.summary, 'compact_sha256': compact_sha,
+                'raw_sha256': raw.sha256 if raw else None,
+                'retrieved_at': (raw.retrieved_at if raw else capture.created_at).isoformat(),
+                'source_url': f's3://overturemaps-us-west-2/release/{capture.release}/theme=places/type=place/*'})
+            written += 1
+        body = ''.join(json.dumps(m, sort_keys=True) + '\n' for m in manifest).encode()
+        info = tarfile.TarInfo('manifest.jsonl')
+        info.size, info.mtime = len(body), 0
+        tar.addfile(info, io.BytesIO(body))
+    return written
+
+
+class HistoryError(Exception):
+    pass
+
+
+def import_history(path, store):
+    """Load an exported history: verify every checksum, store the compact files, create the
+    captures (existing release/pin pairs are kept), then recompute the release-pair guards.
+    Returns (created, skipped)."""
+    import hashlib
+    import re
+    import tarfile
+    created = skipped = 0
+    with tarfile.open(path, 'r') as tar:
+        member = tar.getmember('manifest.jsonl')
+        manifest = [json.loads(line) for line in tar.extractfile(member).read().decode().splitlines() if line.strip()]
+        for m in manifest:
+            if not re.fullmatch(r'[0-9a-f]{64}', m.get('compact_sha256') or '') or \
+                    not re.fullmatch(r'\d{4}-\d{2}-\d{2}\.\d+', m.get('release') or ''):
+                raise HistoryError('invalid manifest entry')
+            if OvertureCapture.objects.filter(release=m['release'], pin_key=m['pin_key']).exists():
+                skipped += 1
+                continue
+            data = tar.extractfile(f'captures/{m["compact_sha256"]}.jsonl.gz').read()
+            if hashlib.sha256(data).hexdigest() != m['compact_sha256']:
+                raise HistoryError(f'checksum mismatch for {m["release"]} {m["pin_key"]}')
+            artifact = store.put(io.BytesIO(data))
+            with gzip.GzipFile(fileobj=io.BytesIO(data)) as gz:
+                count = sum(1 for line in gz if line.strip())
+            if count != m['record_count']:
+                raise HistoryError(f'record count mismatch for {m["release"]} {m["pin_key"]}')
+            OvertureCapture.objects.create(release=m['release'], pin_key=m['pin_key'], compact_key=artifact.key,
+                record_count=count, summary={**m['summary'], 'imported': True, 'retrieved_at': m['retrieved_at'],
+                    'raw_sha256': m.get('raw_sha256')}, raw_pruned=True)
+            created += 1
+    releases = sorted(set(OvertureCapture.objects.values_list('release', flat=True)))
+    for prior, latest in zip(releases, releases[1:]):
+        pair(prior, latest, recompute=True)
+    return created, skipped

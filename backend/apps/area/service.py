@@ -384,7 +384,9 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
         run.snapshots.append(str(capture.raw_snapshot_id or capture.pk))
         name, link = SOURCE_META['SRC-13']
         run.sources.setdefault('SRC-13' + release, {'id': 'SRC-13', 'name': name, 'url': link,
-            'period': f'Overture release {release}', 'retrieved_at': capture.created_at.isoformat()})
+            'period': f'Overture release {release}',
+            # Imported history (B2) keeps the original capture time.
+            'retrieved_at': (capture.summary or {}).get('retrieved_at') or capture.created_at.isoformat()})
         return ostore.load(capture, run.store)
 
     current = load(latest, True)

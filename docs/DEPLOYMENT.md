@@ -86,6 +86,23 @@ preview (18 missing states each): 2024 in 10 s, peak 276 MB; 2019 in 106 s, peak
 Analyses never download ACS themselves: a state that is missing queues a background `ingest_acs_state`
 job, the demographics section shows "loading", and the job wakes the waiting analyses when it is done.
 
+## Production rebuild (redesign B2)
+Replaces copying a database. Run in order; every step is re-runnable.
+1. Deploy with `AUTO_ANALYZE=false` in `/etc/paragon/app.env`, then `migrate`.
+2. On the preview: `manage.py export_overture_history overture-history.tar` (owned pins only; compact
+   captures plus a checksummed `manifest.jsonl`; no names, addresses or screens). Measured: 105
+   captures (Sep/Oct/Nov 2026 × 35 pins), 85 MB.
+3. Copy the tar to the droplet and run `manage.py import_overture_history /path/overture-history.tar`
+   (verifies every checksum and record count, keeps existing captures, recomputes release pairs).
+   Measured on a fresh database: 0.8 s, 77 MB of artifacts.
+4. Upload `var/overture-archive` (1.4 GB raw) to the off-box backup bucket only (needs the Backblaze keys).
+5. `ingest_acs --all-states --year 2024`, `ingest_acs --all-states --year 2019`, `import_listing_tenants`,
+   `confirm_portfolio --actor-email <admin>`, then set `AUTO_ANALYZE=true` and restart: the scheduler
+   sweep computes the pinned properties (or `analyze_portfolio` queues them all at once).
+6. Pin P21 (Bareburger, Mount Kisco) by choosing the right Census candidate; its analysis starts by itself.
+   Re-enter the one SEC filer mapping made on the preview.
+7. `qa_report --strict` must exit 0; compare headline numbers with the preview.
+
 ## First-time data bootstrap (one command, re-runnable)
 ```sh
 python backend/manage.py bootstrap_data --overture-archive /app/var/overture-archive
