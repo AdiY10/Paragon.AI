@@ -250,3 +250,29 @@ def broad_change(cohort):
     up = sum(1 for a, b in usable if (b - a) / a > 0.15)
     down = sum(1 for a, b in usable if (b - a) / a < -0.15)
     return max(up, down) / len(usable) >= 0.30
+
+
+GROCERY_CATEGORIES = {'supermarket', 'grocery_store'}
+COMPETITOR_RADIUS_MI = 2.0
+
+
+def is_grocer(r):
+    return brand_in(r.get('brand'), GROCERY_BRANDS) or r.get('basic_category') in GROCERY_CATEGORIES
+
+
+def new_grocers(older, prior, current, center):
+    """Grocers within 2 mi present in the latest two releases and absent from the one before (B7b, SIG-14):
+    one release is not enough to call an opening."""
+    before = [r for r in older if is_present(r)]
+    before_ids = {r['id'] for r in before}
+    prior_ids = {r['id'] for r in prior if is_present(r)}
+    out = []
+    for r in current:
+        if not (is_present(r) and is_grocer(r)) or r['id'] not in prior_ids or r['id'] in before_ids:
+            continue
+        if r.get('confidence') is None or r['confidence'] < OPENING_CONFIDENCE or _distance(center, r) > COMPETITOR_RADIUS_MI:
+            continue
+        if is_noise(r) or same_place_present(r, before):
+            continue  # an existing store under a new id
+        out.append(_place(center, r))
+    return sorted(out, key=lambda p: p['distance_mi'])

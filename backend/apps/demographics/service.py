@@ -17,7 +17,7 @@ DEFAULT_ACS_YEAR = 2024
 AUTO_INGEST = True  # tests turn this off; jobs ingest a missing state's ACS rows on demand
 BASELINE_ACS_YEAR = acs.LEGACY_YEAR
 # Bump when the ring computation changes; the analysis sweep recomputes older results (B3a).
-LOGIC_VERSION = 1
+LOGIC_VERSION = 2  # 2: depth metrics (age, tenure, home value, rent, $100k+ households; redesign B8)
 RADII = {'1/3/5': (1, 3, 5), '3/5/10': (3, 5, 10)}
 
 
@@ -55,10 +55,19 @@ def acs_cache_dir(year):
 
 def ingested_states(year):
     return {scope.rsplit(':', 1)[1] for scope in SourceSnapshot.objects.filter(
-        source_id='SRC-03', release=str(year)).values_list('scope', flat=True)}
+        source_id='SRC-03', release=str(year), scope__contains=':bg:').values_list('scope', flat=True)}
 
 
-def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None, batch_limit=30_000,
+def current_states(year):
+    """States whose snapshot has the current table set (B8: older table-based snapshots lack the depth
+    tables and are re-ingested; the 2019 legacy vintage keeps its base tables)."""
+    if year == acs.LEGACY_YEAR:
+        return ingested_states(year)
+    return {scope.rsplit(':', 1)[1] for scope in SourceSnapshot.objects.filter(source_id='SRC-03', release=str(year),
+        adapter_version=acs.ADAPTER_VERSION, scope__contains=':bg:').values_list('scope', flat=True)}
+
+
+def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None, batch_limit=15_000,
         skip_existing=True, heartbeat=None):
     """Ingest every state (or ``states``) for a vintage with bounded memory (B4a).
 
@@ -70,9 +79,11 @@ def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None
     store = _store(store)
     wanted = set(states or FIPS.values())
     if skip_existing:
-        wanted -= ingested_states(year)
+        wanted -= current_states(year)
     published = []
     if not wanted:
+        if year != acs.LEGACY_YEAR and not _has_reference(year):
+            ensure_reference(year, acs.download_tables(year, cache_dir or acs_cache_dir(year), opener=opener), store)
         return published
     if year == acs.LEGACY_YEAR:
         for state in sorted(wanted):
@@ -81,6 +92,7 @@ def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None
             published += ingest_acs([state], year=year, store=store, opener=opener)
         return published
     paths = acs.download_tables(year, cache_dir or acs_cache_dir(year), opener=opener)
+    ensure_reference(year, paths, store)
     counts = {s: n for s, n in acs.count_block_groups(acs.file_lines(paths['B01003'])).items() if s in wanted}
     for batch in acs.plan_batches(counts, batch_limit):
         if heartbeat:
@@ -88,6 +100,39 @@ def ingest_acs_all(year, *, states=None, store=None, opener=None, cache_dir=None
         published += ingest_acs(batch, year=year, store=store,
             line_source=lambda table: acs.file_lines(paths[table]))
     return published
+
+
+_REFERENCE = {}
+
+
+def us_reference(year=None, store=None):
+    """Ring-style metrics for the nation (and states) for a vintage; None until ingested (B6b)."""
+    from .metrics import ring_metrics
+    year = year or vintage.current_acs_year()
+    snap = (SourceSnapshot.objects.filter(source_id='SRC-03', scope=f'acs5:{year}:reference')
+        .order_by('-retrieved_at').first())
+    if snap is None:
+        return None
+    if snap.pk not in _REFERENCE:
+        rows = acs.load_rows(snap, _store(store))
+        _REFERENCE.clear()
+        _REFERENCE[snap.pk] = {geo: ring_metrics({geo: 1.0}, {geo: row}) for geo, row in rows.items()}
+    return _REFERENCE[snap.pk]
+
+
+def _has_reference(year):
+    return SourceSnapshot.objects.filter(source_id='SRC-03', scope=f'acs5:{year}:reference',
+        adapter_version=acs.ADAPTER_VERSION).exists()
+
+
+def ensure_reference(year, paths, store):
+    """Nation and state rows for the US index (B6b), from the national files already on disk."""
+    if not _has_reference(year):
+        try:
+            acs.publish_reference(acs.extract_reference(year, lambda table: acs.file_lines(paths[table])), store)
+        except acs.AcsError:
+            import logging
+            logging.getLogger(__name__).warning('ACS %s national reference rows missing; US index unavailable', year)
 
 
 def queue_acs_ingest(year, state):
@@ -135,12 +180,13 @@ def _vintage_rings(lat, lon, radii, year, decennial, store, opener):
     geo_snapshot, capture = _geography(lat, lon, max(radii), year, store, opener, decennial)
     blocks, totals, mapping, unresolved = geography.parse_geography(capture)
     rows, acs_ids, missing = {}, [], []
+    wanted_geoids = set(mapping.values())  # only the ring's block groups are parsed (B8)
     for state in sorted({b.geoid[:2] for b in blocks}):
         snapshot = _latest('SRC-03', acs.scope_for(year, state))
         if snapshot is None:
             missing.append(state)
             continue
-        rows.update(acs.load_rows(snapshot, store))
+        rows.update(acs.load_rows(snapshot, store, geoids=wanted_geoids))
         acs_ids.append(str(snapshot.pk))
     if missing and AUTO_INGEST:
         # Never download inside an analysis (B4a): a background job ingests the state, then wakes

@@ -28,7 +28,8 @@ from .models import AreaSection
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
 # traffic 2: road labels without inventory codes (rows from before that fix still showed "K120 Birch St").
-SECTION_LOGIC = {'economy': 1, 'traffic': 2, 'hazards': 3, 'businesses': 8, 'jobs': 1}
+# jobs 2: sector groups and earnings bands (B8). businesses 9: grocers opened across two releases (B7b).
+SECTION_LOGIC = {'economy': 1, 'traffic': 2, 'hazards': 3, 'businesses': 9, 'jobs': 2}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 # Economy sources are refreshed weekly; 6 days (not 7) so the weekly run always re-checks them (B4a).
@@ -351,7 +352,9 @@ def hazards_section(run, lat, lon):
 
 def businesses_section(run, lat, lon, *, location=None, capturer=None):
     from . import overture_store as ostore
-    capturer = capturer or overture.capture
+    if capturer is None:
+        from . import overture_extract
+        capturer = overture_extract.capture  # local US extract when built (B4b), S3 otherwise
     try:
         releases = overture_releases(run)
     except SourceError as exc:
@@ -415,6 +418,8 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
                     and biz.normalize_brand(c.get('brand')) not in old_drops \
                     and not biz.same_place_present({**c, 'brand': c.get('brand'), 'name': c.get('name')}, present_now):
                 confirmed.append({**c, 'evidence': 'missing from the last two releases', 'confirmed': True})
+    grocers = biz.new_grocers(ostore.load(earlier, run.store), previous, current, (lat, lon)) \
+        if earlier is not None and not broad else []
     drops = set(guard.brand_drops)
     closures = []
     for c in found['closures']:
@@ -437,7 +442,7 @@ def businesses_section(run, lat, lon, *, location=None, capturer=None):
     data['changes'] = {**found, 'closures': found['closures'][:20], 'openings': found['openings'][:20],
         'total_closures': len(found['closures']), 'total_openings': len(found['openings']),
         'broad_data_change': broad, 'cohort_size': guard.cohort_size, 'brand_drops': guard.brand_drops,
-        'reason': None}
+        'new_grocers': grocers[:10], 'reason': None}
     return data, True
 
 

@@ -148,6 +148,8 @@ def maintenance_daily(context,parameters):
     from apps.sources.storage import LocalArtifactStore
     keep=sorted(set(OvertureCapture.objects.values_list('release',flat=True)))[-2:]
     done+=overture_store.prune_raw(LocalArtifactStore(settings.SOURCE_ARTIFACT_ROOT),keep)
+    from apps.area import overture_extract
+    done+=overture_extract.prune()  # newest three US extracts (B4b)
     return JobResult(records=done)
 
 FOREGROUND='paragon-foreground'

@@ -15,7 +15,12 @@ from .http import SourceError, default_opener, fetch
 from .traffic_hazards import STATES
 
 URL = 'https://lehd.ces.census.gov/data/lodes/LODES8/{st}/wac/{st}_wac_S000_JT00_{year}.csv.gz'
-COLUMNS = {'C000': 'total', 'CNS07': 'retail', 'CNS18': 'food_service'}
+COLUMNS = {'C000': 'total', 'CNS07': 'retail', 'CNS18': 'food_service',
+    # Redesign B8: sector detail and earnings bands from the same workplace files.
+    'CNS16': 'health', 'CNS09': 'information', 'CNS10': 'finance', 'CNS11': 'real_estate', 'CNS12': 'professional',
+    'CNS13': 'management', 'CNS14': 'administrative', 'CE01': 'earn_low', 'CE02': 'earn_mid', 'CE03': 'earn_high'}
+NAMES = list(COLUMNS.values())
+OFFICE = ('information', 'finance', 'real_estate', 'professional', 'management', 'administrative')
 MIN_JOBS_FOR_TREND = 1000  # docs/04 MET-09
 
 
@@ -79,14 +84,23 @@ def ring_jobs(blocks, wac, center, radii):
     distances = [(b.geoid, haversine_miles(lat0, lon0, b.lat, b.lon)) for b in blocks]
     out = {}
     for r in radii:
-        sums = [0, 0, 0]
+        sums = [0] * len(NAMES)
         workplaces = 0
         for geoid, d in distances:
             if d <= r and geoid in wac:
                 workplaces += 1
                 for i, v in enumerate(wac[geoid]):
                     sums[i] += v
-        out[r] = {'total': sums[0], 'retail': sums[1], 'food_service': sums[2], 'workplace_blocks': workplaces}
+        v = dict(zip(NAMES, sums))
+        office = sum(v[k] for k in OFFICE)
+        out[r] = {'total': v['total'], 'retail': v['retail'], 'food_service': v['food_service'],
+            'workplace_blocks': workplaces,
+            # Groups add up to the total (WI-6 "jobs by sector"); earnings bands are monthly, per job.
+            'sectors': {'retail': v['retail'], 'food_service': v['food_service'], 'health': v['health'],
+                'office_professional': office,
+                'other': v['total'] - v['retail'] - v['food_service'] - v['health'] - office},
+            'earnings': {'under_1250_month': v['earn_low'], '1251_to_3333_month': v['earn_mid'],
+                'over_3333_month': v['earn_high']}}
     return out
 
 
