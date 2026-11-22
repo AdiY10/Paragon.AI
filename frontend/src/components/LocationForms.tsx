@@ -15,7 +15,7 @@ export function AddLocation() {
     onSuccess: (data) => {
       cache.invalidateQueries({ queryKey: ["locations"] });
       setOpen(false);
-      window.location.hash = "/locations/" + data.id;
+      window.location.hash = "/p/" + data.id;
     },
   });
   function submit(event: FormEvent<HTMLFormElement>) {

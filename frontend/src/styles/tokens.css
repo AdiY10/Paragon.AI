@@ -1,0 +1,99 @@
+/* Paragon Radar design tokens (REDESIGN_PLAN F2). Light only. Contrast ratios are against white
+   unless noted. Red and amber are reserved for attention levels. */
+
+/* Self-hosted Inter (Latin subset only, ~48 KB); the CSP allows fonts from 'self' only. */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --bg: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  --text: #0f172a; /* 17.9:1 */
+  --text-2: #475569; /* 7.6:1 */
+  --text-3: #64748b; /* 4.8:1, never on surface-3 */
+  --border: #e2e8f0; /* decorative */
+  --border-strong: #8391a7; /* 3.2:1, inputs and buttons */
+
+  /* Accent: Paragon green */
+  --accent: #0e6b4f; /* 6.5:1; white on it 6.5:1 */
+  --accent-hover: #0b5640;
+  --accent-press: #094a37;
+  --accent-soft: #e8f3ee;
+  --accent-2: #7dbfa4; /* second chart shade */
+  --focus: var(--accent);
+
+  /* Attention (reserved) */
+  --high-text: #b42318;
+  --high-bg: #fef3f2;
+  --high-pin: #c81e1e;
+  --watch-text: #8a5a00;
+  --watch-bg: #fffaeb;
+  --watch-pin: #c98500;
+  --clear-text: #475569;
+  --clear-bg: #f1f5f9;
+  --clear-pin: #64748b;
+  --bad: #b42318; /* significant unfavourable change */
+
+  /* Type */
+  --font: "Inter Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-caption: 12px;
+  --lh-caption: 16px;
+  --fs-table: 13px;
+  --lh-table: 18px;
+  --fs-body: 14px;
+  --lh-body: 20px;
+  --fs-sub: 16px;
+  --lh-sub: 24px;
+  --fs-section: 20px;
+  --lh-section: 28px;
+  --fs-page: 24px;
+  --lh-page: 32px;
+  --fs-kpi: 28px;
+  --lh-kpi: 32px;
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+
+  /* Radius */
+  --r-badge: 4px;
+  --r-card: 8px;
+  --r-map: 12px;
+  --r-pill: 999px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-2: 0 4px 12px rgb(15 23 42 / 0.1);
+  --shadow-3: 0 12px 32px rgb(15 23 42 / 0.18);
+
+  /* Layout */
+  --topnav-h: 56px;
+  --rail-w: 232px;
+  --content-max: 1120px;
+  --gutter: 24px;
+  --map-h: clamp(320px, 52vh, 560px);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+    --map-h: 280px;
+  }
+}
