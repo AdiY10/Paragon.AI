@@ -352,7 +352,9 @@ def hazards_section(run, lat, lon):
 
 def businesses_section(run, lat, lon, *, location=None, capturer=None):
     from . import overture_store as ostore
-    capturer = capturer or overture.capture
+    if capturer is None:
+        from . import overture_extract
+        capturer = overture_extract.capture  # local US extract when built (B4b), S3 otherwise
     try:
         releases = overture_releases(run)
     except SourceError as exc:
