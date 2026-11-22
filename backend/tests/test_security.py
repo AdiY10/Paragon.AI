@@ -10,7 +10,7 @@ def test_signal_list_rejects_bad_location_param(client):
     user, _ = member()
     client.force_login(user)
     assert client.get('/api/signals/?location=not-a-uuid').status_code == 400
-    assert client.get('/api/signals/?location=00000000-0000-0000-0000-000000000000').json() == {'results': []}
+    assert client.get('/api/signals/?location=00000000-0000-0000-0000-000000000000').json() == {'groups': [], 'results': []}
 
 
 def test_admin_only_endpoints_use_shared_permission(client):

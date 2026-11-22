@@ -20,13 +20,15 @@ def load_definitions(path=None):
         raise ValueError('Invalid schedule definition schema')
     parsed=[];seen=set()
     for item in document['schedules']:
-        if not isinstance(item,dict) or not {'name','kind','cadence','hour'}<=set(item) or set(item)-{'name','kind','cadence','hour','minute','weekday','day'}:
+        if not isinstance(item,dict) or not {'name','kind','cadence','hour'}<=set(item) or set(item)-{'name','kind','cadence','hour','minute','weekday','day','enabled'}:
             raise ValueError('Invalid schedule definition fields')
         if any(not isinstance(item[key],str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,63}',item[key]) for key in ('name','kind')) or item['name'] in seen:
             raise ValueError('Invalid or duplicate schedule name')
         seen.add(item['name'])
-        rule=CalendarRule(**{key:value for key,value in item.items() if key not in ('name','kind')})
-        parsed.append((item['name'],item['kind'],rule))
+        if 'enabled' in item and item['enabled'] is not False:
+            raise ValueError('enabled may only be false (a switched-off schedule)')
+        rule=CalendarRule(**{key:value for key,value in item.items() if key not in ('name','kind','enabled')})
+        parsed.append((item['name'],item['kind'],rule,item.get('enabled',True)))
     return parsed
 
 
@@ -34,14 +36,14 @@ def load_definitions(path=None):
 def sync_schedules(*,path=None,enable_available=False,now=None):
     now=now or timezone.now()
     definitions=load_definitions(path)
-    for name,kind,rule in definitions:
+    for name,kind,rule,allowed in definitions:
         calendar=asdict(rule)
         schedule,created=JobSchedule.objects.get_or_create(name=name,
             defaults={'kind':kind,'calendar':calendar,'next_due_at':next_occurrence(rule,now)})
         if not created and (schedule.calendar!=calendar or schedule.kind!=kind):
             schedule.calendar=calendar;schedule.kind=kind
             schedule.next_due_at=next_occurrence(rule,now)
-        if kind not in REGISTRY:
+        if kind not in REGISTRY or not allowed:
             schedule.enabled=False
         elif enable_available:
             schedule.enabled=True

@@ -486,7 +486,7 @@ def test_flood_polygon_inside_outside_and_holes():
 
 
 @pytest.mark.django_db
-def test_sig11_high_only_inside_and_watch_within_100m():
+def test_flood_badge_inside_or_within_100m_and_never_an_alert():
     from backend.tests.test_signals import placed, section
     from apps.insights import signals as engine
     from apps.insights.models import Signal
@@ -494,12 +494,12 @@ def test_sig11_high_only_inside_and_watch_within_100m():
     section(loc, 'hazards', {'flood_at_pin': {'zone': 'AE', 'sfha': True, 'in_sfha': False},
         'flood_nearby': {'zone': 'AE', 'sfha': True, 'inside': False, 'distance_m': 40}, 'nri': {}})
     engine.evaluate(loc)
-    s = Signal.objects.get(rule_id='SIG-11')
-    assert s.severity == 'Watch' and 'about 40 m' in s.title
+    assert not Signal.objects.exists()  # B7a: a standing risk is a badge in the analysis
+    assert engine.risk_badges(loc) == [{'kind': 'flood', 'level': 'near', 'source': 'SRC-11',
+        'label': 'FEMA high-risk flood zone AE about 40 m away'}]
     section(loc, 'hazards', {'flood_at_pin': {'zone': 'X', 'sfha': False, 'in_sfha': False},
         'flood_nearby': {'zone': 'AE', 'sfha': True, 'inside': False, 'distance_m': 140}, 'nri': {}})
-    engine.evaluate(loc)
-    assert Signal.objects.get(rule_id='SIG-11').status == 'resolved'
+    assert engine.risk_badges(loc) == []
 
 
 def test_nri_concern_uses_specific_hazards():

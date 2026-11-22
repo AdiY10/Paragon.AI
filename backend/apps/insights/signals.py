@@ -20,8 +20,22 @@ SOURCE_LINKS = {'SRC-03': 'https://www.census.gov/programs-surveys/acs', 'SRC-05
     'SRC-13': 'https://docs.overturemaps.org/attribution/', 'SRC-14': 'https://www.sec.gov/edgar/search/'}
 
 
+def _config():
+    return yaml.safe_load((Path(settings.BASE_DIR) / 'config' / 'signals.yaml').read_text())
+
+
 def thresholds():
-    return yaml.safe_load((Path(settings.BASE_DIR) / 'config' / 'signals.yaml').read_text())['thresholds']
+    return _config()['thresholds']
+
+
+def rules():
+    """{rule_id: {'enabled': bool, 'next_step': str}} from config/signals.yaml (B7a)."""
+    return {k: {'enabled': bool(v.get('enabled')), 'next_step': v.get('next_step', '')}
+        for k, v in (_config().get('rules') or {}).items()}
+
+
+def enabled_rules():
+    return {k for k, v in rules().items() if v['enabled']}
 
 
 def _pct(v):
@@ -34,58 +48,38 @@ def _candidate(rule, subject, category, severity, direction, title, why, evidenc
         'period': (period or '')[:120], 'source': source, 'event_date': event_date}
 
 
-def candidates(location, t=None, today=None, evaluated=None):
-    """All signals whose conditions currently hold for the location, from stored results.
+GROCERY_CATEGORIES = {'supermarket', 'grocery_store'}
 
-    Subjects are stable across data periods (docs/04 §5.3): a new month updates the same
-    alert rather than raising a new one. ``evaluated`` (a set) receives the rule ids whose
-    inputs were available, so missing data never resolves an alert.
+
+def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
+    """High/Watch alerts whose conditions currently hold for the location, from stored results (B7a).
+
+    Alerts are for actionable changes only. Subjects are stable across data periods (docs/04 §5.3):
+    a new month updates the same alert rather than raising a new one. ``evaluated`` receives the rule
+    ids whose inputs were available, so missing data never resolves an alert; ``out_of_scope``
+    receives (rule, subject) keys the old, broader rules would have raised, so their open alerts are
+    retired rather than reported as resolved.
     """
     evaluated = set() if evaluated is None else evaluated
-    from apps.demographics.service import current_result
+    out_of_scope = set() if out_of_scope is None else out_of_scope
     from apps.area.models import AreaSection
     t = t or thresholds()
     out = []
-    demo = current_result(location)
-    ring = next((r for r in (demo.rings if demo else []) if r.get('radius_miles') == 3), None)
-    if ring:
-        evaluated.update({'SIG-01', 'SIG-02'})
-        pop = (ring.get('trends') or {}).get('population_change') or {}
-        if pop.get('significant') and abs(pop['value']) >= t['SIG-01']['min_abs_change']:
-            neg = pop['value'] < 0
-            out.append(_candidate('SIG-01', 'ring3:population', 'Demographics', 'Watch' if neg else 'FYI',
-                'negative' if neg else 'positive', f'3-mile population {_pct(pop["value"])} ({pop["period"]})',
-                'Fewer residents within 3 miles can reduce demand for neighborhood retail.' if neg else
-                'More residents within 3 miles can increase demand for neighborhood retail.',
-                {'baseline': pop.get('baseline'), 'current': pop.get('current'), 'z': pop.get('z'),
-                    'threshold': t['SIG-01']['min_abs_change']}, pop.get('period'), 'SRC-03'))
-        inc = (ring.get('trends') or {}).get('real_mean_income_change') or {}
-        if inc.get('significant') and inc.get('value') is not None:
-            c = t['SIG-02']
-            if inc['value'] <= c['watch_at_or_below'] or inc['value'] >= c['fyi_at_or_above']:
-                neg = inc['value'] < 0
-                out.append(_candidate('SIG-02', 'ring3:real_income', 'Demographics', 'Watch' if neg else 'FYI',
-                    'negative' if neg else 'positive', f'3-mile real average household income {_pct(inc["value"])}',
-                    'Household spending power in the trade area has changed after inflation.',
-                    {'baseline_inflation_adjusted': inc.get('baseline'), 'current': inc.get('current'), 'z': inc.get('z'), **c},
-                    inc.get('period'), 'SRC-03'))
     rows = {}
     for row in AreaSection.objects.filter(location=location, analysis_version=location.analysis_version).order_by('computed_at'):
         rows[row.section] = row
     econ = rows.get('economy')
     if econ and econ.status == 'available':
-        evaluated.update({'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'})
+        evaluated.update({'SIG-03', 'SIG-04', 'SIG-05'})
         e, county = econ.data, (econ.data.get('county') or {}).get('name', 'County')
         fips = (e.get('county') or {}).get('fips') or county
         emp = e.get('employment') or {}
         priv = (emp.get('private') or {}).get('yoy_pct')
         c = t['SIG-03']
-        if priv is not None and (priv <= c['watch_at_or_below'] or priv >= c['fyi_at_or_above']):
-            neg = priv < 0
-            out.append(_candidate('SIG-03', f'county:{fips}:private_jobs', 'Economy', 'Watch' if neg else 'FYI',
-                'negative' if neg else 'positive', f'{county} private jobs {_pct(priv)} year over year',
-                'Local job losses affect household income and daytime traffic.' if neg else
-                'Local job gains support household income and daytime traffic.',
+        if priv is not None and priv <= c['watch_at_or_below']:
+            out.append(_candidate('SIG-03', f'county:{fips}:private_jobs', 'Economy', 'Watch', 'negative',
+                f'{county} private jobs {_pct(priv)} year over year',
+                'Local job losses affect household income and daytime traffic.',
                 {'value': priv, **c, 'jobs': (emp.get('private') or {}).get('value')}, emp.get('period'), 'SRC-06'))
         retail = (emp.get('retail') or {}).get('yoy_pct')
         if retail is not None and retail <= t['SIG-04']['watch_at_or_below']:
@@ -108,91 +102,80 @@ def candidates(location, t=None, today=None, evaluated=None):
                     f' It rose {excess:.1f} pts more than the state.' if excess is not None else ''),
                 {'rate': u.get('rate'), 'three_month_average': u.get('avg3_rate'), 'prior_rate': u.get('prior_rate'),
                     'change_pts': change, 'more_than_state_pts': excess, **c}, u.get('period'), 'SRC-07'))
-        p = e.get('permits') or {}
-        c = t['SIG-07']
-        if p.get('change_pct') is not None and abs(p['change_pct']) >= c['min_abs_pct'] and abs(p.get('change') or 0) >= c['min_abs_units']:
-            neg = p['change_pct'] < 0
-            out.append(_candidate('SIG-07', f'county:{fips}:permits', 'Housing', 'FYI', 'negative' if neg else 'positive',
-                f'{county}: {p["value"]:,} new homes permitted, {_pct(p["change_pct"])} vs prior 12 months',
-                'New housing adds future households to the trade area.' if not neg else
-                'Fewer new homes means slower household growth ahead.',
-                {'current': p['value'], 'prior': p.get('prior'), **c}, p.get('period'), 'SRC-09'))
-    jobs = rows.get('jobs')
-    if jobs and jobs.status == 'available':
-        evaluated.add('SIG-06')
-        r3 = next((r for r in jobs.data.get('rings', []) if r['radius_miles'] == 3), None)
-        c = t['SIG-06']
-        if r3 and r3.get('change_pct') is not None and (r3['change_pct'] <= c['watch_at_or_below'] or r3['change_pct'] >= c['fyi_at_or_above']):
-            neg = r3['change_pct'] < 0
-            out.append(_candidate('SIG-06', 'ring3:jobs', 'Jobs', 'Watch' if neg else 'FYI',
-                'negative' if neg else 'positive', f'Jobs within 3 miles {_pct(r3["change_pct"])} ({jobs.data["prior_year"]}–{jobs.data["year"]})',
-                'Fewer people work near the center, affecting weekday traffic.' if neg else
-                'More people work near the center, supporting weekday traffic.',
-                {'current': r3['total'], 'prior': r3['prior_total'], **c}, f'LODES {jobs.data["year"]}', 'SRC-05'))
     traffic = rows.get('traffic')
     if traffic and traffic.status == 'available':
         evaluated.add('SIG-08')
     if traffic and traffic.status == 'available' and traffic.data.get('roads'):
-        road = traffic.data['roads'][0]
+        road = traffic.data['roads'][0]  # the primary road
         c = t['SIG-08']
-        if road.get('change_pct') is not None and (road['change_pct'] <= c['watch_at_or_below'] or road['change_pct'] >= c['fyi_at_or_above']):
-            neg = road['change_pct'] < 0
-            out.append(_candidate('SIG-08', 'road:primary', 'Traffic', 'Watch' if neg else 'FYI',
-                'negative' if neg else 'positive', f'Traffic on {road["label"]} {_pct(road["change_pct"])} ({road.get("prior_year")}–{road["year"]})',
-                'Traffic past the site affects visibility and convenience trips.',
-                {'aadt': road['aadt'], 'prior_aadt': road.get('prior_aadt'), **c}, f'HPMS {road["year"]}', 'SRC-10'))
-    hazards = rows.get('hazards')
-    if hazards and hazards.status == 'available':
-        evaluated.add('SIG-11')
-        at, near = hazards.data.get('flood_at_pin') or {}, hazards.data.get('flood_nearby') or {}
-        why = ('Special Flood Hazard Areas usually require flood insurance for financed properties and carry higher '
-            'physical risk. Screening only, not a flood determination.')
-        inside = at.get('in_sfha', at.get('sfha'))
-        dist = near.get('distance_m')
-        if inside:
-            zone = near.get('zone') if near.get('inside') else at.get('zone')
-            out.append(_candidate('SIG-11', 'flood:sfha', 'Hazard', 'High', 'negative',
-                f'Pin is inside FEMA high-risk flood zone {zone}', why,
-                {'zone': zone, 'base_flood_elevation_ft': at.get('bfe_ft'), 'flood_map_panel': at.get('dfirm_id')},
-                'Effective flood maps', 'SRC-11'))
-        elif near.get('sfha') and (dist is None or dist <= 100):
-            out.append(_candidate('SIG-11', 'flood:sfha', 'Hazard', 'Watch', 'negative',
-                f'FEMA high-risk flood zone {near["zone"]} ' + (f'about {dist} m from the pin' if dist is not None
-                    else 'close to the pin'), why,
-                {'zone': near['zone'], 'distance_m': dist, 'flood_map_panel': near.get('dfirm_id')},
-                'Effective flood maps', 'SRC-11'))
+        change, prior = road.get('change_pct'), road.get('prior_aadt')
+        # change_pct is None when the state carried the same count forward (SAME_COUNT): never an alert.
+        if change is not None and change <= c['decline_at_or_below'] and (prior or 0) >= c['min_prior_aadt']:
+            out.append(_candidate('SIG-08', 'road:primary', 'Traffic', 'Watch', 'negative',
+                f'Traffic on {road["label"]} {_pct(change)} ({road.get("prior_year")}–{road["year"]})',
+                'Fewer vehicles past the site can reduce visibility and convenience trips.',
+                {'aadt': road['aadt'], 'prior_aadt': prior, 'count_year': road.get('count_year'),
+                    'prior_count_year': road.get('prior_count_year'), **c}, f'HPMS {road["year"]}', 'SRC-10'))
+        elif change is not None and abs(change) >= 0.10:
+            out_of_scope.add(('SIG-08', 'road:primary'))  # an increase, or a decline on a minor road
     biz = rows.get('businesses')
     if biz and biz.status == 'available':
-        evaluated.update({'SIG-09', 'SIG-10', f'overture@{biz.data.get("release")}'})
+        evaluated.update({'SIG-09', f'overture@{biz.data.get("release")}'})
         ch, rel = biz.data.get('changes') or {}, biz.data.get('release')
-        from apps.area.businesses import brand_in, normalize_brand
+        from apps.area.businesses import brand_in, is_key, normalize_brand, ANCHOR_BRANDS, GROCERY_BRANDS
         tenants = {normalize_brand(n) for n in location.tenants.filter(archived=False).values_list('name', flat=True)}
         tenants.discard(None)
+        c9 = t['SIG-09']
         for c in ch.get('closures') or []:
+            subject = f'place:{c["id"]}'
             if c.get('confirmed') is False:
-                continue  # an unconfirmed disappearance is shown on the property page, not alerted
-            c = dict(c)
+                continue  # an unconfirmed disappearance is shown in the analysis, not alerted
             label = c.get('brand') or c.get('name')
-            c['tenant_match'] = bool(tenants) and brand_in(label, tenants)
-            if c['tenant_match'] and c['distance_mi'] <= 0.093 and not ch.get('broad_data_change'):
-                # ~150 m from the pin: likely the tenant's own store at this center.
-                c['severity'] = 'High' if c.get('evidence') == 'marked permanently closed' else 'Watch'
-            out.append(_candidate('SIG-09', f'place:{c["id"]}', 'Closure', c['severity'], 'negative',
+            own_store = (bool(tenants) and brand_in(label, tenants) and c['distance_mi'] <= c9['tenant_store_within_mi']
+                and not ch.get('broad_data_change'))
+            # Anchors as the businesses module defines them (key categories or curated anchor brands) plus grocers.
+            anchor = (is_key({'basic_category': c.get('category'), 'brand': c.get('brand')}) or brand_in(label, ANCHOR_BRANDS)
+                or brand_in(label, GROCERY_BRANDS) or c.get('category') in GROCERY_CATEGORIES) and \
+                c['distance_mi'] <= c9['anchor_within_mi']
+            if not (own_store or anchor):
+                out_of_scope.add(('SIG-09', subject))
+                continue
+            severity = 'High' if own_store and c.get('evidence') == 'marked permanently closed' else 'Watch'
+            out.append(_candidate('SIG-09', subject, 'Closure', severity, 'negative',
                 f'Possible closure nearby: {c.get("name") or c.get("brand")} ({c["distance_mi"]:.1f} mi)',
-                ('Data suggests your tenant\'s location may have closed; confirm with the tenant.' if c.get('tenant_match') else
-                 'Possible closure; verify. A nearby anchor or traffic driver closing can reduce shopping trips.'),
+                ("Data suggests your tenant's location may have closed; confirm with the tenant." if own_store else
+                 'An anchor or grocery store near the center may have closed; that can reduce shopping trips.'),
                 {'overture_id': c['id'], 'evidence': c.get('evidence'), 'distance_mi': c['distance_mi'], 'category': c.get('category'),
-                    'release': rel, 'prior_release': biz.data.get('prior_release'), 'lat': c.get('lat'), 'lon': c.get('lon')},
-                f'Overture {rel}', 'SRC-13', event_date=_release_date(rel)))
-        for c in ch.get('openings') or []:
-            out.append(_candidate('SIG-10', f'place:{c["id"]}', 'Businesses', 'FYI', 'neutral',
-                f'New in map data nearby: {c.get("name") or c.get("brand")} ({c["distance_mi"]:.1f} mi)',
-                'Newly appears in map data (may be a new opening or a data addition); possible competitor or traffic driver.',
-                {'overture_id': c['id'], 'distance_mi': c['distance_mi'], 'category': c.get('category'), 'release': rel},
+                    'tenant_match': own_store, 'release': rel, 'prior_release': biz.data.get('prior_release'),
+                    'lat': c.get('lat'), 'lon': c.get('lon')},
                 f'Overture {rel}', 'SRC-13', event_date=_release_date(rel)))
     out.extend(_tenant_candidates(location, today))
     evaluated.update({'SIG-12', 'SIG-13'})
+    on = rules()
+    out = [c for c in out if on.get(c['rule_id'], {}).get('enabled') and c['severity'] in ('High', 'Watch')]
+    for c in out:
+        c['next_step'] = on[c['rule_id']]['next_step']
     return out
+
+
+def risk_badges(location):
+    """Standing risks shown on the analysis, not alerts (B7a): today, inside or near a FEMA high-risk flood zone."""
+    from apps.area.models import AreaSection
+    row = (AreaSection.objects.filter(location=location, analysis_version=location.analysis_version, section='hazards',
+        status='available').order_by('-computed_at').first())
+    if row is None:
+        return []
+    at, near = row.data.get('flood_at_pin') or {}, row.data.get('flood_nearby') or {}
+    if at.get('in_sfha', at.get('sfha')):
+        zone = near.get('zone') if near.get('inside') else at.get('zone')
+        bfe = at.get('bfe_ft')
+        return [{'kind': 'flood', 'level': 'inside', 'label': f'Inside FEMA high-risk flood zone {zone}'
+            + (f' (base flood elevation {bfe:g} ft)' if isinstance(bfe, (int, float)) else ''), 'source': 'SRC-11'}]
+    dist = near.get('distance_m')
+    if near.get('sfha') and (dist is None or dist <= 100):
+        return [{'kind': 'flood', 'level': 'near', 'label': f'FEMA high-risk flood zone {near.get("zone")} '
+            + (f'about {dist} m away' if dist is not None else 'close by'), 'source': 'SRC-11'}]
+    return []
 
 
 def _release_date(release):
@@ -224,8 +207,9 @@ def evaluate(location, *, today=None):
     t = thresholds()
     today = today or timezone.now().date()
     now = timezone.now()
-    evaluated = set()
-    found = {(c['rule_id'], c['subject']): c for c in candidates(location, t, today, evaluated)}
+    evaluated, out_of_scope = set(), set()
+    found = {(c['rule_id'], c['subject']): c for c in candidates(location, t, today, evaluated, out_of_scope)}
+    on = enabled_rules()
     created = updated = resolved = 0
     existing = {(s.rule_id, s.subject): s for s in Signal.objects.select_for_update().filter(location=location)}
 
@@ -252,9 +236,9 @@ def evaluate(location, *, today=None):
                 s.evidence, s.period, s.last_seen_at = c['evidence'], c['period'], now
                 s.save(update_fields=['evidence', 'period', 'last_seen_at'])
                 continue
-        reopened = s.status in ('resolved', 'expired') and not expired
+        reopened = s.status in ('resolved', 'expired', 'retired') and not expired
         changed = s.severity != c['severity'] or reopened
-        for field in ('severity', 'direction', 'title', 'why', 'evidence', 'period', 'source', 'event_date', 'category'):
+        for field in ('severity', 'direction', 'title', 'why', 'evidence', 'period', 'source', 'event_date', 'category', 'next_step'):
             setattr(s, field, c[field])
         if reopened:
             s.episode += 1
@@ -269,7 +253,14 @@ def evaluate(location, *, today=None):
             updated += 1
         s.save()
     for key, s in existing.items():
-        if key in found or s.status != 'active':
+        if key in found or s.status in ('resolved', 'expired', 'retired'):
+            continue
+        if s.rule_id not in on or s.severity == 'FYI' or key in out_of_scope:
+            # Outside the alert scope (B7a): retired quietly, never listed as "resolved".
+            s.status, s.resolved_reason = 'retired', 'outside the alert scope'
+            s.save(update_fields=['status', 'resolved_reason'])
+            continue
+        if s.status != 'active':
             continue
         moved = s.analysis_version != location.analysis_version
         if moved and s.rule_id not in evaluated:
@@ -317,7 +308,32 @@ def serialize(s):
         'first_evidence': s.first_evidence, 'subject': s.subject,
         'reviewed': s.reviewed_by_id is not None, 'reviewed_at': s.reviewed_at.isoformat() if s.reviewed_at else None,
         'review_note': s.review_note, 'feedback': s.feedback, 'resolved_reason': s.resolved_reason,
+        'next_step': s.next_step,
         'location': {'id': str(s.location_id), 'name': s.location.name, 'city': s.location.city, 'state': s.location.state}}
+
+
+def group_key(s):
+    """County figures and one nearby place shared by several properties form one group (B7a)."""
+    from .brief import SHARED_SUBJECT_RULES
+    return f'{s.rule_id}:{s.subject}' if s.rule_id in SHARED_SUBJECT_RULES else str(s.id)
+
+
+def group_signals(signals):
+    """PART C grouped alerts: one entry per group, worst first, with every property listed."""
+    groups, order = {}, []
+    for s in sorted(signals, key=rank_key):
+        key = group_key(s)
+        if key not in groups:
+            groups[key] = {'key': key, 'rule_id': s.rule_id, 'title': s.title, 'severity': s.severity,
+                'category': s.category, 'why': s.why, 'next_step': s.next_step, 'evidence': s.evidence,
+                'period': s.period, 'source': s.source, 'status': s.status, 'locations': [], 'signal_ids': []}
+            order.append(key)
+        g = groups[key]
+        if str(s.location_id) not in {l['id'] for l in g['locations']}:
+            g['locations'].append({'id': str(s.location_id), 'name': s.location.name, 'city': s.location.city,
+                'state': s.location.state})
+        g['signal_ids'].append(str(s.id))
+    return [groups[k] for k in order]
 
 
 def active_for(location):

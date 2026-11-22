@@ -44,11 +44,15 @@ def all_sections(loc):
 def test_rules_fire_with_expected_severity_and_attention():
     loc = placed()
     all_sections(loc)
-    assert engine.evaluate(loc, today=TODAY) == (9, 0, 0)
+    assert engine.evaluate(loc, today=TODAY) == (5, 0, 0)
     got = {s.rule_id: s.severity for s in Signal.objects.filter(location=loc)}
-    assert got == {'SIG-03': 'Watch', 'SIG-04': 'Watch', 'SIG-05': 'Watch', 'SIG-06': 'Watch', 'SIG-07': 'FYI',
-        'SIG-08': 'Watch', 'SIG-09': 'Watch', 'SIG-10': 'FYI', 'SIG-11': 'High'}
-    assert engine.attention(loc.pk) == 'High'
+    # B7a: actionable changes only, High/Watch only. Nearby jobs (SIG-06), permits (SIG-07), openings
+    # (SIG-10) and the static flood zone (SIG-11, now a risk badge) stay in the analysis.
+    assert got == {'SIG-03': 'Watch', 'SIG-04': 'Watch', 'SIG-05': 'Watch', 'SIG-08': 'Watch', 'SIG-09': 'Watch'}
+    assert all(s.next_step for s in Signal.objects.all())
+    assert engine.attention(loc.pk) == 'Watch'
+    assert engine.risk_badges(loc) == [{'kind': 'flood', 'level': 'inside', 'source': 'SRC-11',
+        'label': 'Inside FEMA high-risk flood zone AE (base flood elevation 9 ft)'}]
     s05 = Signal.objects.get(rule_id='SIG-05')
     assert '(preliminary)' in s05.title and s05.evidence['source_link'] == 'https://www.bls.gov/lau/'
     assert engine.evaluate(loc, today=TODAY) == (0, 0, 0)  # idempotent
@@ -69,7 +73,7 @@ def test_conditions_clearing_resolve_and_events_expire():
     engine.evaluate(loc, today=date(2027, 3, 1))  # 103 days after the Overture release
     status = {s.rule_id: (s.status, s.resolved_reason) for s in Signal.objects.all()}
     assert status['SIG-03'] == ('resolved', 'condition no longer holds')
-    assert status['SIG-09'][0] == 'expired' and status['SIG-11'][0] == 'active'
+    assert status['SIG-09'][0] == 'expired' and status['SIG-08'][0] == 'active'
 
 
 def test_pin_move_resolves_as_location_corrected():
@@ -83,7 +87,7 @@ def test_pin_move_resolves_as_location_corrected():
     assert engine.attention(loc.pk) == 'Clear'
 
 
-def test_demographic_trend_signals_need_significance(monkeypatch):
+def test_demographic_trends_are_analysis_context_not_alerts(monkeypatch):
     loc = placed()
 
     class Demo:
@@ -93,7 +97,7 @@ def test_demographic_trend_signals_need_significance(monkeypatch):
             'real_mean_income_change': {'value': 0.08, 'significant': False}}}]
     monkeypatch.setattr('apps.demographics.service.current_result', lambda l: Demo)
     engine.evaluate(loc, today=TODAY)
-    assert [(s.rule_id, s.severity, s.direction) for s in Signal.objects.all()] == [('SIG-01', 'Watch', 'negative')]
+    assert not Signal.objects.exists()  # B7a: shown in the analysis, never alerted
 
 
 def test_api_ranking_review_dismiss_and_escalation_reopens(client):
@@ -105,18 +109,23 @@ def test_api_ranking_review_dismiss_and_escalation_reopens(client):
     loc = placed()
     all_sections(loc)
     engine.evaluate(loc, today=TODAY)
-    results = client.get('/api/signals/').json()['results']
-    assert results[0]['rule_id'] == 'SIG-11' and [r['severity'] for r in results][:1] == ['High']
-    assert client.get(f'/api/locations/{loc.pk}/').json()['attention'] == 'High'
+    body = client.get('/api/signals/').json()
+    results = body['results']
+    assert results[0]['rule_id'] == 'SIG-09' and {r['severity'] for r in results} == {'Watch'}
+    assert all(r['next_step'] for r in results)
+    assert client.get(f'/api/locations/{loc.pk}/').json()['attention'] == 'Watch'
+    assert [g['rule_id'] for g in body['groups']] == [r['rule_id'] for r in results]  # one property: no merging
     closure = next(r for r in results if r['rule_id'] == 'SIG-09')
     assert client.post(f"/api/signals/{closure['id']}/review/", {'action': 'dismissed', 'note': 'Verified open'},
         content_type='application/json').status_code == 200
     engine.evaluate(loc, today=TODAY)
     assert Signal.objects.get(pk=closure['id']).status == 'dismissed'
-    # Escalation (tenant match -> High) reopens a dismissed signal.
+    # Escalation (it turns out to be the tenant's own store -> High) reopens a dismissed signal.
     from apps.area.models import AreaSection
+    from apps.locations.models import Tenant
+    Tenant.objects.create(location=loc, name='Regal Cinemas', normalized_key='regal cinemas', origin='user')
     data = AreaSection.objects.filter(section='businesses').latest('computed_at').data
-    data['changes']['closures'][0]['severity'] = 'High'
+    data['changes']['closures'][0]['distance_mi'] = 0.05
     section(loc, 'businesses', data)
     engine.evaluate(loc, today=TODAY)
     assert Signal.objects.get(pk=closure['id']).status == 'active'
@@ -129,7 +138,9 @@ def test_real_cypress_lake_flood_and_kingston_regal_closure(tmp_path, client, se
     from apps.area.service import compute_area
     loc = setup(tmp_path, client, *CYPRESS, settings)
     compute_area(loc.pk, sections=('hazards',), opener=FixtureOpener('cypress'))
-    assert Signal.objects.get(location=loc, rule_id='SIG-11').severity == 'High'
+    # Inside zone AE is a standing risk: a badge on the analysis, not an alert (B7a).
+    assert not Signal.objects.filter(location=loc).exists()
+    assert engine.risk_badges(loc)[0]['label'].startswith('Inside FEMA high-risk flood zone AE')
     king = placed('Kingston Marketplace', *KPIN)
     monkeypatch.setattr('apps.area.overture.available_releases', lambda opener=None: ['2026-09-23.1', '2026-10-21.0'])
     compute_area(king.pk, sections=('businesses',), capturer=lambda lat, lon, r: json.dumps(kingston(r)).encode())
@@ -176,9 +187,9 @@ def test_missing_inputs_never_resolve_alerts():
     loc = placed()
     all_sections(loc)
     engine.evaluate(loc, today=TODAY)
-    section(loc, 'hazards', {}, status='unavailable')  # newer row for the same version wins
+    section(loc, 'traffic', {}, status='unavailable')  # newer row for the same version wins
     engine.evaluate(loc, today=TODAY)
-    assert Signal.objects.get(rule_id='SIG-11').status == 'active'
+    assert Signal.objects.get(rule_id='SIG-08').status == 'active'
 
 
 def test_event_alerts_stay_until_the_window_ends_even_when_not_in_the_latest_diff():

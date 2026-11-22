@@ -16,21 +16,24 @@
 - **Portfolio benchmarks** (median, min, max) via `metrics.benchmarks()`, used by Compare.
 
 ## Signal engine (T4; FR-19, FR-20, FR-23)
+
+**Alert scope (redesign B7a):** alerts are High or Watch only, for actionable changes, and every alert
+carries a `next_step` from `config/signals.yaml` (`rules:`). SIG-01/02 (trade-area trends), SIG-06 (jobs
+nearby), SIG-07 (permits) and SIG-10 (openings) are no longer alerts; their data stays in the analysis.
+The static flood zone (SIG-11) is a **risk badge** (`signals.risk_badges`). Open alerts outside the scope
+are `retired` (never shown, never counted as "resolved"). `GET /api/signals/` adds `groups` (one entry per
+county figure or shared place, with every property and `signal_ids`); `POST /api/signals/<id>/review/`
+accepts `apply_to_group: true`. The weekly brief schedule is switched off (`enabled: false`).
+On the preview this took active alerts from 95 to 17 rows shown as 7 alerts.
 `backend/apps/insights/signals.py` derives signals only from stored section results. Thresholds live in `config/signals.yaml`, which holds the docs/04 §5.2 defaults (configuration, to validate with John).
 
 | Rule | Source section | Fires when (defaults) | Severity |
 |---|---|---|---|
-| SIG-01 | Demographics (3 mi) | Population change is significant and abs ≥ 3% | Watch if down, FYI if up |
-| SIG-02 | Demographics (3 mi) | Real income change is significant and ≤ −5% or ≥ +5% | Watch / FYI |
-| SIG-03 | Economy | County private jobs YoY ≤ −2% or ≥ +3% | Watch / FYI |
-| SIG-04 | Economy | County retail jobs YoY ≤ −4% | Watch |
-| SIG-05 | Economy | Unemployment up ≥ 1.0 pt vs a year earlier (preliminary flagged) | Watch |
-| SIG-06 | Jobs (3 mi) | Jobs change ≤ −5% or ≥ +5% (both years ≥ 1,000) | Watch / FYI |
-| SIG-07 | Economy | Permits ±25% and ±50 units vs prior 12 months | FYI |
-| SIG-08 | Traffic | Main-road AADT ≤ −10% or ≥ +10%, same route | Watch / FYI |
-| SIG-09 | Businesses | Possible closure (severity from the closure rules, tenant match → High) | per item |
-| SIG-10 | Businesses | New key business | FYI |
-| SIG-11 | Hazards | Pin in a Special Flood Hazard Area → High; one within ~100 m → Watch | High / Watch |
+| SIG-03 | Economy (county) | County private jobs YoY ≤ −2% | Watch |
+| SIG-04 | Economy (county) | County retail jobs YoY ≤ −4% | Watch |
+| SIG-05 | Economy (county) | Unemployment 3-month average up ≥ 1.0 pt vs a year earlier and ≥ 0.5 pt more than the state | Watch |
+| SIG-08 | Traffic | Main road down ≥ 10% on a genuinely newer count (never SAME_COUNT), prior count ≥ 3,000/day | Watch |
+| SIG-09 | Businesses | Confirmed closure of an anchor or grocer within 1 mi (Watch), or the tenant's own store within ~150 m (High if marked closed) | High / Watch |
 | SIG-12/13 | SEC (T9) | Tenant bankruptcy (1.03) / restructuring (2.05, 2.06) within 90 days | High / Watch |
 
 - **Lifecycle:** one row per (location, rule, subject).
