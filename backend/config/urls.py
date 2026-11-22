@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/locations/<uuid:location_id>/history/', locations.history),
     path('api/locations/<uuid:location_id>/demographics/', demographics.demographics),
     path('api/locations/<uuid:location_id>/area/', area.area),
+    path('api/locations/<uuid:location_id>/analysis/', area.analysis_bundle),
     path('api/locations/<uuid:location_id>/summary/', insights.location_summary),
     path('api/signals/', insights.signal_list),
     path('api/screens/', insights.screens),

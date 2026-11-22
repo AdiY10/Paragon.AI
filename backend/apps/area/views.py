@@ -23,3 +23,11 @@ def area(request, location_id):
             return Response({'status': 'complete'})
         return Response({'job_id': str(job.pk), 'status': job.status}, status=202)
     return Response(serialize(location))
+
+
+@api_view(['GET'])
+def analysis_bundle(request, location_id):
+    """PART C analysis bundle (B3b); opening it queues whatever is missing."""
+    from .bundle import build
+    location = get_object_or_404(Location.objects.select_related('current_revision', 'metrics_snapshot'), pk=location_id)
+    return Response(build(location, user=request.user))
