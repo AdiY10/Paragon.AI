@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evidenceRows } from "../src/alertText";
+import { evidenceRows } from "../src/features/alerts/alertText";
 
 describe("evidenceRows", () => {
   it("explains unemployment in plain English", () => {

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import * as Dialog from "@radix-ui/react-dialog";
-import { ThumbsDown, ThumbsUp, X } from "lucide-react";
-import { api, dateLabel } from "./api";
+import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { api } from "../../api/client";
+import { Button } from "../../components/ui/Button";
+import { Drawer } from "../../components/ui/Drawer";
+import { dateLabel } from "../../lib/format/dates";
 import { GLOSSARY, RULE_NAMES, evidenceRows } from "./alertText";
 
 export interface AlertLike {
@@ -21,6 +23,7 @@ export interface AlertLike {
   feedback?: string;
   detected_at?: string;
   location?: { id: string; name: string; city?: string; state?: string };
+  next_step?: string | null;
 }
 
 const SOURCE_TERMS: Record<string, string[]> = {
@@ -35,17 +38,28 @@ const SOURCE_TERMS: Record<string, string[]> = {
 };
 
 /** Review, dismiss (with a note), reopen, and "was this useful?" for one alert. */
-export function AlertActions({ alert, compact = false }: { alert: AlertLike; compact?: boolean }) {
+export function AlertActions({
+  alert,
+  compact = false,
+  applyToGroup = false,
+}: {
+  alert: AlertLike;
+  compact?: boolean;
+  /** A shared alert (county figure, one nearby place): the review applies to every property's copy. */
+  applyToGroup?: boolean;
+}) {
   const cache = useQueryClient();
   const [note, setNote] = useState(alert.review_note ?? "");
   const [noting, setNoting] = useState(false);
   const [state, setState] = useState({ status: alert.status, reviewed: alert.reviewed, feedback: alert.feedback });
   const review = useMutation({
-    mutationFn: (body: Record<string, string>) => api<AlertLike>(`/api/signals/${alert.id}/review/`, "POST", body),
+    mutationFn: (body: Record<string, string>) =>
+      api<AlertLike>(`/api/signals/${alert.id}/review/`, "POST", applyToGroup ? { ...body, apply_to_group: true } : body),
     onSuccess: (s) => {
       setState({ status: s.status, reviewed: s.reviewed, feedback: s.feedback });
       setNoting(false);
-      for (const key of ["signals", "summary", "locations", "location"]) cache.invalidateQueries({ queryKey: [key] });
+      // Reviews change attention: refresh alerts, analyses and the property list.
+      for (const key of ["signals", "analysis", "summary", "locations", "location"]) cache.invalidateQueries({ queryKey: [key] });
     },
   });
   const dismissed = state.status === "dismissed";
@@ -54,22 +68,23 @@ export function AlertActions({ alert, compact = false }: { alert: AlertLike; com
       {dismissed ? (
         <>
           <span className="badge">Dismissed</span>
-          <button className="text-button" disabled={review.isPending} onClick={() => review.mutate({ action: "reopened" })}>
+          <Button variant="ghost" size="sm" disabled={review.isPending} onClick={() => review.mutate({ action: "reopened" })}>
             Reopen
-          </button>
+          </Button>
         </>
       ) : (
         <>
-          <button
-            className="button secondary small-button"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={review.isPending || state.reviewed}
             onClick={() => review.mutate({ action: "reviewed" })}
           >
             {state.reviewed ? "Reviewed" : "Mark reviewed"}
-          </button>
-          <button className="button secondary small-button" disabled={review.isPending} onClick={() => setNoting(!noting)}>
+          </Button>
+          <Button variant="secondary" size="sm" disabled={review.isPending} onClick={() => setNoting(!noting)}>
             Dismiss…
-          </button>
+          </Button>
         </>
       )}
       <span className="feedback" role="group" aria-label="Was this alert useful?">
@@ -104,9 +119,9 @@ export function AlertActions({ alert, compact = false }: { alert: AlertLike; com
             <textarea value={note} rows={2} maxLength={2000} onChange={(e) => setNote(e.target.value)} />
           </label>
           <p className="small muted">It stays hidden unless it gets more serious.</p>
-          <button className="button small-button" type="submit" disabled={review.isPending}>
+          <Button size="sm" type="submit" disabled={review.isPending}>
             Dismiss alert
-          </button>
+          </Button>
         </form>
       )}
       {review.error && (
@@ -118,65 +133,77 @@ export function AlertActions({ alert, compact = false }: { alert: AlertLike; com
   );
 }
 
-/** "Evidence" button and drawer: what the data shows in plain English, the source, and actions. */
-export function AlertEvidence({ alert }: { alert: AlertLike }) {
+/** "Evidence and actions" drawer: what the data shows in plain English, the source, and the review. */
+export function AlertEvidence({
+  alert,
+  applyToGroup = false,
+  properties,
+}: {
+  alert: AlertLike;
+  applyToGroup?: boolean;
+  /** Every property a shared alert applies to. */
+  properties?: string[];
+}) {
   const link = alert.evidence?.source_link as string | undefined;
   const rows = evidenceRows(alert.rule_id, alert.evidence ?? {});
   const terms = SOURCE_TERMS[alert.source ?? ""] ?? [];
   return (
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
-        <button className="text-button small">Evidence and actions</button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="overlay" />
-        <Dialog.Content className="drawer">
-          <div className="drawer-head">
-            <Dialog.Title>{alert.title}</Dialog.Title>
-            <Dialog.Close className="icon-button" aria-label="Close evidence">
-              <X />
-            </Dialog.Close>
-          </div>
-          <Dialog.Description className="muted">
-            {RULE_NAMES[alert.rule_id] ?? "Alert"}
-            {alert.location ? ` · ${alert.location.name}` : ""}
-            {alert.detected_at ? ` · first seen ${dateLabel(alert.detected_at)}` : ""}
-          </Dialog.Description>
-          <p>{alert.why}</p>
-          <dl className="facts">
-            <dt>Level</dt>
-            <dd>{alert.severity === "FYI" ? "For your information" : alert.severity}</dd>
-            {alert.period && (
-              <>
-                <dt>Data period</dt>
-                <dd>{alert.period}</dd>
-              </>
-            )}
-            {rows.map(([label, value]) => (
-              <div key={label} style={{ display: "contents" }}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
+    <Drawer
+      title={alert.title}
+      description={[
+        RULE_NAMES[alert.rule_id] ?? "Alert",
+        properties?.length ? properties.join(", ") : alert.location?.name,
+        alert.detected_at ? `first seen ${dateLabel(alert.detected_at)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      trigger={
+        <button type="button" className="text-link-button">
+          Evidence and actions
+        </button>
+      }
+    >
+      <div className="evidence-body">
+        <p>{alert.why}</p>
+        {alert.next_step && (
+          <p className="next-step">
+            <strong>Next step:</strong> {alert.next_step}
+          </p>
+        )}
+        <dl className="facts">
+          <dt>Level</dt>
+          <dd>{alert.severity === "FYI" ? "For your information" : alert.severity}</dd>
+          {alert.period && (
+            <>
+              <dt>Data period</dt>
+              <dd>{alert.period}</dd>
+            </>
+          )}
+          {rows.map(([label, value]) => (
+            <div key={label} style={{ display: "contents" }}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {terms.length > 0 && (
+          <dl className="glossary">
+            {terms.map((t) => (
+              <div key={t}>
+                <dt>{t}</dt>
+                <dd>{GLOSSARY[t]}</dd>
               </div>
             ))}
           </dl>
-          {terms.length > 0 && (
-            <dl className="glossary">
-              {terms.map((t) => (
-                <div key={t}>
-                  <dt>{t}</dt>
-                  <dd>{GLOSSARY[t]}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          {link && (
-            <a className="text-button" href={link} target="_blank" rel="noreferrer">
-              Open the source
-            </a>
-          )}
-          <AlertActions alert={alert} />
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        )}
+        {link && (
+          <a href={link} target="_blank" rel="noreferrer">
+            Open the source
+          </a>
+        )}
+        {applyToGroup && <p className="fine-print">A review here applies to every property listed above.</p>}
+        <AlertActions alert={alert} applyToGroup={applyToGroup} />
+      </div>
+    </Drawer>
   );
 }

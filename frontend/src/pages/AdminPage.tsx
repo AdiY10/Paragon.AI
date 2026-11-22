@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, dateLabel } from "../api";
 import { type Page } from "../types";
-import { titleCase, Badge, ErrorNotice, PageHead } from "../components/ui";
+import { titleCase, Badge, ErrorNotice } from "../components/ui";
 import { AddLocation } from "../components/LocationForms";
 
-export function Admin() {
+export function AdminPage() {
   const jobs = useQuery({
     queryKey: ["jobs"],
     queryFn: () =>
@@ -51,12 +51,13 @@ export function Admin() {
   };
   return (
     <>
-      <PageHead
-        eyebrow="Workspace administration"
-        title="Keep the workspace reliable."
-        description="Problems that need attention, then recorded job activity."
-        action={<AddLocation />}
-      />
+      <header className="page-header admin-header">
+        <div>
+          <h1>Admin</h1>
+          <p className="page-lead">Who uses the workspace, problems that need attention, and recorded job activity.</p>
+        </div>
+        <AddLocation />
+      </header>
       <section className="panel" aria-labelledby="access-title">
         <h2 id="access-title">Who is using the workspace</h2>
         {access.error ? (
@@ -65,7 +66,7 @@ export function Admin() {
           <p className="muted">Loading…</p>
         ) : (
           <>
-            <div className="table-wrap">
+            <div className="table-wrap" role="region" aria-labelledby="access-title" tabIndex={0}>
               <table>
                 <thead>
                   <tr>
@@ -124,14 +125,14 @@ export function Admin() {
           </ul>
         )}
       </section>
-      <section className="panel">
-        <h2>Recent job runs</h2>
+      <section className="panel" aria-labelledby="jobs-title">
+        <h2 id="jobs-title">Recent job runs</h2>
         {jobs.error ? (
           <ErrorNotice error={jobs.error} />
         ) : jobs.isPending ? (
           <p className="muted">Loading recorded job activity…</p>
         ) : jobs.data?.results.length ? (
-          <div className="table-wrap">
+          <div className="table-wrap" role="region" aria-labelledby="jobs-title" tabIndex={0}>
             <table>
               <thead>
                 <tr>

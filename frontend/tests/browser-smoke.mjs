@@ -178,6 +178,11 @@ try {
   const tray = page.getByRole("complementary", { name: "Compare selection" });
   await tray.getByRole("link", { name: "Compare 2 properties" }).click();
   await page.waitForFunction(() => location.hash.startsWith("#/compare?ids="));
+  // WI-8 Compare: both chosen properties are columns of the side-by-side table.
+  await page.getByRole("heading", { name: "Compare", level: 1 }).waitFor();
+  await page.getByRole("table", { name: "Side-by-side comparison" }).waitFor();
+  if ((await page.getByRole("table", { name: "Side-by-side comparison" }).locator("thead th").count()) !== 4)
+    throw new Error("Compare should show two properties plus the measure and portfolio columns");
   await page.goBack();
   await page.getByRole("table", { name: "Owned properties" }).waitFor();
   await page.getByRole("button", { name: "Clear", exact: true }).click();
@@ -346,11 +351,30 @@ try {
       path: `${output}/property-1280.png`,
       fullPage: true,
     });
+  // WI-8 Alerts: High and Watch are on by default, FYI is opt-in.
+  await page.goto(`${base}/#/alerts`);
+  await page.getByRole("heading", { name: "Alerts", level: 1 }).waitFor();
+  if (
+    !(await page.getByRole("checkbox", { name: "High", exact: true }).isChecked()) ||
+    !(await page.getByRole("checkbox", { name: "Watch", exact: true }).isChecked()) ||
+    (await page.getByRole("checkbox", { name: "FYI", exact: true }).isChecked())
+  )
+    throw new Error("Alerts should default to High and Watch");
+  await page.getByText(/No High or Watch alerts\.|alerts?$/).first().waitFor();
+  for (const width of [768, 375]) {
+    await page.setViewportSize({ width, height: 1000 });
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
+      throw new Error(`Alerts page overflows at ${width}`);
+    const alertsA11y = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+    if (alertsA11y.violations.length)
+      throw new Error(`Alerts page a11y at ${width}: ${alertsA11y.violations.map((v) => v.id).join(", ")}`);
+  }
+  await page.setViewportSize({ width: 1280, height: 1000 });
   await page.goto(`${base}/#/sources`);
-  await page
-    .getByRole("heading", { name: "The evidence, explained." })
-    .waitFor();
-  if ((await page.locator(".source-card").count()) !== 16)
+  await page.getByRole("heading", { name: "Data sources", level: 1 }).waitFor();
+  const sourceList = page.getByRole("list", { name: "Sources" });
+  await sourceList.waitFor();
+  if ((await sourceList.locator(":scope > li").count()) !== 16)
     throw new Error("Expected 16 real catalog sources");
   if (output)
     await page.screenshot({
@@ -523,7 +547,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, analysis page sections/menu/Property actions, Analyze map point + star, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
+    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, Compare table, Alerts defaults, Sources list, analysis page sections/menu/Property actions, Analyze map point + star, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
   );
 } finally {
   await browser.close();
