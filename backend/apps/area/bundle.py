@@ -115,7 +115,8 @@ def build(location, *, user=None, now=None, trigger=True):
     loc.update(kind='place' if screening else 'property', display_label=location.name,
         kept=bool(kept_at) if screening else None,
         expires_at=(location.created_at + timedelta(days=SCREEN_TTL_DAYS)).isoformat()
-            if screening and not kept_at else None)
+            if screening and not kept_at else None,
+        lat=location.current_revision.lat if placed else None, lon=location.current_revision.lon if placed else None)
 
     tenants = []
     if location.status == 'owned':

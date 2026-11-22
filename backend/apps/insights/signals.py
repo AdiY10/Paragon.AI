@@ -62,6 +62,8 @@ def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
     """
     evaluated = set() if evaluated is None else evaluated
     out_of_scope = set() if out_of_scope is None else out_of_scope
+    if getattr(location, 'screening', False):
+        return []  # new-place analyses are never monitored and never raise alerts (B5)
     from apps.area.models import AreaSection
     t = t or thresholds()
     out = []
