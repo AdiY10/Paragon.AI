@@ -28,7 +28,8 @@ from .models import AreaSection
 ADAPTER = 'area-v1'
 # Bump a section's logic version when its computation changes, so cached results are recomputed.
 # traffic 2: road labels without inventory codes (rows from before that fix still showed "K120 Birch St").
-SECTION_LOGIC = {'economy': 1, 'traffic': 2, 'hazards': 3, 'businesses': 8, 'jobs': 1}
+# jobs 2: sector groups and earnings bands (B8).
+SECTION_LOGIC = {'economy': 1, 'traffic': 2, 'hazards': 3, 'businesses': 8, 'jobs': 2}
 log = logging.getLogger(__name__)
 SECTIONS = ('economy', 'traffic', 'hazards', 'businesses', 'jobs')
 # Economy sources are refreshed weekly; 6 days (not 7) so the weekly run always re-checks them (B4a).
