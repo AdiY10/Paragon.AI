@@ -105,3 +105,26 @@ On the preview this took active alerts from 95 to 17 rows shown as 7 alerts.
 - **Real-data tests:**
   - Leslie's (CIK 1821806): three 1.03 filings from 2026-09-30 to 2026-10-22 produce one SIG-12 High plus a SIG-13 Watch.
   - Rite Aid (CIK 84129): the 2023-10-16 Item 1.03 filing is listed as a past event with no signal.
+
+## Data-quality gate (redesign B6a)
+`python backend/manage.py qa_report [--strict] [--json]` (`backend/apps/insights/qa.py`) checks every owned,
+pinned property from stored results only (no fetching). `--strict` exits 1 on any failure; run it after
+every deploy and data rebuild.
+
+| Check | Fails when |
+|---|---|
+| complete | a section is missing, outdated (`logic_version`) or failed transiently |
+| rings_increase | population, households or jobs shrink from the 1- to the 3- to the 5-mile ring |
+| households_per_person | households ÷ population outside 0.2–0.7 (rings with ≥1,000 people) |
+| median_income_range / median_vs_mean_income | median outside $15k–$250k, or above 1.3 × the mean |
+| headline_reliability | a 3-mile headline (population, households, median income) has very low reliability |
+| acs_vintage | demographics are not on the current ACS vintage |
+| aadt_plausible / road_distance / road_label | primary-road AADT implausible for its class, road >250 m away, or a label that is an inventory code ("K120 Birch St") |
+| flood_zone_consistent | "inside a high-risk area" without an A or V zone |
+| county_matches_tract | the economy county differs from the pin's census tract county |
+| business_count_swing | the 3-mile business count moves >20% between Overture releases |
+| fresh | a section is older than its refresh cadence (economy/businesses 21 days; traffic, jobs, hazards 45) |
+| golden | a hand-verified value in `config/qa_golden.yaml` is off (Norwalk 1/3-mi population, Kingston US 9W 2024 AADT, Cypress Lake zone AE / BFE 9 ft, CVS–Graham NC-87) |
+
+Preview, 2026-11-22: 35 properties, 0 failures, 0 warnings (after the traffic logic bump recomputed the
+road labels that still carried inventory codes).

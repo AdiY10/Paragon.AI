@@ -1,0 +1,10 @@
+schema_version: 1
+# Reference values verified by hand against the primary sources (redesign B6a). `location` matches an
+# owned property's name (case-insensitive substring). Tolerance is a fraction of the value.
+golden:
+  - {location: Norwalk Office Building, check: population, ring_miles: 1, value: 11500, tolerance: 0.10}
+  - {location: Norwalk Office Building, check: population, ring_miles: 3, value: 84000, tolerance: 0.10}
+  - {location: Kingston Marketplace, check: road_aadt, road: US 9W, year: 2024, value: 22523, tolerance: 0}
+  - {location: Cypress Lake Shopping Center, check: flood_zone, value: AE}
+  - {location: Cypress Lake Shopping Center, check: base_flood_elevation_ft, value: 9, tolerance: 0}
+  - {location: CVS – Graham, check: road_aadt, road: NC-87, year: 2025, value: 21000, tolerance: 0.10}

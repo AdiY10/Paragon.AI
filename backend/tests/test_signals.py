@@ -19,9 +19,11 @@ def placed(name='Center', lat=41.1, lon=-73.4, status='owned'):
 
 def section(loc, name, data, status='available'):
     from apps.area.models import AreaSection
+    from apps.area.service import SECTION_LOGIC
     import uuid
     return AreaSection.objects.create(location=loc, revision=loc.current_revision, analysis_version=loc.analysis_version,
-        section=name, status=status, data=data, sources=[], snapshot_ids=[], inputs_sha256=uuid.uuid4().hex)
+        section=name, status=status, data=data, sources=[], snapshot_ids=[], inputs_sha256=uuid.uuid4().hex,
+        logic_version=SECTION_LOGIC.get(name, 1))  # as computed by the current code
 
 
 def economy(priv=-0.03, retail=-0.05, unemp=1.2, permits=0.4, units=100):
