@@ -24,6 +24,21 @@ scp -i ~/.ssh/paragon_droplet /tmp/src.tgz root@DROPLET:/root/
 ssh -i ~/.ssh/paragon_droplet root@DROPLET 'cd /srv/paragon && rm -rf app.new && mkdir app.new && tar -xzf /root/src.tgz -C app.new && rm -rf app.old && mv app app.old && mv app.new app && cd app && docker compose -f infra/compose.yaml --env-file /etc/paragon/compose.env --profile web up -d --build'
 ```
 
+**Baseline (B0, 2026-11-22, idle, 36 seeded properties, no portfolio analysis yet):**
+
+| Measure | Value |
+|---|---|
+| Host memory | 1,967 MB total; 926 MB used, 1,041 MB available; swap 579 MB used of 2,047 MB |
+| Containers | app 478 MB (limit 1.27 GB), db 51 MB (limit 384 MB), caddy 15 MB |
+| App processes | one qcluster worker 251 MB (held after a compute), 2 Gunicorn workers ~70 MB each, cluster parents and scheduler 10–51 MB |
+| Disk | 8.0 GB used of 48 GB; Docker images 1.15 GB, volumes 677 MB, build cache 1.9 GB (1.3 GB reclaimable) |
+| Postgres | 12 MB |
+| Rows | 36 locations, 137 snapshots, 10 area sections, 6 signals, 4 jobs |
+| Compute timings | demographics 248 s with a first-time state ACS load, 5 s after; area profile 40 s and 18 s |
+
+Decision: the idle app container is under 900 MB, so the foreground cluster keeps 2 workers;
+both clusters recycle a worker above `max_rss` 350,000 KB.
+
 **Backups** (`infra/backup.sh`, systemd `paragon-backup.timer`, 07:00 UTC daily): pg_dump
 plus the app volume, copied to Backblaze B2 with rclone, 14 days kept; the Overture
 archive is copied off-box once. `infra/backup.sh --restore-check` restores the newest dump

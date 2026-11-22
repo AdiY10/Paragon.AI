@@ -112,8 +112,11 @@ Q_CLUSTER = {
     'timeout': 7200, 'retry': 7500, 'max_attempts': 3,
     'queue_limit': 1, 'bulk': 1, 'poll': 1, 'save_limit': 250,
     'scheduler': False, 'catch_up': False,
+    # Recycle a worker after a task once its RSS passes ~340 MB (KB units): DuckDB scans and ACS
+    # parsing leave large heaps behind on the 2 GB droplet (B0 baseline: one worker held 251 MB idle).
+    'max_rss': 350000,
     'ALT_CLUSTERS': {'paragon-foreground': {
-        'workers': 2, 'timeout': 1200, 'retry': 1500, 'queue_limit': 2,
+        'workers': 2, 'timeout': 1200, 'retry': 1500, 'queue_limit': 2, 'max_rss': 350000,
     }},
 }
 
