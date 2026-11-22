@@ -138,19 +138,21 @@ class AcsExtract:
     retrieved_at: datetime
 
     def _columns(self):
+        """(keys, sorted geoids, geoid -> values list), converting one row at a time."""
         if isinstance(self.rows, RowView):
-            return self.rows.keys_, ((g, [None if math.isnan(v) else v for v in vals]) for g, vals in self.rows.values_.items())
+            arrays = self.rows.values_
+            return self.rows.keys_, sorted(arrays), lambda g: [None if math.isnan(v) else v for v in arrays[g]]
         keys = sorted({k for r in self.rows.values() for k in r})
-        return keys, ((g, [r.get(k) for k in keys]) for g, r in self.rows.items())
+        return keys, sorted(self.rows), lambda g: [self.rows[g].get(k) for k in keys]
 
     def payload(self):
         """Gzipped JSON lines: a header, then [geoid, values] sorted by block group (format v2)."""
-        keys, rows = self._columns()
+        keys, geoids, values = self._columns()
         buf = io.BytesIO()
         with gzip.GzipFile(fileobj=buf, mode='wb', mtime=0) as gz:
             gz.write(json.dumps({'year': self.year, 'state': self.state, 'columns': keys}, separators=(',', ':')).encode() + b'\n')
-            for geoid, values in sorted(rows):
-                gz.write(json.dumps([geoid, values], separators=(',', ':')).encode() + b'\n')
+            for geoid in geoids:
+                gz.write(json.dumps([geoid, values(geoid)], separators=(',', ':')).encode() + b'\n')
         return buf.getvalue()
 
 
