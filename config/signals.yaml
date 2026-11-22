@@ -1,12 +1,40 @@
 schema_version: 1
-# Default thresholds from docs/04 §5.2. Configuration, not code: validate with John (A-11, Q-06).
+# Alerts are High or Watch only, for actionable changes (redesign B7a). Context that is not a change
+# (population trend, income, nearby jobs, permits, openings, static flood zone) stays in the analysis.
+# Thresholds from docs/04 §5.2; configuration, not code (validate with John: A-11, Q-06).
 thresholds:
-  SIG-01: {min_abs_change: 0.03}                 # 3-mile population change, significant only
-  SIG-02: {watch_at_or_below: -0.05, fyi_at_or_above: 0.05}   # real mean HH income, significant only
-  SIG-03: {watch_at_or_below: -0.02, fyi_at_or_above: 0.03}   # county private jobs YoY
+  SIG-03: {watch_at_or_below: -0.02}             # county private jobs YoY
   SIG-04: {watch_at_or_below: -0.04}             # county retail jobs YoY
   SIG-05: {watch_at_or_above_pts: 1.0, min_excess_vs_state_pts: 0.5}  # 3-month avg vs a year earlier, beyond the state's change
-  SIG-06: {watch_at_or_below: -0.05, fyi_at_or_above: 0.05}   # jobs within 3 miles YoY
-  SIG-07: {min_abs_pct: 0.25, min_abs_units: 50} # housing permits T12M vs prior T12M
-  SIG-08: {watch_at_or_below: -0.10, fyi_at_or_above: 0.10}   # main-road AADT YoY
-  event_days: 90                                 # SIG-09/10/12/13 expire after this many days
+  SIG-08: {decline_at_or_below: -0.10, min_prior_aadt: 3000}   # main road, only a genuinely newer count
+  SIG-09: {anchor_within_mi: 1.0, tenant_store_within_mi: 0.093}  # anchors/grocers within 1 mi; the tenant's own store (~150 m)
+  event_days: 90                                 # SIG-09/12/13 expire after this many days
+# enabled: false stops a rule; its open alerts are retired (not "resolved") on the next evaluation.
+rules:
+  SIG-01: {enabled: false}   # 3-mile population change: shown in the analysis
+  SIG-02: {enabled: false}   # real household income change: shown in the analysis
+  SIG-03:
+    enabled: true
+    next_step: Check whether the job losses are in industries your tenants rely on; raise it at the next leasing review for centers in this county.
+  SIG-04:
+    enabled: true
+    next_step: Ask tenants in this county how their sales compare with last year, and watch for early lease-renewal requests.
+  SIG-05:
+    enabled: true
+    next_step: Watch rent collections and renewal conversations in this county over the next quarter.
+  SIG-06: {enabled: false}   # jobs within 3 miles: shown in the analysis
+  SIG-07: {enabled: false}   # housing permits: shown in the analysis
+  SIG-08:
+    enabled: true
+    next_step: Check for road work, a new bypass or access changes near the center, and compare with your own traffic or sales data.
+  SIG-09:
+    enabled: true
+    next_step: Confirm the closure (call or visit); if it is an anchor or your tenant, review co-tenancy clauses and leasing plans.
+  SIG-10: {enabled: false}   # new businesses: shown in the analysis
+  SIG-11: {enabled: false}   # static flood zone: a risk badge in the analysis (B7b adds a zone-change alert)
+  SIG-12:
+    enabled: true
+    next_step: Read the filing and contact the tenant's real-estate team about this location.
+  SIG-13:
+    enabled: true
+    next_step: Read the filing for store closures or restructuring that could affect this lease.

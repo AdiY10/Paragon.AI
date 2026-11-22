@@ -125,7 +125,7 @@ def test_snapshot_follows_reviews_and_pin_moves(client):
     all_sections(loc)
     safe_evaluate(loc.pk)
     loc.refresh_from_db()
-    assert LocationMetrics.objects.get(location=loc).attention == 'High' and cached_attention(loc) == 'High'
+    assert LocationMetrics.objects.get(location=loc).attention == 'Watch' and cached_attention(loc) == 'Watch'
     from apps.locations.service import change_pin
     loc = change_pin(location_id=loc.pk, expected_version=loc.version, lat=41.5, lon=-73, actor=None)
     assert cached_attention(loc) in ('High', 'Watch', 'Clear')  # stale row ignored, recomputed live

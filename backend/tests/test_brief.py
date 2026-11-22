@@ -15,9 +15,8 @@ def test_first_brief_is_a_baseline_with_ranked_items_and_fyi_collapsed():
     engine.evaluate(loc, today=TODAY)
     b = briefs.generate()
     assert b.kind == 'baseline' and b.title == 'Baseline: current conditions'
-    assert b.items[0]['rule_id'] == 'SIG-11' and b.items[0]['flag'] == 'new'
-    assert {i['severity'] for i in b.items} == {'High', 'Watch'}
-    assert {i['rule_id'] for i in b.fyi} == {'SIG-07', 'SIG-10'}
+    assert b.items[0]['rule_id'] == 'SIG-09' and b.items[0]['flag'] == 'new'
+    assert {i['severity'] for i in b.items} == {'Watch'} and b.fyi == []  # B7a: no FYI alerts
 
 
 def test_next_brief_shows_only_new_or_changed_plus_still_active_high(monkeypatch):
@@ -30,8 +29,7 @@ def test_next_brief_shows_only_new_or_changed_plus_still_active_high(monkeypatch
     section(loc, 'economy', economy(priv=-0.05))  # same SIG-03 subject, unchanged severity
     engine.evaluate(loc, today=TODAY)
     b = briefs.generate(now=later)
-    assert [(i['rule_id'], i['flag']) for i in b.items] == [('SIG-11', 'still_active')]
-    assert b.title == '1 item needs attention across 1 property'
+    assert b.items == []  # nothing new or changed, and no High alert still open (B7a: no static flood alert)
 
 
 def test_empty_state_when_nothing_material():

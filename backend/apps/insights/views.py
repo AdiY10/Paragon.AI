@@ -26,24 +26,30 @@ def location_summary(request, location_id):
 def signal_list(request):
     """Portfolio-wide signals, ranked (docs/04 §5.4). ?status=active|resolved|all, ?location=<uuid>."""
     from .models import Signal
-    from .signals import serialize, rank_key
+    from .signals import serialize, rank_key, group_signals
     qs = Signal.objects.select_related('location').exclude(location__status='archived').exclude(location__screening=True)
     status = request.query_params.get('status', 'active')
-    if status != 'all':
+    if status == 'all':
+        qs = qs.exclude(status='retired')  # outside the alert scope (B7a): never listed
+    else:
         qs = qs.filter(status=status)
     if loc := request.query_params.get('location'):
         try:
             qs = qs.filter(location_id=uuid.UUID(loc))
         except ValueError:
             return Response({'detail': 'location must be a location id'}, status=400)
-    return Response({'results': [serialize(s) for s in sorted(qs, key=rank_key)][:500]})
+    ranked = sorted(qs, key=rank_key)[:500]
+    # `groups` is the PART C shape (one entry per county figure or shared place); `results` stays for
+    # the current pages until the new Alerts page lands.
+    return Response({'groups': group_signals(ranked), 'results': [serialize(s) for s in ranked]})
 
 
 @api_view(['POST'])
 def signal_review(request, signal_id):
     """FR-23: mark a signal reviewed (kept active), dismissed (hidden unless it escalates) or reopened.
 
-    Optional ``note`` and ``feedback`` ("useful" / "not_useful").
+    Optional ``note`` and ``feedback`` ("useful" / "not_useful"). ``apply_to_group: true`` applies the
+    review to every property's copy of a shared alert (a county figure or one nearby place; B7a).
     """
     from django.utils import timezone
     from .models import Signal
@@ -55,23 +61,31 @@ def signal_review(request, signal_id):
     feedback = request.data.get('feedback', '')
     if feedback not in ('', 'useful', 'not_useful'):
         return Response({'detail': 'feedback must be useful or not_useful'}, status=400)
-    fields = ['reviewed_by', 'reviewed_at']
-    signal.reviewed_by, signal.reviewed_at = request.user, timezone.now()
-    if 'note' in request.data:
-        signal.review_note = str(request.data.get('note', ''))[:2000]
-        fields.append('review_note')
-    if feedback:
-        signal.feedback = feedback
-        fields.append('feedback')
-    if action == 'dismissed':
-        signal.status = 'dismissed'
-        fields.append('status')
-    elif action == 'reopened' and signal.status == 'dismissed':
-        signal.status = 'active'
-        fields.append('status')
-    signal.save(update_fields=fields)
+    targets = [signal]
+    if request.data.get('apply_to_group') is True:
+        from .signals import group_key
+        key = group_key(signal)
+        targets = [s for s in Signal.objects.select_related('location').filter(rule_id=signal.rule_id, subject=signal.subject)
+            .exclude(location__status='archived').exclude(status='retired') if group_key(s) == key] or [signal]
     from .metrics import refresh_snapshot
-    refresh_snapshot(signal.location)
+    for target in targets:
+        fields = ['reviewed_by', 'reviewed_at']
+        target.reviewed_by, target.reviewed_at = request.user, timezone.now()
+        if 'note' in request.data:
+            target.review_note = str(request.data.get('note', ''))[:2000]
+            fields.append('review_note')
+        if feedback:
+            target.feedback = feedback
+            fields.append('feedback')
+        if action == 'dismissed':
+            target.status = 'dismissed'
+            fields.append('status')
+        elif action == 'reopened' and target.status == 'dismissed':
+            target.status = 'active'
+            fields.append('status')
+        target.save(update_fields=fields)
+        refresh_snapshot(target.location)
+    signal.refresh_from_db()
     return Response(serialize(signal))
 
 

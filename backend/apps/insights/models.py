@@ -6,7 +6,8 @@ from django.db import models
 class Signal(models.Model):
     """A deterministic change signal (docs/04 §5). One row per (location, rule, subject)."""
     SEVERITIES = [('High', 'High'), ('Watch', 'Watch'), ('FYI', 'FYI')]
-    STATUSES = [('active', 'Active'), ('resolved', 'Resolved'), ('expired', 'Expired'), ('dismissed', 'Dismissed')]
+    STATUSES = [('active', 'Active'), ('resolved', 'Resolved'), ('expired', 'Expired'), ('dismissed', 'Dismissed'),
+        ('retired', 'Retired')]  # retired: outside the alert scope (B7a), never shown as resolved
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     location = models.ForeignKey('locations.Location', on_delete=models.PROTECT, related_name='signals')
     rule_id = models.CharField(max_length=8)
@@ -16,6 +17,7 @@ class Signal(models.Model):
     direction = models.CharField(max_length=10, choices=[('positive', 'Positive'), ('negative', 'Negative'), ('neutral', 'Neutral')])
     title = models.CharField(max_length=300)
     why = models.TextField()
+    next_step = models.CharField(max_length=300, blank=True)  # config/signals.yaml, per rule (B7a)
     evidence = models.JSONField(default=dict)
     period = models.CharField(max_length=120, blank=True)
     source = models.CharField(max_length=8, blank=True)

@@ -24,7 +24,8 @@ def test_missing_source_handlers_remain_disabled_and_visible(client):
     from apps.operations.registry import REGISTRY
     assert sync_schedules(enable_available=True,now=anchor())==8
     implemented={s.name for s in JobSchedule.objects.all() if s.kind in REGISTRY}
-    assert set(JobSchedule.objects.filter(enabled=True).values_list('name',flat=True))==implemented
+    # brief_weekly is implemented but switched off in config (B7a): enable_available never turns it on.
+    assert set(JobSchedule.objects.filter(enabled=True).values_list('name',flat=True))==implemented-{'brief_weekly'}
     user,_=member('admin@example.org','admin');client.force_login(user)
     data=client.get('/api/admin/schedules/').json()
     assert len(data['schedules'])==8
