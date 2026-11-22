@@ -63,6 +63,8 @@ def test_old_unsaved_screens_expire(client):
     user = member(client)
     loc = placed('Old screen', status='candidate')
     Location.objects.filter(pk=loc.pk).update(screening=True, created_at=timezone.now() - timedelta(days=31))
+    assert screens.expire_screens() == 0  # B5: unstarred places are kept 90 days
+    Location.objects.filter(pk=loc.pk).update(created_at=timezone.now() - timedelta(days=91))
     assert screens.expire_screens() == 1 and Location.objects.get(pk=loc.pk).status == 'archived'
 
 

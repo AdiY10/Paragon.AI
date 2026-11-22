@@ -3,7 +3,7 @@ import json
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
+from urllib.request import BaseHandler, HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 import ssl
 import certifi
 
@@ -22,8 +22,35 @@ class _SameSiteRedirects(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+# Every outbound request goes to a public-data host (redesign B5). Property and candidate
+# locations are confidential: a host that is not on this list never receives a request.
+ALLOWED_HOST_SUFFIXES = ('.census.gov', '.bls.gov', '.fema.gov', '.dot.gov', '.sec.gov')
+ALLOWED_HOSTS = frozenset({'services.arcgis.com', 'overturemaps-us-west-2.s3.us-west-2.amazonaws.com'})
+
+
+class HostNotAllowed(URLError):
+    pass
+
+
+def host_allowed(host):
+    host = (host or '').lower().split(':')[0]
+    return host in ALLOWED_HOSTS or host.endswith(ALLOWED_HOST_SUFFIXES)
+
+
+class HostAllowlist(BaseHandler):
+    """Refuses any request (including a redirect target) to a host outside the allowlist."""
+    handler_order = 100
+
+    def https_request(self, req):
+        if not host_allowed(urlsplit(req.full_url).hostname):
+            raise HostNotAllowed('host not allowed')
+        return req
+
+    http_request = https_request
+
+
 def default_opener():
-    return build_opener(HTTPSHandler(context=_CONTEXT), _SameSiteRedirects())
+    return build_opener(HostAllowlist(), HTTPSHandler(context=_CONTEXT), _SameSiteRedirects())
 
 
 class SourceError(Exception):

@@ -131,7 +131,7 @@ def fetch_census(address, *, opener=None, timeout=10):
         'User-Agent':'ParagonRadar/0.1 (+https://github.com/AdiY10/Paragon.AI)',
         'Accept':'application/json'})
     try:
-        with (opener or build_opener(NoRedirects())).open(request,timeout=timeout) as response:
+        with (opener or _opener()).open(request,timeout=timeout) as response:
             if response.status != 200:
                 raise GeocoderError('HTTP_ERROR')
             if response.headers.get_content_type() != 'application/json':
@@ -152,3 +152,50 @@ def fetch_census(address, *, opener=None, timeout=10):
         raise GeocoderError('TIMEOUT' if isinstance(exc.reason,(TimeoutError,socket.timeout)) else 'SOURCE_ERROR') from None
     except (OSError,ValueError,TypeError,KeyError):
         raise GeocoderError('SOURCE_ERROR') from None
+
+
+def _opener():
+    from apps.area.http import HostAllowlist
+    return build_opener(HostAllowlist(), NoRedirects())
+
+
+POINT_ENDPOINT = 'https://geocoding.geo.census.gov/geocoder/geographies/coordinates'
+PLACE_SUFFIX = re.compile(r'\s+(city|town|village|borough|CDP|municipality|township)$', re.I)
+
+
+def fetch_point_geographies(lat, lon, *, opener=None, timeout=10):
+    """State, county and place at a map point (Census coordinates service; redesign B5).
+
+    Returns {'state', 'state_fips', 'county', 'county_fips', 'place'} or None outside the US.
+    """
+    params = {'x': f'{lon:.6f}', 'y': f'{lat:.6f}', 'benchmark': 'Public_AR_Current', 'vintage': 'Current_Current',
+        'layers': 'all', 'format': 'json'}
+    request = Request(POINT_ENDPOINT + '?' + urlencode(params), headers={
+        'User-Agent': 'ParagonRadar/0.1 (+https://github.com/AdiY10/Paragon.AI)', 'Accept': 'application/json'})
+    try:
+        with (opener or _opener()).open(request, timeout=timeout) as response:
+            if response.status != 200:
+                raise GeocoderError('HTTP_ERROR')
+            raw = response.read(MAX_BYTES + 1)
+        if len(raw) > MAX_BYTES:
+            raise GeocoderError('SCHEMA_ERROR')
+        geos = json.loads(raw)['result']['geographies']
+    except GeocoderError:
+        raise
+    except (TimeoutError, socket.timeout):
+        raise GeocoderError('TIMEOUT') from None
+    except HTTPError:
+        raise GeocoderError('HTTP_ERROR') from None
+    except URLError as exc:
+        raise GeocoderError('TIMEOUT' if isinstance(exc.reason, (TimeoutError, socket.timeout)) else 'SOURCE_ERROR') from None
+    except (OSError, ValueError, TypeError, KeyError):
+        raise GeocoderError('SCHEMA_ERROR') from None
+    first = lambda key: (geos.get(key) or [None])[0] or {}  # noqa: E731
+    state = first('States')
+    if not state.get('STUSAB'):
+        return None
+    county = first('Counties')
+    place = first('Incorporated Places') or first('Census Designated Places') or first('County Subdivisions')
+    name = PLACE_SUFFIX.sub('', place.get('NAME') or '') or None
+    return {'state': state['STUSAB'], 'state_fips': state.get('STATE') or state.get('GEOID'),
+        'county': county.get('NAME'), 'county_fips': county.get('GEOID'), 'place': name}
