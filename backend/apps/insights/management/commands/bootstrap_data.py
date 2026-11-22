@@ -26,6 +26,10 @@ class Command(BaseCommand):
         import_public_portfolio()
         step('3/8 Listing tenants (unconfirmed claims)')
         call_command('import_listing_tenants')
+        # Owned means confirmed (redesign B1); skipped quietly until an administrator exists.
+        from apps.locations.management.commands.confirm_portfolio import admin_actor
+        if admin_actor():
+            call_command('confirm_portfolio')
         step('4/8 ACS 2020-2024 for portfolio states and neighbours')
         call_command('ingest_acs', year=2024)
         step('5/8 ACS 2015-2019 trend baseline')
