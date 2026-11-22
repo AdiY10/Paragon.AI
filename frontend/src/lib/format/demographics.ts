@@ -6,7 +6,7 @@ export interface Metric {
   moe: number | null;
   reliability: Reliability;
   reason: string | null;
-  unit: "people" | "households" | "usd" | "share" | null;
+  unit: "people" | "households" | "usd" | "share" | "years" | null;
   label: string | null;
   open_ended?: boolean;
   display?: string;
@@ -128,15 +128,35 @@ export function formatValue(metric: Metric | undefined): string {
       return money.format(metric.value);
     case "share":
       return `${(metric.value * 100).toFixed(1)}%`;
+    case "years":
+      return `${metric.value.toFixed(1)} years`;
     default:
       return integer.format(metric.value);
   }
 }
 
+/** Display names for the B8 depth metrics (their own `label` describes the method, not the measure). */
+export const DEPTH_ROWS: { key: string; label: string; hint: string }[] = [
+  { key: "households_100k_plus_share", label: "Households earning $100k+", hint: "Share of households" },
+  { key: "median_age", label: "Median age", hint: "Interpolated from age bands" },
+  { key: "age_under_18_share", label: "Under 18", hint: "Share of residents" },
+  { key: "age_18_34_share", label: "Age 18–34", hint: "Share of residents" },
+  { key: "age_35_54_share", label: "Age 35–54", hint: "Share of residents" },
+  { key: "age_55_64_share", label: "Age 55–64", hint: "Share of residents" },
+  { key: "age_65_plus_share", label: "Age 65 and over", hint: "Share of residents" },
+  { key: "owner_occupied_share", label: "Owner-occupied homes", hint: "Share of occupied homes" },
+  { key: "median_home_value", label: "Median home value", hint: "Owner-estimated; about the area, not this property" },
+  { key: "median_gross_rent", label: "Median gross rent", hint: "Residential rent; about the area, not this property" },
+];
+const ALL_LABELS = (): Record<string, string> =>
+  Object.fromEntries([...METRIC_ROWS, ...DEPTH_ROWS].map((row) => [row.key, row.label]));
+export const metricLabel = (key: string) => ALL_LABELS()[key] ?? key.replaceAll("_", " ").replace(/^\w/, (c) => c.toUpperCase());
+
 export function formatMoe(metric: Metric | undefined): string | null {
   if (!metric || metric.value === null || metric.moe === null) return null;
   if (metric.unit === "usd") return `± ${money.format(metric.moe)}`;
   if (metric.unit === "share") return `± ${(metric.moe * 100).toFixed(1)} pts`;
+  if (metric.unit === "years") return `± ${metric.moe.toFixed(1)}`;
   return `± ${integer.format(metric.moe)}`;
 }
 

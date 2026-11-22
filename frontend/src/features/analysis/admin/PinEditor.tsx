@@ -81,7 +81,7 @@ export default function PinEditor({
     <Dialog.Root open={open} onOpenChange={openChange}>
       {!controlled && (
         <Dialog.Trigger asChild>
-          <button className="button secondary small-button">
+          <button className="btn btn-secondary btn-sm">
             <MapPin size={15} />
             {location.current_revision.lat === null ? "Place pin" : "Correct / confirm pin"}
           </button>
@@ -180,7 +180,7 @@ export default function PinEditor({
             {mutation.error instanceof ApiError && mutation.error.status === 409 && (
               <button
                 type="button"
-                className="button secondary"
+                className="btn btn-secondary btn-md"
                 onClick={() => {
                   cache.invalidateQueries({
                     queryKey: ["location", location.id],
@@ -191,7 +191,7 @@ export default function PinEditor({
                 Reload record
               </button>
             )}
-            <button className="button" disabled={!valid || mutation.isPending}>
+            <button className="btn btn-primary btn-md" disabled={!valid || mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save pin"}
               <Check size={16} />
             </button>

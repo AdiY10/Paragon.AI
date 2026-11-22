@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight, Search, X } from "lucide-react";
-import { api } from "../api";
+import { api } from "../api/client";
 import type { Location, Page } from "../types";
 import { setPendingAddress } from "./nav";
 import { navigate } from "./router";
@@ -62,7 +62,7 @@ export function GlobalSearch() {
               onChange={(event) => setText(event.target.value)}
               autoComplete="off"
             />
-            <button className="button" type="submit" disabled={search.isPending}>
+            <button className="btn btn-primary btn-md" type="submit" disabled={search.isPending}>
               Search
             </button>
           </form>
@@ -96,7 +96,7 @@ export function GlobalSearch() {
             <div className="search-analyze">
               <button
                 type="button"
-                className="button secondary"
+                className="btn btn-secondary btn-md"
                 onClick={() => {
                   setPendingAddress(submitted);
                   onOpenChange(false);

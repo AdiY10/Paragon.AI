@@ -5,34 +5,44 @@ Django root. It uses the existing private APIs; there is no separate public data
 feed or browser sign-in bypass. The UI is an implementation milestone, not a claim
 that Release 1's data calculations or production deployment are complete.
 
-## Implemented experience (Release 2.0, items 17-23)
+## Implemented experience (redesign, WI-1 to WI-9)
 
-- **This Week (home):** the page heading is the brief's headline ("3 items need attention
-  across 3 properties"), followed by the attention items, "Resolved since the last brief",
-  an FYI count, then portfolio health (High / Watch / Clear tiles that open a filtered
-  portfolio) and a one-card setup reminder.
-- **Alerts:** every alert across the portfolio, filtered by status, level, category and
-  property (filters in the URL). Each alert opens "Evidence and actions": plain-English
-  evidence, the source, glossary terms, Mark reviewed, Dismiss with a note, Reopen and
-  "Was this useful?".
-- **Portfolio:** attention-ranked cards with key numbers (3-mile population, median
-  income, traffic), map, and state/status/type/attention filters that persist in the URL.
-- **Confirm your portfolio (#/setup):** bulk confirm or archive (with undo) the publicly
-  listed properties, then check each confirmed property's unconfirmed tenants.
-- **Property page:** a key-facts strip (attention, latest alert, population and 5-year
-  change, median income, main-road traffic, flood, nearest supermarket, active alerts),
-  a sticky section menu, and sections in FR-08 order: summary, trade area, economy and
-  jobs, retail, traffic, hazards, tenants (owned only), then the property record, map
-  pin and change history. "Refresh data" uses one flow with a live timer and a
-  persistent message when the background worker is slow or stopped.
-- **Screen / Compare / Data Sources / Admin:** as described in INSIGHTS.md and
-  DEPLOYMENT.md; a banner appears when a public source is failing.
+The approved redesign (docs/REDESIGN_PLAN.md, PART F) replaced the Release 2.0 screens.
 
-Accessibility: route changes move focus to the main content and update the tab title;
-the map has a "Skip map" link; text is at least 12 px (body 14 px, phone inputs 16 px);
-the browser smoke runs axe with WCAG 2.2 AA tags, including a property page at 375 px.
-Code layout: `src/main.tsx` holds routing and the shell; pages live in `src/pages/`,
-shared pieces in `src/components/`.
+- **Shell:** white top bar with PARAGON RADAR, `nav "Main"` (Properties · Analyze · Alerts ·
+  Compare; Properties stays current on property analyses), a POST-only search dialog that can
+  hand a typed address to Analyze (never through the URL), and an "Account menu" (Data sources,
+  Admin for administrators, Sign out). At 640 px and below the navigation opens as the
+  "Workspace navigation" dialog. Hash routes: `#/`, `#/p/:id`, `#/analyze`, `#/analyze/:id`,
+  `#/alerts`, `#/compare`, `#/sources`, `#/admin`; `#/portfolio`, `#/locations/:id`, `#/screen`
+  and `#/setup` redirect.
+- **Properties (`#/`):** "36 owned · N High · N Watch" (each count filters), a toolbar whose
+  search, State, Attention and sort live in the URL, the portfolio map (HTML pins, clusters,
+  hover card), and the "Owned properties" table (sortable, missing values last, row ↔ pin
+  highlight; cards with "Sort by" on phones). Compare up to four through a sticky tray.
+- **Analysis (`#/p/:id`, `#/analyze/:id`):** one bundle request (GET /api/locations/<id>/analysis/)
+  polled only while the analysis runs. Ten fixed sections with a status dot each (Overview,
+  Trade area & demographics, Daytime population, Retail landscape, Access & traffic, Risk,
+  Market, Tenants & SEC watch for owned properties, Ranking vs portfolio, Sources & methods),
+  a left menu / chip strip / "Jump to section" select by width, deep links with `?section=`.
+  There is no button that runs an analysis; sections fill in by themselves and a polite live
+  region says when each is ready. Administrators get a "Property actions" menu (Edit details,
+  Correct pin, Find address pin, Record & history).
+- **Analyze (`#/analyze`):** type an address or click the map; ambiguous addresses ask which
+  match, unmatched ones are placed by clicking the map; recent analyses with a star that keeps
+  one beyond 90 days.
+- **Alerts:** High and Watch by default (FYI opt-in), grouped by property, worst first; shared
+  county or nearby-place alerts once with every property; next step on every alert; evidence
+  drawer with review (a review of a shared alert applies to the whole group).
+- **Compare, Data sources, Admin:** restyled; "Add location" lives in Admin.
+
+Design: tokens in `src/styles/tokens.css` (white surfaces, accent Paragon green #0E6B4F, red
+#C81E1E and amber #C98500 reserved for attention), self-hosted Inter, custom charts with printed
+values (no chart library). Accessibility: one h1 per page, labelled landmarks, focus to `#main`
+on route changes, focus returned from every dialog and menu, ≥24 px targets, colour never the
+only signal, scroll padding so the sticky bars never hide focus. Code layout: `src/app` (shell,
+router), `src/api` (client, PART C types, hooks), `src/lib` (formatters, scales, clustering,
+filters), `src/components` (ui kit, charts, map), `src/features/*`, `src/pages/*`.
 
 ## Build and serve
 
@@ -86,10 +96,10 @@ and are not deployed. Automated accessibility checks supplement manual keyboard,
 focus, screen-reader, and production acceptance checks; they do not certify full
 WCAG 2.2 conformance.
 
-Visual choices: pine navigation, warm neutral surfaces, restrained green/brass,
-visible source labels, text-labelled status, native form controls, Radix accessible
-dialogs, reduced-motion support, and system fonts. No analytics or third-party font
-requests are made. No invented metrics, photographs, or “live” activity are shown.
+Visual choices (redesign): white surfaces, one accent green, red/amber only for attention
+levels, visible source labels, text-labelled status, native form controls, Radix accessible
+dialogs, reduced-motion support, and Inter served from this application (Latin subset). No
+analytics or third-party font requests are made. No invented metrics, photographs, or “live” activity are shown.
 
 Census lookup/review is now implemented in the canonical Django UI. The browser
 smoke contacts Census for three real public addresses and verifies match, ambiguity,

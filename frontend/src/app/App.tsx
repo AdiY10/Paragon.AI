@@ -4,7 +4,9 @@ import { AlertsPage } from "../pages/AlertsPage";
 import { ComparePage } from "../pages/ComparePage";
 import { AnalyzePage } from "../pages/AnalyzePage";
 import { useLocations, useSession, useSources } from "../api/hooks";
-import { Empty, ErrorNotice } from "../components/ui";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Skeleton } from "../components/ui/Skeleton";
+import { ErrorState } from "../components/ui/ErrorState";
 import { AdminPage } from "../pages/AdminPage";
 import { AnalysisPage } from "../pages/AnalysisPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -57,13 +59,13 @@ export function App() {
     );
   const isAdmin = session.data.role === "admin";
   let body: ReactNode;
-  if (needsPortfolio && portfolio.error) body = <ErrorNotice error={portfolio.error} />;
+  if (needsPortfolio && portfolio.error) body = <ErrorState error={portfolio.error} title="Properties could not load." onRetry={() => void portfolio.refetch()} />;
   else if (needsPortfolio && !portfolio.data)
     body = (
-      <div className="skeleton-grid" role="status" aria-label="Loading properties">
-        <div />
-        <div />
-        <div />
+      <div role="status" aria-label="Loading properties" className="page-loading">
+        <Skeleton height={32} width="30%" />
+        <Skeleton height={320} />
+        <Skeleton lines={6} height={20} />
       </div>
     );
   else
@@ -93,9 +95,9 @@ export function App() {
         body = isAdmin ? (
           <AdminPage />
         ) : (
-          <Empty title="Administrator access required">
+          <EmptyState title="Administrator access required">
             Your account can manage properties. User and system controls are restricted to administrators.
-          </Empty>
+          </EmptyState>
         );
         break;
       default:

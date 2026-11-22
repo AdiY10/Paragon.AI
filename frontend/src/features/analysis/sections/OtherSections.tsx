@@ -16,86 +16,46 @@ export function TenantsSection({ location, isAdmin }: { location: Location; isAd
   );
 }
 
+/** Track captions: the percentile already counts "better" to the right, so lower-is-better flips the ends. */
+function scaleFor(k: { key: string; direction?: "up" | "down" | null }): [string, string, string] {
+  if (k.key.startsWith("nearest_supermarket")) return ["Farthest", "Median", "Closest"];
+  return k.direction === "down" ? ["Highest", "Median", "Lowest"] : ["Lowest", "Median", "Highest"];
+}
+
 /** Where the property sits among the owned portfolio on each ranked figure. */
 export function RankingSection({ bundle, mode }: { bundle: AnalysisBundle; mode: "property" | "place" }) {
-  const ranked = bundle.kpis.filter((k) => k.ranked !== false);
-  const any = ranked.some((k) => k.percentile != null);
+  const ranked = bundle.kpis.filter((k) => k.ranked !== false && k.key !== "flood");
+  const any = ranked.some((k) => k.rank != null);
   const busy = bundle.analysis.state === "queued" || bundle.analysis.state === "running";
-  const portfolio = bundle.portfolio;
   return (
     <SectionShell
       id="ranking"
       title="Ranking vs portfolio"
       run={busy && !any ? "loading" : any ? "ready" : "unavailable"}
-      reason={
-        portfolio && !portfolio.ready
-          ? `Rankings need at least ${portfolio.min} owned properties with data.`
-          : "Rankings appear once this location's figures are in."
-      }
+      reason="Rankings appear once this location's figures are in and at least five owned properties have the same figure."
       intro={
         <p>
-          {mode === "place" ? "Where this place would sit" : "Where this property sits"} among Paragon's owned properties,
-          lowest to highest. Higher is not always better; each figure describes the surrounding area.
+          {mode === "place" ? "Where this place would sit" : "Where this property sits"} among Paragon's owned properties.
+          Each figure describes the surrounding area, not the property.
         </p>
       }
     >
       <div className="bullet-list">
-        {ranked.map((k) =>
-          k.rank != null && k.of != null ? (
-            <PercentileBullet
-              key={k.key}
-              label={k.label}
-              value={kpiValue(k)}
-              percentile={k.percentile ?? null}
-              rank={k.rank}
-              of={k.of}
-              mode={mode}
-            />
-          ) : (
-            <LegacyBullet key={k.key} label={k.label} value={kpiValue(k)} percentile={k.percentile ?? null} of={k.of ?? null} mode={mode} />
-          ),
-        )}
+        {ranked.map((k) => (
+          <PercentileBullet
+            key={k.key}
+            label={k.label}
+            value={kpiValue(k)}
+            percentile={k.percentile ?? null}
+            rank={k.rank ?? null}
+            of={k.of ?? null}
+            mode={mode === "place" || k.hypothetical ? "place" : "property"}
+            scale={scaleFor(k)}
+            reason="Not ranked: not enough owned properties have this figure"
+          />
+        ))}
       </div>
     </SectionShell>
-  );
-}
-
-/** Percentile without a rank (older servers): "Above 91% of 34 owned properties". */
-function LegacyBullet({
-  label,
-  value,
-  percentile,
-  of,
-  mode,
-}: {
-  label: string;
-  value: string | null;
-  percentile: number | null;
-  of: number | null;
-  mode: "property" | "place";
-}) {
-  if (percentile === null || of === null)
-    return <PercentileBullet label={label} value={value} percentile={null} rank={null} of={null} reason="Not ranked: this figure is not available here" />;
-  return (
-    <div className="bullet">
-      <div className="bullet-head">
-        <span className="bar-label">{label}</span>
-        {value && <span className="bullet-value">{value}</span>}
-      </div>
-      <span className="bullet-track" aria-hidden="true">
-        <span className="bullet-fill" style={{ width: `${percentile}%` }} />
-        <span className="bullet-median" style={{ left: "50%" }} />
-        <span className="bullet-marker" style={{ left: `${percentile}%` }} />
-      </span>
-      <span className="bullet-scale" aria-hidden="true">
-        <span>Lowest</span>
-        <span>Median</span>
-        <span>Highest</span>
-      </span>
-      <p className="bullet-text">
-        {mode === "place" ? "Would be above" : "Above"} {percentile}% of {of} other owned properties
-      </p>
-    </div>
   );
 }
 

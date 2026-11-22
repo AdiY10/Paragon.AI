@@ -189,6 +189,21 @@
   color: var(--text);
 }
 
+.inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid #f5c2bd;
+  border-radius: var(--r-card);
+  background: var(--high-bg);
+  color: var(--high-text);
+}
+.page-loading {
+  display: grid;
+  gap: var(--s-4);
+}
+
 /* ---- Drawer ---- */
 .ui-drawer {
   position: fixed;

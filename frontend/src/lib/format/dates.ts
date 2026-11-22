@@ -11,3 +11,11 @@ export const dateLabel = (value: string | null | undefined) =>
         timeZone: "America/New_York",
       }).format(new Date(value.length === 10 ? value + "T12:00:00Z" : value))
     : "Not checked";
+
+/** Readable data periods: "Overture 2026-11-18.0" → "Overture Nov 2026"; others unchanged. */
+export function periodLabel(period: string | null | undefined): string | null {
+  if (!period) return null;
+  return period.replace(/\b(\d{4})-(\d{2})-\d{2}(?:\.\d+)?\b/, (_, y: string, m: string) =>
+    new Date(Number(y), Number(m) - 1, 1).toLocaleString("en-US", { month: "short", year: "numeric" }),
+  );
+}

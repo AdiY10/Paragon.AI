@@ -13,7 +13,10 @@ export function PercentileBullet({
   of,
   mode = "property",
   reason,
+  scale = ["Lowest", "Median", "Highest"],
 }: {
+  /** Track captions, left to right (a "lower is better" figure reads e.g. Farthest → Closest). */
+  scale?: [string, string, string];
   label: string;
   /** Printed value, e.g. "67,312". */
   value?: string | null;
@@ -39,9 +42,9 @@ export function PercentileBullet({
             <span className="bullet-marker" style={{ left: `${position(percentile!, [0, 100])}%` }} />
           </span>
           <span className="bullet-scale" aria-hidden="true">
-            <span>Lowest</span>
-            <span>Median</span>
-            <span>Highest</span>
+            <span>{scale[0]}</span>
+            <span>{scale[1]}</span>
+            <span>{scale[2]}</span>
           </span>
           <p className="bullet-text">{sentence}</p>
         </>

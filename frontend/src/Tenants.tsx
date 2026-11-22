@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { api, dateLabel } from "./api";
+import { api } from "./api/client";
+import { dateLabel } from "./lib/format/dates";
 import type { Location } from "./types";
 
 export interface SecEvent {
@@ -124,7 +125,7 @@ export default function TenantsPanel({ location, isAdmin }: { location: Location
         <label className="small">
           <input type="checkbox" name="anchor" /> Anchor
         </label>
-        <button className="button small-button" disabled={add.isPending}>
+        <button className="btn btn-primary btn-sm" disabled={add.isPending}>
           <Plus size={14} /> Add
         </button>
       </form>
