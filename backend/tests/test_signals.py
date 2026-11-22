@@ -46,17 +46,19 @@ def all_sections(loc):
 def test_rules_fire_with_expected_severity_and_attention():
     loc = placed()
     all_sections(loc)
-    assert engine.evaluate(loc, today=TODAY) == (5, 0, 0)
+    assert engine.evaluate(loc, today=TODAY) == (3, 0, 0)
     got = {s.rule_id: s.severity for s in Signal.objects.filter(location=loc)}
     # B7a: actionable changes only, High/Watch only. Nearby jobs (SIG-06), permits (SIG-07), openings
     # (SIG-10) and the static flood zone (SIG-11, now a risk badge) stay in the analysis.
-    assert got == {'SIG-03': 'Watch', 'SIG-04': 'Watch', 'SIG-05': 'Watch', 'SIG-08': 'Watch', 'SIG-09': 'Watch'}
+    # B7b: the three county figures are one county alert (SIG-15).
+    assert got == {'SIG-15': 'Watch', 'SIG-08': 'Watch', 'SIG-09': 'Watch'}
     assert all(s.next_step for s in Signal.objects.all())
     assert engine.attention(loc.pk) == 'Watch'
     assert engine.risk_badges(loc) == [{'kind': 'flood', 'level': 'inside', 'source': 'SRC-11',
         'label': 'Inside FEMA high-risk flood zone AE (base flood elevation 9 ft)'}]
-    s05 = Signal.objects.get(rule_id='SIG-05')
-    assert '(preliminary)' in s05.title and s05.evidence['source_link'] == 'https://www.bls.gov/lau/'
+    s15 = Signal.objects.get(rule_id='SIG-15')
+    assert 'private jobs' in s15.title and 'unemployment up 1.2 pts' in s15.title
+    assert s15.evidence['source_link'] == 'https://www.bls.gov/cew/'
     assert engine.evaluate(loc, today=TODAY) == (0, 0, 0)  # idempotent
 
 
@@ -74,7 +76,7 @@ def test_conditions_clearing_resolve_and_events_expire():
     section(loc, 'economy', economy(priv=0.01, retail=0.0, unemp=0.1, permits=0.0, units=0))
     engine.evaluate(loc, today=date(2027, 3, 1))  # 103 days after the Overture release
     status = {s.rule_id: (s.status, s.resolved_reason) for s in Signal.objects.all()}
-    assert status['SIG-03'] == ('resolved', 'condition no longer holds')
+    assert status['SIG-15'] == ('resolved', 'condition no longer holds')
     assert status['SIG-09'][0] == 'expired' and status['SIG-08'][0] == 'active'
 
 
@@ -157,32 +159,31 @@ def test_new_data_period_updates_the_same_alert_and_keeps_dismissal():
     loc = placed()
     section(loc, 'economy', economy())
     engine.evaluate(loc, today=TODAY)
-    s05 = Signal.objects.get(rule_id='SIG-05')
-    assert s05.subject == 'county:36111:unemployment'
+    s05 = Signal.objects.get(rule_id='SIG-15')
+    assert s05.subject == 'county:36111:economy'
     s05.status = 'dismissed'
     s05.save()
     later = economy()
     later['unemployment'] = {**later['unemployment'], 'period': '2026-10', 'change_pts': 1.3}
     section(loc, 'economy', later)
     engine.evaluate(loc, today=TODAY)
-    rows = Signal.objects.filter(rule_id='SIG-05')
-    assert rows.count() == 1 and rows[0].status == 'dismissed' and rows[0].period == '2026-10'
-    assert Signal.objects.filter(rule_id='SIG-03').count() == 1
+    rows = Signal.objects.filter(rule_id='SIG-15')
+    assert rows.count() == 1 and rows[0].status == 'dismissed' and rows[0].period == '2026 Q1 · 2026-10'
 
 
 def test_reappearing_condition_starts_a_new_episode():
     loc = placed()
     section(loc, 'economy', economy())
     engine.evaluate(loc, today=TODAY)
-    first = Signal.objects.get(rule_id='SIG-04')
-    section(loc, 'economy', economy(retail=0.0))
+    first = Signal.objects.get(rule_id='SIG-15')
+    section(loc, 'economy', economy(priv=0.0, retail=0.0))  # one condition left: below the county rule
     engine.evaluate(loc, today=TODAY)
     assert Signal.objects.get(pk=first.pk).status == 'resolved'
-    section(loc, 'economy', economy(retail=-0.06))
+    section(loc, 'economy', economy(priv=0.0, retail=-0.06))
     engine.evaluate(loc, today=TODAY)
     again = Signal.objects.get(pk=first.pk)
     assert again.status == 'active' and again.episode == 2
-    assert again.first_evidence['value'] == -0.06 and again.episode_started_at > first.episode_started_at
+    assert again.first_evidence['retail_jobs_yoy'] == -0.06 and again.episode_started_at > first.episode_started_at
 
 
 def test_missing_inputs_never_resolve_alerts():
