@@ -198,6 +198,12 @@ def prefetch_laus(opener=None, store=None):
         return 0
 
 
+def tract_for(run, lat, lon):
+    raw, _ = run.cached('SRC-04', f'tract:{_pin_key(lat, lon)}', None,
+        lambda: (th.fetch_tract(lat, lon, opener=run.opener), th.TRACT_URL, 'ACS2024', 'Census tracts (ACS 2024 vintage)'))
+    return th.parse_tract(raw)
+
+
 def county_for(run, lat, lon):
     raw, _ = run.cached('SRC-04', f'county:{_pin_key(lat, lon)}', None,
         lambda: (econ.fetch_county(lat, lon, opener=run.opener), econ.COUNTY_URL, 'ACS2024', 'Counties (ACS 2024 vintage)'))
@@ -305,9 +311,15 @@ def hazards_section(run, lat, lon):
         return {**th.parse_flood(raw), 'checked': snap.retrieved_at.isoformat()}
 
     def nri():
-        raw, _ = run.cached('SRC-12', f'nri:{_pin_key(lat, lon)}', 90,
-            lambda: (th.fetch_nri(lat, lon, opener=run.opener), th.NRI_URL, 'current', 'National Risk Index'))
-        return th.parse_nri(raw)
+        # The pin's tract comes from TIGERweb (Census); the rating from a per-state bulk copy of FEMA's
+        # NRI table (B4a), so the third-party host that serves NRI never receives a pin.
+        tract = tract_for(run, lat, lon)
+
+        def fetch_state():
+            payload, version = th.fetch_nri_state(tract[:2], opener=run.opener)
+            return payload, th.NRI_URL, version, f'National Risk Index ({version})'
+        raw, _ = run.cached('SRC-12', f'nri:tracts:{tract[:2]}', 90, fetch_state)
+        return th.nri_for_tract(raw, tract)
 
     def sfha_nearby():
         raw, snap = run.cached('SRC-11', f'nfhl-sfha:{_pin_key(lat, lon)}:150m', 30,
