@@ -154,3 +154,90 @@ def compare_view(request):
     except ValueError:
         return Response({'detail': 'Invalid location id.'}, status=400)
     return Response(compare(ids))
+
+
+def _analysis_row(location):
+    """One entry of GET /api/analyses/ (redesign B5)."""
+    from apps.area import analysis
+    from .screens import expires_at
+    placed = location.current_revision_id and location.current_revision.lat is not None
+    if not placed:
+        state = 'unplaced'
+    elif not analysis.missing_sections(location):
+        state = 'complete'
+    elif analysis._attempts(location).filter(status__in=analysis.LIVE).exists():
+        state = 'running'
+    else:
+        state = 'partial'
+    expiry = expires_at(location)
+    rev = location.current_revision
+    return {'id': str(location.pk), 'name': location.name, 'display_label': location.name, 'address': location.address,
+        'lat': rev.lat if rev else None, 'lon': rev.lon if rev else None, 'created_at': location.created_at.isoformat(),
+        'kept': location.kept_at is not None, 'expires_at': expiry.isoformat() if expiry else None, 'state': state,
+        'key_numbers': _key_numbers(location)}
+
+
+def _key_numbers(location):
+    from apps.locations.serializers import LocationSerializer
+    return LocationSerializer().get_key_numbers(location)
+
+
+@api_view(['GET', 'POST'])
+@throttle_classes([ExpensiveThrottle])
+def analyses(request):
+    """Analyze a new place (redesign B5, PART C). POST {address, name?} or {lat, lon, label?}; GET recent."""
+    from apps.locations.serializers import LocationSerializer
+    from apps.locations.geocoding import lookup_payload
+    from .screens import create_screen, create_point_screen, expire_screens, too_busy, OutsideUS
+    if request.method == 'GET':
+        expire_screens()
+        recent = (Location.objects.filter(screening=True).exclude(status='archived')
+            .select_related('current_revision', 'metrics_snapshot').order_by('-created_at')[:25])
+        return Response([_analysis_row(l) for l in recent])
+    if too_busy():
+        return Response({'detail': 'Several analyses are running. Try again in a minute.', 'retry_after': 30},
+            status=429, headers={'Retry-After': '30'})
+    data = request.data
+    if data.get('lat') is not None or data.get('lon') is not None:
+        try:
+            lat, lon = float(data.get('lat')), float(data.get('lon'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'lat and lon must be numbers.'}, status=400)
+        try:
+            location, job = create_point_screen(lat=lat, lon=lon, label=str(data.get('label', '')).strip()[:200],
+                actor=request.user)
+        except OutsideUS as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response({'location': LocationSerializer(location).data, 'geocode': {'status': 'map_point'},
+            'analysis': {'state': 'queued', 'job_id': str(job.pk) if job else None}}, status=201)
+    address = str(data.get('address', '')).strip()
+    if not address or len(address) > 500:
+        return Response({'detail': 'Enter a US street address or choose a point on the map.'}, status=400)
+    location, lookup, status, jobs = create_screen(address=address, name=str(data.get('name', '')).strip()[:200],
+        actor=request.user)
+    body = {'location': LocationSerializer(location).data}
+    if jobs:
+        body.update(geocode={'status': 'matched', 'matched_address': location.current_revision.matched_address},
+            analysis={'state': 'queued', 'job_id': jobs[0]})
+        return Response(body, status=201)
+    if lookup is not None and lookup.status in ('matched', 'ambiguous') and lookup.candidates:
+        p = lookup_payload(lookup)
+        body['geocode'] = {'status': 'ambiguous', 'lookup_id': p['id'], 'expected_version': p['expected_version'],
+            'candidates': [{'index': i, 'matched_address': c.get('matched_address'), 'lat': c.get('lat'), 'lon': c.get('lon')}
+                for i, c in enumerate(lookup.candidates)]}
+        return Response(body)
+    unavailable = status.startswith('geocoder_')
+    body.update(geocode={'status': 'unavailable' if unavailable else 'no_match'}, next='place_pin')
+    return Response(body, status=503 if unavailable else 200)
+
+
+@api_view(['POST'])
+def analysis_keep(request, location_id):
+    """Star (keep) or unstar a new-place analysis: {kept: bool} -> {kept, expires_at}."""
+    from .screens import keep_screen, expires_at
+    location = get_object_or_404(Location, pk=location_id, screening=True)
+    if not isinstance(request.data.get('kept'), bool):
+        return Response({'detail': 'kept must be true or false.'}, status=400)
+    location = keep_screen(location, request.data['kept'])
+    expiry = expires_at(location)
+    return Response({'kept': location.kept_at is not None, 'expires_at': expiry.isoformat() if expiry else None})
