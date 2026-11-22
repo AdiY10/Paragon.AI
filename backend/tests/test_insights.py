@@ -145,4 +145,5 @@ def test_location_list_carries_key_numbers_and_unconfirmed_tenants(client):
     with um.patch.object(mm, 'extract', lambda location, fresh=False: {'population': {'value': 41000}, 'aadt': {'value': 18000}}):
         refresh_snapshot(loc)
     row = next(r for r in client.get('/api/locations/').json()['results'] if r['id'] == str(loc.pk))
-    assert row['key_numbers'] == {'population': 41000, 'aadt': 18000} and row['unconfirmed_tenants'] == 1
+    assert row['key_numbers'] == {'population': 41000, 'aadt': 18000, 'flood': None, 'nearest_supermarket': None,
+        'active_alerts': 0} and row['unconfirmed_tenants'] == 1

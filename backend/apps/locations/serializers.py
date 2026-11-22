@@ -31,8 +31,10 @@ class LocationSerializer(serializers.ModelSerializer):
         try:row=obj.metrics_snapshot
         except ObjectDoesNotExist:return {}
         if row.analysis_version!=obj.analysis_version:return {}
-        return {k:(row.values.get(k) or {}).get('value') for k in ('population','median_household_income','aadt')
+        out={k:(row.values.get(k) or {}).get('value') for k in ('population','median_household_income','aadt')
             if (row.values.get(k) or {}).get('value') is not None}
+        out.update(row.values.get('_list') or {})  # flood, nearest_supermarket, active_alerts (B9)
+        return out
     def get_unconfirmed_tenants(self,obj):
         return getattr(obj,'unconfirmed_tenant_count',None)
     def get_attention(self,obj):
