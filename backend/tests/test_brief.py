@@ -76,10 +76,10 @@ def test_brief_weekly_is_registered():
 def test_county_level_signals_are_grouped_across_properties():
     a, b = placed('Westport A', 41.1), placed('Westport B', 41.2)
     for loc in (a, b):
-        section(loc, 'economy', economy(priv=0.0, retail=0.0, unemp=1.0, permits=0.0, units=0))
+        section(loc, 'economy', economy(priv=0.0, unemp=1.0, permits=0.0, units=0))
         engine.evaluate(loc, today=TODAY)
     brief = briefs.generate()
-    sig05 = [i for i in brief.items if i['rule_id'] == 'SIG-05']
+    sig05 = [i for i in brief.items if i['rule_id'] == 'SIG-15']
     assert len(sig05) == 1 and {l['name'] for l in sig05[0]['locations']} == {'Westport A', 'Westport B'}
     assert brief.stats['properties_with_items'] == 2
 
@@ -109,7 +109,7 @@ def test_county_alerts_do_not_raise_property_attention():
     loc = placed()
     section(loc, 'economy', economy())
     engine.evaluate(loc, today=TODAY)
-    assert Signal.objects.filter(rule_id='SIG-05', status='active').exists()
+    assert Signal.objects.filter(rule_id='SIG-15', status='active').exists()
     assert engine.attention(loc.pk) == 'Clear'
 
 
@@ -129,16 +129,16 @@ def test_unemployment_uses_three_month_average_relative_to_state():
     assert out['avg3_change_pts'] == 1.5 and out['state_avg3_change_pts'] == 1.0 and out['excess_vs_state_pts'] == 0.5
     from backend.tests.test_signals import section, economy
     loc = placed()
-    e = economy()
+    e = economy(priv=0.0)  # retail -5% plus the unemployment rise: two conditions (SIG-15)
     e['unemployment'] = out
     section(loc, 'economy', e)
     engine.evaluate(loc, today=TODAY)
-    s = Signal.objects.get(rule_id='SIG-05')
-    assert '3-month average' in s.title and s.evidence['more_than_state_pts'] == 0.5
+    s = Signal.objects.get(rule_id='SIG-15')
+    assert 'unemployment up 1.5 pts (0.5 more than the state)' in s.title and s.evidence['more_than_state_pts'] == 0.5
     e['unemployment'] = {**out, 'excess_vs_state_pts': 0.2}  # statewide swing: no alert
     section(loc, 'economy', e)
     engine.evaluate(loc, today=TODAY)
-    assert Signal.objects.get(rule_id='SIG-05').status == 'resolved'
+    assert Signal.objects.get(rule_id='SIG-15').status == 'resolved'
 
 
 def test_sources_updated_reports_the_newest_period(tmp_path):

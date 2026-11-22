@@ -241,3 +241,16 @@ def analysis_keep(request, location_id):
     location = keep_screen(location, request.data['kept'])
     expiry = expires_at(location)
     return Response({'kept': location.kept_at is not None, 'expires_at': expiry.isoformat() if expiry else None})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdministrator])
+def alert_quality(request):
+    """Per rule: alerts raised and reviewer feedback (B7b). precision = useful / judged."""
+    from django.db.models import Count, Q
+    from .models import Signal
+    rows = (Signal.objects.exclude(status='retired').values('rule_id').annotate(total=Count('id'),
+        useful=Count('id', filter=Q(feedback='useful')), not_useful=Count('id', filter=Q(feedback='not_useful')))
+        .order_by('rule_id'))
+    return Response([{**r, 'precision': round(r['useful'] / (r['useful'] + r['not_useful']), 2)
+        if r['useful'] + r['not_useful'] else None} for r in rows])

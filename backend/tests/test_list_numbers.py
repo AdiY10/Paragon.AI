@@ -13,7 +13,7 @@ def test_list_key_numbers_include_flood_supermarket_and_alerts(client):
     section(a, 'hazards', {'flood_at_pin': {'zone': 'AE', 'sfha': True, 'in_sfha': True}, 'flood_nearby': {}, 'nri': {}})
     section(a, 'businesses', {'release': '2026-11-18.0', 'nearest_supermarket': {'name': 'Publix Super Market',
         'brand': 'Publix', 'distance_mi': 0.48}, 'changes': {}})
-    section(a, 'economy', economy(priv=0.0, retail=0.0, permits=0.0, units=0))  # one county alert (SIG-05)
+    section(a, 'economy', economy(priv=0.0, permits=0.0, units=0))  # one county alert (SIG-15)
     section(b, 'hazards', {'flood_at_pin': {'zone': 'X', 'sfha': False}, 'flood_nearby': {'zone': 'AE', 'sfha': True,
         'inside': False, 'distance_m': 60}, 'nri': {}})
     for loc in (a, b, c):

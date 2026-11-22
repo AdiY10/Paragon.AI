@@ -6,15 +6,20 @@ rows for the requested states, and publish one immutable snapshot per state.
 """
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import gzip
 import io
 import json
+import math
+from array import array
+from collections.abc import Mapping
 from pathlib import Path
 import re
 from urllib.request import Request
 from apps.area.http import default_opener
 from apps.sources.snapshots import publish_snapshot, ValidationReport
 
-ADAPTER_VERSION = 'acs-table-sf-v1'
+# v2 (redesign B8): gzipped JSON lines sorted by block group, read back for the ring's block groups only.
+ADAPTER_VERSION = 'acs-table-sf-v2'
 BASE_URL = 'https://www2.census.gov/programs-surveys/acs/summary_file/{year}/table-based-SF/data/5YRData/acsdt5y{year}-{table}.dat'
 # Tables and the cells each metric needs (docs/04 §4, MET-01..05).
 TABLES = {
@@ -24,8 +29,17 @@ TABLES = {
     'B19025': ['001'],
     'B15003': ['001', '022', '023', '024', '025'],
 }
+# Depth tables (redesign B8), table-based vintages only: age by sex, tenure, home value, gross rent.
+DEPTH_TABLES = {
+    'B01001': [f'{i:03d}' for i in range(1, 50)],
+    'B25003': ['001', '002', '003'],
+    'B25075': [f'{i:03d}' for i in range(1, 28)],
+    'B25063': [f'{i:03d}' for i in range(1, 28)],
+}
+BASE_TABLES = dict(TABLES)          # also what the 2019 legacy files provide
+TABLES = {**BASE_TABLES, **DEPTH_TABLES}
 BG_PREFIX = '1500000US'
-MAX_TABLE_BYTES = 400 * 1024 * 1024
+MAX_TABLE_BYTES = 1536 * 1024 * 1024  # B01001 (age by sex) is the largest national file
 CONTROLLED_MOE = -555555555   # "estimate is controlled": no sampling error
 STATE = re.compile(r'^\d{2}$')
 
@@ -96,17 +110,50 @@ def _stream_lines(url, opener, timeout):
         yield raw.decode('utf-8')
 
 
+class RowView(Mapping):
+    """Block groups as compact float arrays (NaN = not published), read like {geoid: {cell: value}}.
+
+    The depth tables add ~210 values per block group; dicts of floats for California (~25,600
+    block groups) would take ~1 GB, arrays take ~2 KB each.
+    """
+    def __init__(self, keys, values):
+        self.keys_, self.values_ = list(keys), values
+
+    def __getitem__(self, geoid):
+        return {k: (None if math.isnan(v) else v) for k, v in zip(self.keys_, self.values_[geoid])}
+
+    def __iter__(self):
+        return iter(self.values_)
+
+    def __len__(self):
+        return len(self.values_)
+
+
 @dataclass(frozen=True)
 class AcsExtract:
     year: int
     state: str
-    rows: dict          # GEOID -> {cell: value}
+    rows: Mapping        # GEOID -> {cell: value} (a RowView for table-based vintages)
     source_urls: tuple
     retrieved_at: datetime
 
+    def _columns(self):
+        """(keys, sorted geoids, geoid -> values list), converting one row at a time."""
+        if isinstance(self.rows, RowView):
+            arrays = self.rows.values_
+            return self.rows.keys_, sorted(arrays), lambda g: [None if math.isnan(v) else v for v in arrays[g]]
+        keys = sorted({k for r in self.rows.values() for k in r})
+        return keys, sorted(self.rows), lambda g: [self.rows[g].get(k) for k in keys]
+
     def payload(self):
-        return json.dumps({'year': self.year, 'state': self.state, 'tables': TABLES,
-            'rows': self.rows}, sort_keys=True, separators=(',', ':')).encode()
+        """Gzipped JSON lines: a header, then [geoid, values] sorted by block group (format v2)."""
+        keys, geoids, values = self._columns()
+        buf = io.BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode='wb', mtime=0) as gz:
+            gz.write(json.dumps({'year': self.year, 'state': self.state, 'columns': keys}, separators=(',', ':')).encode() + b'\n')
+            for geoid in geoids:
+                gz.write(json.dumps([geoid, values(geoid)], separators=(',', ':')).encode() + b'\n')
+        return buf.getvalue()
 
 
 def extract_states(year, states, *, opener=None, timeout=120, line_source=None):
@@ -118,6 +165,11 @@ def extract_states(year, states, *, opener=None, timeout=120, line_source=None):
     states = sorted(set(states))
     if not states or not all(STATE.fullmatch(s) for s in states):
         raise AcsError('States must be two-digit FIPS codes')
+    # Census omits some block groups from some tables (e.g. B19025 where too few households to
+    # publish). Absent cells stay NaN -> None, i.e. "not published", never zero.
+    keys = [f'{t}_{c}_{k}' for t, cells in TABLES.items() for c in cells for k in ('E', 'M')]
+    index = {k: i for i, k in enumerate(keys)}
+    blank = array('d', [math.nan]) * len(keys)
     rows = {s: {} for s in states}
     urls = []
     for table in TABLES:
@@ -126,20 +178,16 @@ def extract_states(year, states, *, opener=None, timeout=120, line_source=None):
         lines = line_source(table) if line_source else _stream_lines(url, opener, timeout)
         seen = 0
         for geoid, values in parse_table(iter(lines), table, states):
-            rows[geoid[:2]].setdefault(geoid, {}).update(values)
+            row = rows[geoid[:2]].get(geoid)
+            if row is None:
+                row = rows[geoid[:2]][geoid] = array('d', blank)
+            for key, value in values.items():
+                row[index[key]] = math.nan if value is None else value
             seen += 1
         if seen == 0:
             raise AcsError(f'{table}: no block groups for {states}')
     retrieved = datetime.now(timezone.utc)
-    # Census omits some block groups from some tables (e.g. B19025 where too few
-    # households to publish). Absent cells become None, i.e. "not published",
-    # never zero; metrics decide how to handle them.
-    keys = [f'{t}_{c}_{k}' for t, cells in TABLES.items() for c in cells for k in ('E', 'M')]
-    for state_rows in rows.values():
-        for values in state_rows.values():
-            for key in keys:
-                values.setdefault(key, None)
-    return [AcsExtract(year, s, rows[s], tuple(urls), retrieved) for s in states]
+    return [AcsExtract(year, s, RowView(keys, rows[s]), tuple(urls), retrieved) for s in states]
 
 
 # ---- all-states ingest (redesign B4a) ------------------------------------------
@@ -208,6 +256,42 @@ def plan_batches(counts, limit=30_000):
     return batches
 
 
+REFERENCE_PREFIXES = {'0100000US': 'US', '0400000US': None}  # nation; states (GEO_ID suffix = state FIPS)
+
+
+def extract_reference(year, line_source):
+    """Nation and state rows of every table (redesign B6b: the "100 = US average" index).
+
+    Returns an AcsExtract whose rows are keyed 'US' and two-digit state FIPS codes.
+    """
+    rows = {}
+    for table in TABLES:
+        lines = iter(line_source(table))
+        columns = next(lines).rstrip('\r\n').split('|')
+        wanted = {columns.index(f'{table}_{k}{c}'): (f'{table}_{c}_{k}', k == 'M') for c in TABLES[table] for k in 'EM'
+            if f'{table}_{k}{c}' in columns}
+        for line in lines:
+            if not line.startswith(('0100000US', '0400000US')):
+                continue
+            parts = line.rstrip('\r\n').split('|')
+            key = 'US' if parts[0] == '0100000US' else parts[0][len('0400000US'):]
+            row = rows.setdefault(key, {})
+            for i, (name, is_moe) in wanted.items():
+                row[name] = parse_value(parts[i], moe=is_moe)
+    if 'US' not in rows:
+        raise AcsError('national row missing')
+    return AcsExtract(year, 'reference', rows, (BASE_URL.format(year=year, table='b01003'),), datetime.now(timezone.utc))
+
+
+def publish_reference(extract, store):
+    payload = extract.payload()
+    return publish_snapshot(source_id='SRC-03', scope=f'acs5:{extract.year}:reference', release=str(extract.year),
+        data_period=vintage_period(extract.year), source_url=extract.source_urls[0].rsplit('/', 1)[0] + '/',
+        adapter_version=ADAPTER_VERSION, stream=io.BytesIO(payload), store=store, retrieved_at=extract.retrieved_at,
+        validation=ValidationReport(True, True, {'tables': TABLES}, len(extract.rows)),
+        context={'tables': sorted(TABLES), 'geography': 'nation and states', 'format': 'jsonl.gz'})
+
+
 def scope_for(year, state):
     return f'acs5:{year}:bg:{state}'
 
@@ -219,13 +303,29 @@ def publish_extract(extract, store):
         source_url=extract.source_urls[0].rsplit('/', 1)[0] + '/', adapter_version=ADAPTER_VERSION,
         stream=io.BytesIO(payload), store=store, retrieved_at=extract.retrieved_at,
         validation=ValidationReport(True, True, {'tables': TABLES}, len(extract.rows)),
-        context={'tables': sorted(TABLES), 'geography': 'block group', 'state': extract.state})
+        context={'tables': sorted(_tables_for(extract.year)), 'geography': 'block group', 'state': extract.state,
+            'format': 'jsonl.gz'})
 
 
-def load_rows(snapshot, store):
+def _tables_for(year):
+    return BASE_TABLES if year == LEGACY_YEAR else TABLES
+
+
+def load_rows(snapshot, store, geoids=None):
+    """{geoid: {cell: value}}; only ``geoids`` when given (v2 streams and skips the rest)."""
     with store.open_verified(snapshot.artifact_key) as handle:
-        data = json.load(handle)
-    return data['rows']
+        if snapshot.adapter_version == 'acs-table-sf-v1':
+            rows = json.load(handle)['rows']
+            return rows if geoids is None else {g: r for g, r in rows.items() if g in geoids}
+        with gzip.GzipFile(fileobj=handle) as gz:
+            keys = json.loads(gz.readline())['columns']
+            out = {}
+            for line in gz:
+                if geoids is not None and line[2:14].decode() not in geoids:
+                    continue  # '["' + 12-digit GEOID: skip without parsing the row
+                geoid, values = json.loads(line)
+                out[geoid] = dict(zip(keys, values))
+            return out
 
 
 # ---- 2015-2019 vintage: legacy sequence-based summary files -----------------
@@ -334,7 +434,7 @@ def parse_legacy(state, geo_csv, sequences):
                 for cell in TABLES[table]:
                     raw = parts[start - 2 + int(cell)]
                     rows[geoid][f'{table}_{cell}_{kind}'] = parse_value(raw, moe=kind == 'M')
-    keys = [f'{t}_{c}_{k}' for t, cells in TABLES.items() for c in cells for k in ('E', 'M')]
+    keys = [f'{t}_{c}_{k}' for t, cells in BASE_TABLES.items() for c in cells for k in ('E', 'M')]
     for values in rows.values():
         for key in keys:
             values.setdefault(key, None)

@@ -116,12 +116,12 @@ def test_county_alert_is_one_group_and_a_review_can_cover_the_group(client):
     client.force_login(user)
     a, b = placed('A'), placed('B')
     for loc in (a, b):
-        section(loc, 'economy', economy(priv=0.0, retail=0.0, permits=0.0, units=0))  # SIG-05 only
+        section(loc, 'economy', economy(priv=0.0, permits=0.0, units=0))  # retail + unemployment: SIG-15
         engine.evaluate(loc, today=TODAY)
     body = client.get('/api/signals/').json()
     assert len(body['results']) == 2 and len(body['groups']) == 1
     group = body['groups'][0]
-    assert group['rule_id'] == 'SIG-05' and {l['name'] for l in group['locations']} == {'A', 'B'}
+    assert group['rule_id'] == 'SIG-15' and {l['name'] for l in group['locations']} == {'A', 'B'}
     assert len(group['signal_ids']) == 2 and group['next_step']
     r = client.post(f"/api/signals/{group['signal_ids'][0]}/review/",
         {'action': 'dismissed', 'apply_to_group': True}, content_type='application/json')
