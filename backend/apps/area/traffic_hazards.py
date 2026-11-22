@@ -278,18 +278,83 @@ PROPERTY_HAZARDS = {'Coastal flooding', 'Inland flooding', 'Hurricane', 'Wildfir
 RATING_ORDER = ['Very Low', 'Relatively Low', 'Relatively Moderate', 'Relatively High', 'Very High']
 
 
-def fetch_nri(lat, lon, *, opener=None):
-    fields = ','.join(['TRACTFIPS', 'RISK_RATNG', 'RISK_SPCTL', 'NRI_VER'] + [f'{h}_RISKR' for h in NRI_HAZARDS])
-    return fetch(NRI_URL, params={'geometry': f'{lon},{lat}', 'geometryType': 'esriGeometryPoint', 'inSR': 4326,
-        'spatialRel': 'esriSpatialRelIntersects', 'outFields': fields, 'returnGeometry': 'false', 'f': 'json'},
+TRACT_URL = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/8/query'
+NRI_FIELDS = ['TRACTFIPS', 'RISK_RATNG', 'RISK_SPCTL', 'NRI_VER'] + [f'{h}_RISKR' for h in NRI_HAZARDS]
+NRI_PAGE = 2000
+MAX_TRACTS_PER_STATE = 20_000   # California has about 9,100
+
+
+def fetch_tract(lat, lon, *, opener=None):
+    """2020 census tract at the pin (TIGERweb, a Census host; ACS 2024 codes = NRI's, incl. CT planning regions)."""
+    return fetch(TRACT_URL, params={'geometry': f'{lon},{lat}', 'geometryType': 'esriGeometryPoint', 'inSR': 4326,
+        'spatialRel': 'esriSpatialRelIntersects', 'outFields': 'GEOID', 'returnGeometry': 'false', 'f': 'json'},
         opener=opener)
 
 
+def parse_tract(raw):
+    rows = arcgis_json(raw)
+    geoid = rows[0].get('GEOID') if rows else None
+    if not geoid or not re.fullmatch(r'\d{11}', geoid):
+        raise SourceError('NOT_COVERED', 'no census tract at the pin')
+    return geoid
+
+
+def fetch_nri_state(state, *, opener=None):
+    """Every tract of one state from FEMA's National Risk Index layer, in pages (B4a).
+
+    Bulk pages by state replace the per-pin query, so the hosting service never sees a pin.
+    Returns a compact JSON payload: {"fields": [...], "version": ..., "rows": {tract: [values]}}.
+    """
+    if not re.fullmatch(r'\d{2}', state or ''):
+        raise SourceError('NOT_COVERED', 'invalid state')
+    rows, offset, versions = {}, 0, {}
+    while True:
+        raw = fetch(NRI_URL, params={'where': f"STATEFIPS='{state}'", 'outFields': ','.join(NRI_FIELDS),
+            'returnGeometry': 'false', 'orderByFields': 'OBJECTID', 'resultOffset': offset,
+            'resultRecordCount': NRI_PAGE, 'f': 'json'}, opener=opener, timeout=60)
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            raise SourceError('SCHEMA_ERROR', 'not JSON') from None
+        if 'error' in data or not isinstance(data.get('features'), list):
+            raise SourceError('SOURCE_ERROR', 'ArcGIS query failed')
+        for feature in data['features']:
+            a = feature.get('attributes', {})
+            tract = a.get('TRACTFIPS')
+            if not isinstance(tract, str) or not re.fullmatch(state + r'\d{9}', tract):
+                raise SourceError('SCHEMA_ERROR', 'unexpected tract code')
+            rows[tract] = [a.get(f) for f in NRI_FIELDS[1:]]
+            versions[a.get('NRI_VER')] = versions.get(a.get('NRI_VER'), 0) + 1
+        offset += len(data['features'])
+        if not data.get('exceededTransferLimit') or not data['features']:
+            break
+        if offset > MAX_TRACTS_PER_STATE:
+            raise SourceError('SCHEMA_ERROR', 'too many tracts')
+    if not rows:
+        raise SourceError('NOT_COVERED', 'no National Risk Index tracts for this state')
+    version = max(versions, key=versions.get)
+    payload = json.dumps({'fields': NRI_FIELDS[1:], 'version': version, 'rows': rows}, sort_keys=True,
+        separators=(',', ':')).encode()
+    return payload, version
+
+
+def nri_for_tract(payload, tract):
+    data = json.loads(payload)
+    values = data['rows'].get(tract)
+    if values is None:
+        return {'tract': tract, 'rating': None, 'reason': 'NOT_COVERED'}
+    return nri_from_attributes({'TRACTFIPS': tract, **dict(zip(data['fields'], values))})
+
+
 def parse_nri(raw):
+    """A single ArcGIS point-query response (kept for recorded fixtures)."""
     rows = arcgis_json(raw)
     if not rows:
         return {'rating': None, 'reason': 'NOT_COVERED'}
-    a = rows[0]
+    return nri_from_attributes(rows[0])
+
+
+def nri_from_attributes(a):
     hazards = [{'hazard': name, 'rating': a.get(f'{code}_RISKR')} for code, name in NRI_HAZARDS.items()
         if a.get(f'{code}_RISKR') in RATING_ORDER]
     hazards.sort(key=lambda h: -RATING_ORDER.index(h['rating']))

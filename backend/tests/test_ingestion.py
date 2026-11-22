@@ -189,3 +189,61 @@ def test_laus_batches_respect_the_series_limit_and_split_per_county(monkeypatch)
     server = BlsServer()
     out, url = econ.fetch_laus_many([f'{n:05d}' for n in range(1000, 1030)], opener=server)
     assert url == econ.LAUS_V2 and [len(b['seriesid']) for b in server.bodies] == [31]
+
+
+# ---- FEMA NRI: per-state bulk copy, local tract lookup ---------------------------
+
+class NriServer:
+    """TIGERweb tract point queries and paged NRI state queries; records every URL."""
+    def __init__(self):
+        self.urls = []
+
+    def open(self, request, timeout=None):
+        from urllib.parse import urlsplit, parse_qs
+        url = request.full_url
+        self.urls.append(url)
+        q = {k: v[0] for k, v in parse_qs(urlsplit(url).query).items()}
+        if 'MapServer/8/query' in url:
+            lon = float(q['geometry'].split(',')[0])
+            body = {'features': [{'attributes': {'GEOID': '09190043500' if lon < -73.3 else '09190044000'}}]}
+        else:
+            assert 'geometry' not in q and q['where'] == "STATEFIPS='09'"
+            offset = int(q['resultOffset'])
+            tracts = ['09190043500', '09190044000', '09110535200'][offset:offset + 2]
+            body = {'features': [{'attributes': {'TRACTFIPS': t, 'RISK_RATNG': 'Relatively Low', 'RISK_SPCTL': 41.234,
+                'NRI_VER': 'December 2025', 'HRCN_RISKR': 'Very High' if t.endswith('3500') else 'Very Low'}}
+                for t in tracts], 'exceededTransferLimit': offset == 0}
+        resp = io.BytesIO(json.dumps(body).encode())
+        resp.status = 200
+        resp.__enter__ = lambda: resp
+        resp.__exit__ = lambda *a: False
+        return resp
+
+
+def test_nri_state_pages_are_combined_and_looked_up_by_tract():
+    from apps.area import traffic_hazards as th
+    server = NriServer()
+    payload, version = th.fetch_nri_state('09', opener=server)
+    assert version == 'December 2025' and len(server.urls) == 2  # two pages
+    hit = th.nri_for_tract(payload, '09190043500')
+    assert hit['rating'] == 'Relatively Low' and hit['percentile'] == 41.2 and hit['high_hazards'] == ['Hurricane']
+    assert th.nri_for_tract(payload, '09999999999') == {'tract': '09999999999', 'rating': None, 'reason': 'NOT_COVERED'}
+
+
+@pytest.mark.django_db
+def test_hazard_nri_never_sends_a_pin_and_fetches_each_state_once(tmp_path):
+    from apps.sources.catalog import sync_catalog
+    from apps.sources.storage import LocalArtifactStore
+    from apps.area.service import Run, hazards_section
+    sync_catalog()
+    store = LocalArtifactStore(tmp_path)
+    server = NriServer()
+    import unittest.mock as um
+    with um.patch('apps.area.traffic_hazards.fetch_flood', side_effect=__import__('apps.area.http', fromlist=['x']).SourceError('NOT_COVERED')):
+        first, _ = hazards_section(Run(store, server), 41.126611, -73.388299)
+        second, _ = hazards_section(Run(store, server), 41.13, -73.2)
+    assert first['nri']['tract'] == '09190043500' and first['nri']['high_hazards'] == ['Hurricane']
+    assert second['nri']['tract'] == '09190044000' and second['nri']['high_hazards'] == []
+    nri_calls = [u for u in server.urls if 'National_Risk_Index' in u]
+    assert len(nri_calls) == 2  # one state, two pages, fetched once for both pins
+    assert not any('41.1' in u or '73.3' in u or '73.2' in u for u in nri_calls)  # no coordinates leave to the NRI host

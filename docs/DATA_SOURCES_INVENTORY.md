@@ -162,13 +162,15 @@ loaded by the viewer's browser from tile.openstreetmap.org; free under OSM's til
 
 ### SRC-12 National Risk Index (NRI)
 - **What it is:** FEMA's modelled natural-hazard risk by census tract.
-- **Access:** map service (ArcGIS Online). No key.
+- **Access:** map service (ArcGIS Online). No key. Read in bulk, one state at a time (paged, 1–5
+  requests per state); the pin's tract comes from TIGERweb (Census), so FEMA's hosting service never
+  receives a property location. FEMA's former bulk download now redirects away (checked 2026-11-21).
 - **What it can give:** composite risk score, expected annual loss, social vulnerability and
   community resilience, plus ratings for 18 hazards (floods, hurricane, tornado, wildfire,
   earthquake, hail, heat wave, winter weather…).
 - **What we use:** the composite rating and percentile, the top three hazards, and a concern only
   when a property-damaging hazard (flooding, hurricane, wildfire, earthquake, landslide) rates high.
-- **Freshness:** about yearly (December 2025 release); cached 90 days.
+- **Freshness:** about yearly (December 2025 release); each state's copy cached 90 days.
 
 ### SRC-13 Overture Places
 - **What it is:** an open map dataset of ~60 million places worldwide, combining Meta, Microsoft

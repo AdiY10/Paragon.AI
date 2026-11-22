@@ -54,6 +54,9 @@ class FixtureOpener:
         q = parse_qs(parts.query)
         if 'MapServer/82' in url:
             return Response(raw(f'{self.site}.county.json'))
+        if 'MapServer/8/query' in url:  # tract at the pin: the one in the site's recorded NRI response
+            tract = json.loads(raw(f'{self.site}.nri.json'))['features'][0]['attributes']['TRACTFIPS']
+            return Response(json.dumps({'features': [{'attributes': {'GEOID': tract}}]}).encode())
         if 'cew/data/api/2026/1/area/36111.csv' in url:
             return Response(raw('ulster.qcew.csv'))
         if 'publicAPI' in url:
