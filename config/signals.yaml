@@ -6,22 +6,17 @@ thresholds:
   SIG-03: {watch_at_or_below: -0.02}             # county private jobs YoY
   SIG-04: {watch_at_or_below: -0.04}             # county retail jobs YoY
   SIG-05: {watch_at_or_above_pts: 1.0, min_excess_vs_state_pts: 0.5}  # 3-month avg vs a year earlier, beyond the state's change
-  SIG-08: {decline_at_or_below: -0.10, min_prior_aadt: 3000}   # main road, only a genuinely newer count
+  SIG-08: {decline_at_or_below: -0.10, min_prior_aadt: 3000, max_count_gap_years: 5}   # main road, a genuinely newer count, counts <= 5 years apart
   SIG-09: {anchor_within_mi: 1.0, tenant_store_within_mi: 0.093}  # anchors/grocers within 1 mi; the tenant's own store (~150 m)
-  event_days: 90                                 # SIG-09/12/13 expire after this many days
+  SIG-15: {min_conditions: 2, private_jobs_sharp_drop: -0.04}  # county: 2+ of SIG-03/04/05 conditions, or private jobs <= -4%
+  event_days: 90                                 # SIG-09/11/12/13/14 expire after this many days
 # enabled: false stops a rule; its open alerts are retired (not "resolved") on the next evaluation.
 rules:
   SIG-01: {enabled: false}   # 3-mile population change: shown in the analysis
   SIG-02: {enabled: false}   # real household income change: shown in the analysis
-  SIG-03:
-    enabled: true
-    next_step: Check whether the job losses are in industries your tenants rely on; raise it at the next leasing review for centers in this county.
-  SIG-04:
-    enabled: true
-    next_step: Ask tenants in this county how their sales compare with last year, and watch for early lease-renewal requests.
-  SIG-05:
-    enabled: true
-    next_step: Watch rent collections and renewal conversations in this county over the next quarter.
+  SIG-03: {enabled: false}   # county private jobs: one combined county alert (SIG-15) instead (B7b)
+  SIG-04: {enabled: false}   # county retail jobs: SIG-15
+  SIG-05: {enabled: false}   # county unemployment: SIG-15
   SIG-06: {enabled: false}   # jobs within 3 miles: shown in the analysis
   SIG-07: {enabled: false}   # housing permits: shown in the analysis
   SIG-08:
@@ -31,10 +26,18 @@ rules:
     enabled: true
     next_step: Confirm the closure (call or visit); if it is an anchor or your tenant, review co-tenancy clauses and leasing plans.
   SIG-10: {enabled: false}   # new businesses: shown in the analysis
-  SIG-11: {enabled: false}   # static flood zone: a risk badge in the analysis (B7b adds a zone-change alert)
+  SIG-11:
+    enabled: true            # only a change into a high-risk zone; the standing zone is a risk badge
+    next_step: Order a FIRMette for the parcel, check whether lenders now require flood insurance, and tell tenants.
   SIG-12:
     enabled: true
     next_step: Read the filing and contact the tenant's real-estate team about this location.
   SIG-13:
     enabled: true
     next_step: Read the filing for store closures or restructuring that could affect this lease.
+  SIG-14:
+    enabled: true
+    next_step: Ask your grocery tenant how sales are trending and review its lease term, co-tenancy and renewal options.
+  SIG-15:
+    enabled: true
+    next_step: Check rent collections and renewal conversations for centers in this county; ask tenants how sales compare with last year.

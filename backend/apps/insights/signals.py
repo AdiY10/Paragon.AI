@@ -13,7 +13,7 @@ import yaml
 from .models import Signal
 
 SEVERITY_ORDER = {'High': 0, 'Watch': 1, 'FYI': 2}
-CATEGORY_ORDER = ['Tenant', 'Closure', 'Hazard', 'Economy', 'Housing', 'Demographics', 'Traffic', 'Jobs', 'Businesses']
+CATEGORY_ORDER = ['Tenant', 'Closure', 'Competition', 'Hazard', 'Economy', 'Housing', 'Demographics', 'Traffic', 'Jobs', 'Businesses']
 SOURCE_LINKS = {'SRC-03': 'https://www.census.gov/programs-surveys/acs', 'SRC-05': 'https://lehd.ces.census.gov/data/#lodes',
     'SRC-06': 'https://www.bls.gov/cew/', 'SRC-07': 'https://www.bls.gov/lau/', 'SRC-09': 'https://www.census.gov/construction/bps/',
     'SRC-10': 'https://www.fhwa.dot.gov/policyinformation/hpms.cfm', 'SRC-11': 'https://msc.fema.gov/portal/home',
@@ -39,7 +39,7 @@ def enabled_rules():
 
 
 def _pct(v):
-    return f'{v * 100:+.1f}%'
+    return f'{v * 100:+.1f}%'.replace('-', '\u2212')  # a real minus sign in titles
 
 
 def _candidate(rule, subject, category, severity, direction, title, why, evidence, period, source, event_date=None):
@@ -72,7 +72,7 @@ def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
         rows[row.section] = row
     econ = rows.get('economy')
     if econ and econ.status == 'available':
-        evaluated.update({'SIG-03', 'SIG-04', 'SIG-05'})
+        evaluated.update({'SIG-03', 'SIG-04', 'SIG-05', 'SIG-15'})
         e, county = econ.data, (econ.data.get('county') or {}).get('name', 'County')
         fips = (e.get('county') or {}).get('fips') or county
         emp = e.get('employment') or {}
@@ -104,6 +104,8 @@ def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
                     f' It rose {excess:.1f} pts more than the state.' if excess is not None else ''),
                 {'rate': u.get('rate'), 'three_month_average': u.get('avg3_rate'), 'prior_rate': u.get('prior_rate'),
                     'change_pts': change, 'more_than_state_pts': excess, **c}, u.get('period'), 'SRC-07'))
+    if econ and econ.status == 'available' and 'SIG-15' in t:
+        out.extend(_county_economy(econ, t['SIG-15'], t['SIG-03'], t['SIG-04'], t['SIG-05']))
     traffic = rows.get('traffic')
     if traffic and traffic.status == 'available':
         evaluated.add('SIG-08')
@@ -112,14 +114,18 @@ def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
         c = t['SIG-08']
         change, prior = road.get('change_pct'), road.get('prior_aadt')
         # change_pct is None when the state carried the same count forward (SAME_COUNT): never an alert.
-        if change is not None and change <= c['decline_at_or_below'] and (prior or 0) >= c['min_prior_aadt']:
+        years = (road.get('prior_count_year'), road.get('count_year'))
+        recent = None not in years and years[1] - years[0] <= c.get('max_count_gap_years', 99)
+        span = f'counts {years[0]} → {years[1]}' if None not in years else f'{road.get("prior_year")}–{road["year"]}'
+        if change is not None and change <= c['decline_at_or_below'] and (prior or 0) >= c['min_prior_aadt'] and \
+                (recent or None in years):
             out.append(_candidate('SIG-08', 'road:primary', 'Traffic', 'Watch', 'negative',
-                f'Traffic on {road["label"]} {_pct(change)} ({road.get("prior_year")}–{road["year"]})',
+                f'Traffic on {road["label"]} {_pct(change)} ({span})',
                 'Fewer vehicles past the site can reduce visibility and convenience trips.',
                 {'aadt': road['aadt'], 'prior_aadt': prior, 'count_year': road.get('count_year'),
                     'prior_count_year': road.get('prior_count_year'), **c}, f'HPMS {road["year"]}', 'SRC-10'))
         elif change is not None and abs(change) >= 0.10:
-            out_of_scope.add(('SIG-08', 'road:primary'))  # an increase, or a decline on a minor road
+            out_of_scope.add(('SIG-08', 'road:primary'))  # an increase, a minor road, or counts years apart
     biz = rows.get('businesses')
     if biz and biz.status == 'available':
         evaluated.update({'SIG-09', f'overture@{biz.data.get("release")}'})
@@ -151,6 +157,15 @@ def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
                     'tenant_match': own_store, 'release': rel, 'prior_release': biz.data.get('prior_release'),
                     'lat': c.get('lat'), 'lon': c.get('lon')},
                 f'Overture {rel}', 'SRC-13', event_date=_release_date(rel)))
+    if biz and biz.status == 'available':
+        evaluated.add('SIG-14')
+        from apps.area.businesses import normalize_brand
+        names = location.tenants.filter(archived=False).values_list('name', flat=True)
+        out.extend(_competing_grocers(location, biz, {normalize_brand(n) for n in names} - {None}))
+    hazards = rows.get('hazards')
+    if hazards and hazards.status == 'available':
+        evaluated.add('SIG-11')
+        out.extend(_flood_zone_change(location, hazards))
     out.extend(_tenant_candidates(location, today))
     evaluated.update({'SIG-12', 'SIG-13'})
     on = rules()
@@ -158,6 +173,82 @@ def candidates(location, t=None, today=None, evaluated=None, out_of_scope=None):
     for c in out:
         c['next_step'] = on[c['rule_id']]['next_step']
     return out
+
+
+def _county_economy(econ, c15, c03, c04, c05):
+    """SIG-15 (B7b): one county alert when at least two of the job/retail/unemployment conditions
+    hold, or private jobs fall sharply; replaces three separate county alerts."""
+    e = econ.data
+    county = (e.get('county') or {}).get('name', 'County')
+    fips = (e.get('county') or {}).get('fips') or county
+    emp, u = e.get('employment') or {}, e.get('unemployment') or {}
+    priv = (emp.get('private') or {}).get('yoy_pct')
+    retail = (emp.get('retail') or {}).get('yoy_pct')
+    change = u.get('avg3_change_pts') if 'avg3_change_pts' in u else u.get('change_pts')
+    excess = u.get('excess_vs_state_pts')
+    held = []
+    if priv is not None and priv <= c03['watch_at_or_below']:
+        held.append(f'private jobs {_pct(priv)} year over year')
+    if retail is not None and retail <= c04['watch_at_or_below']:
+        held.append(f'retail jobs {_pct(retail)}')
+    if change is not None and change >= c05['watch_at_or_above_pts'] and (excess is None or excess >= c05['min_excess_vs_state_pts']):
+        held.append(f'unemployment up {change:.1f} pts' + (f' ({excess:.1f} more than the state)' if excess is not None else ''))
+    sharp = priv is not None and priv <= c15['private_jobs_sharp_drop']
+    if len(held) < c15['min_conditions'] and not sharp:
+        return []
+    return [_candidate('SIG-15', f'county:{fips}:economy', 'Economy', 'Watch', 'negative',
+        f'{county}: local economy weakening ({"; ".join(held)})',
+        'Several county indicators point the same way, which can weaken local spending and leasing demand.',
+        {'private_jobs_yoy': priv, 'retail_jobs_yoy': retail, 'unemployment_change_pts': change,
+            'more_than_state_pts': excess, 'conditions': held, **c15},
+        ' · '.join(p for p in (emp.get('period'), u.get('period')) if p), 'SRC-06')]
+
+
+def _competing_grocers(location, biz, tenants):
+    """SIG-14 (B7b): a grocer opened within 2 mi (in the latest two releases, not the one before) and
+    the property has a grocer of another brand."""
+    from apps.area.businesses import brand_in, normalize_brand, GROCERY_BRANDS
+    ours = {t for t in tenants if brand_in(t, GROCERY_BRANDS)}
+    if not ours:
+        return []
+    rel = biz.data.get('release')
+    out = []
+    for g in (biz.data.get('changes') or {}).get('new_grocers') or []:
+        brand = normalize_brand(g.get('brand') or g.get('name'))
+        if brand and any(brand_in(brand, {t}) for t in ours):
+            continue  # the same brand as our grocer: not a competitor
+        out.append(_candidate('SIG-14', f'grocer:{g["id"]}', 'Competition', 'Watch', 'negative',
+            f'New competing grocer nearby: {g.get("name") or g.get("brand")} ({g["distance_mi"]:.1f} mi)',
+            'A new grocery store within 2 miles competes with your grocery anchor for shopping trips.',
+            {'overture_id': g['id'], 'distance_mi': g['distance_mi'], 'category': g.get('category'), 'release': rel,
+                'lat': g.get('lat'), 'lon': g.get('lon'), 'our_grocers': sorted(ours)},
+            f'Overture {rel}', 'SRC-13', event_date=_release_date(rel)))
+    return out
+
+
+def _flood_zone_change(location, current):
+    """SIG-11 (B7b): FEMA's effective map now puts the pin in a high-risk zone it was not in before."""
+    from apps.area.models import AreaSection
+    previous = (AreaSection.objects.filter(location=location, analysis_version=location.analysis_version,
+        section='hazards', status='available', computed_at__lt=current.computed_at).order_by('-computed_at').first())
+    if previous is None:
+        return []
+    def inside(row):
+        at = row.data.get('flood_at_pin') or {}
+        return bool(at.get('in_sfha', at.get('sfha'))), at.get('zone')
+    was, old_zone = inside(previous)
+    now, new_zone = inside(current)
+    if was or not now:
+        return []
+    near = current.data.get('flood_nearby') or {}
+    zone = near.get('zone') if near.get('inside') else new_zone
+    return [_candidate('SIG-11', 'flood:zone_change', 'Hazard', 'High', 'negative',
+        f'Flood map change: the pin is now in high-risk zone {zone} (was {old_zone or "outside"})',
+        'A revised FEMA flood map can require flood insurance for financed properties and raises physical risk. '
+        'Screening only, not a flood determination.',
+        {'zone': zone, 'previous_zone': old_zone, 'flood_map_panel': (current.data.get('flood_at_pin') or {}).get('dfirm_id'),
+            'base_flood_elevation_ft': (current.data.get('flood_at_pin') or {}).get('bfe_ft')},
+        'Effective flood maps', 'SRC-11', event_date=current.computed_at.date())]
 
 
 def risk_badges(location):
@@ -192,7 +283,7 @@ def _tenant_candidates(location, today=None):
     return tenant_candidates(location, today=today)
 
 
-EVENT_RULES = {'SIG-09', 'SIG-10', 'SIG-12', 'SIG-13'}
+EVENT_RULES = {'SIG-09', 'SIG-10', 'SIG-11', 'SIG-12', 'SIG-13', 'SIG-14'}
 
 
 @transaction.atomic
@@ -257,7 +348,8 @@ def evaluate(location, *, today=None):
     for key, s in existing.items():
         if key in found or s.status in ('resolved', 'expired', 'retired'):
             continue
-        if s.rule_id not in on or s.severity == 'FYI' or key in out_of_scope:
+        if s.rule_id not in on or s.severity == 'FYI' or key in out_of_scope or (
+                s.rule_id == 'SIG-11' and s.subject != 'flood:zone_change'):  # the static flood alert is a badge now
             # Outside the alert scope (B7a): retired quietly, never listed as "resolved".
             s.status, s.resolved_reason = 'retired', 'outside the alert scope'
             s.save(update_fields=['status', 'resolved_reason'])
@@ -348,7 +440,7 @@ def rank_key(s):
     return (SEVERITY_ORDER[s.severity], cat, -s.last_changed_at.timestamp(), s.location.name)
 
 
-COUNTY_ONLY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07'}
+COUNTY_ONLY_RULES = {'SIG-03', 'SIG-04', 'SIG-05', 'SIG-07', 'SIG-15'}
 
 
 def cached_attention(location):
