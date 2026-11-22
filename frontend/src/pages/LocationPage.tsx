@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ArrowUpRight, Building2, Check, ChevronRight, FileText, MapPin, ShieldCheck } from "lucide-react";
 import PinEditor from "../PinEditor";
@@ -14,7 +14,7 @@ import { type Audit, type Location, type Page, type Session, type Source } from 
 import { titleCase, Badge, ErrorNotice, PageHead, Drawer } from "../components/ui";
 import { EditLocation } from "../components/LocationForms";
 
-const LocationMap = lazy(() => import("../LocationMap"));
+import { AnalysisMap } from "../components/map/lazy";
 
 export function RecordEvidence({ location }: { location: Location }) {
   return (
@@ -263,9 +263,18 @@ export function LocationPage({ id }: { id: string }) {
               <h2>Location reference</h2>
               <MapPin size={21} />
             </div>
-            <Suspense fallback={<p className="notice">Loading interactive map…</p>}>
-              <LocationMap locations={[item]} rings />
-            </Suspense>
+            {pin.lat !== null && pin.lon !== null ? (
+              <AnalysisMap
+                key={`${pin.lat},${pin.lon}`}
+                center={[pin.lon, pin.lat]}
+                ringMiles={item.ring_preset.split("/").map(Number).filter((m) => m > 0)}
+                subjectLabel={`${item.name} pin`}
+                label="Property pin and radius rings"
+                lazy={false}
+              />
+            ) : (
+              <p className="notice">No pin yet. A missing pin is not an empty trade area.</p>
+            )}
             <div className="pin-actions">
               <GeocodeDialog location={item} />
               <PinEditor location={item} />
