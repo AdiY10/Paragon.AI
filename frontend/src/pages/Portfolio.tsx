@@ -1,10 +1,11 @@
-import React, { lazy, Suspense, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ArrowUpRight, Building2, MapPin, SlidersHorizontal } from "lucide-react";
 import { type Location } from "../types";
 import { hashParams, titleCase, Badge, Empty, PageHead } from "../components/ui";
 import { AddLocation } from "../components/LocationForms";
 
-const LocationMap = lazy(() => import("../LocationMap"));
+import { PortfolioMap } from "../components/map/lazy";
+import { navigate } from "../app/router";
 
 export const rankAttention = (l: Location) => (l.attention === "High" ? 0 : l.attention === "Watch" ? 1 : 2);
 export function PropertyCard({ location }: { location: Location }) {
@@ -93,6 +94,9 @@ export function Portfolio({
       (!attention || (item.attention ?? "Clear") === attention) &&
       (!onlyUnconfirmed || !item.confirmed),
   ).sort((a, b) => rankAttention(a) - rankAttention(b) || a.name.localeCompare(b.name));
+  const filteredKey = filtered.map((item) => item.id).join(",");
+  // A new Set only when the filtered ids change, so the map re-fits on filter changes only.
+  const visibleIds = useMemo(() => new Set(filteredKey ? filteredKey.split(",") : []), [filteredKey]);
   return (
     <>
       {!candidates && (
@@ -177,12 +181,12 @@ export function Portfolio({
         </button>
       </div>
       {showMap && (
-        <section className="portfolio-map panel">
-          <Suspense
-            fallback={<p className="notice">Loading interactive map…</p>}
-          >
-            <LocationMap locations={filtered} />
-          </Suspense>
+        <section className="panel" aria-label="Map">
+          <PortfolioMap
+            locations={candidates ? filtered : locations}
+            visibleIds={visibleIds}
+            onSelect={(id) => navigate("/p/" + id)}
+          />
         </section>
       )}
       <div className="property-grid portfolio-grid">

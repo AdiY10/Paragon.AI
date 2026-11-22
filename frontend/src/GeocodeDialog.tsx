@@ -1,10 +1,10 @@
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Compass, X } from "lucide-react";
 import { api, ApiError, dateLabel } from "./api";
 import type { Location } from "./types";
-const LocationMap = lazy(() => import("./LocationMap"));
+import { PreviewMap } from "./components/map/lazy";
 export interface GeocodePreview {
   id: string;
   expected_version: number;
@@ -184,9 +184,11 @@ export default function GeocodeDialog({ location }: { location: Location }) {
                   <span className="preview-label">
                     CENSUS SUGGESTION · NOT YET SAVED
                   </span>
-                  <Suspense fallback={<p>Loading suggestion map…</p>}>
-                    <LocationMap locations={[preview]} previewOnly />
-                  </Suspense>
+                  <PreviewMap
+                    lat={preview.current_revision.lat!}
+                    lon={preview.current_revision.lon!}
+                    label="Census suggestion preview"
+                  />
                 </>
               )}
               <p className="small muted">

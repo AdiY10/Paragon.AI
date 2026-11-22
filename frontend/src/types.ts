@@ -40,7 +40,15 @@ export interface Location {
   updated_at: string;
   attention?: "High" | "Watch" | "Clear";
   screening?: boolean;
-  key_numbers?: { population?: number; median_household_income?: number; aadt?: number };
+  /** PART C list fields; flood / nearest_supermarket / active_alerts arrive with backend B9. */
+  key_numbers?: {
+    population?: number | null;
+    median_household_income?: number | null;
+    aadt?: number | null;
+    flood?: "inside" | "near" | "none" | null;
+    nearest_supermarket?: { name: string; distance_mi: number } | null;
+    active_alerts?: number | null;
+  };
   unconfirmed_tenants?: number | null;
 }
 export interface Page<T> {

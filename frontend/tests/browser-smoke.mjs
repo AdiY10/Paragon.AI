@@ -119,10 +119,17 @@ try {
     await page.waitForFunction((hash) => location.hash === hash, to);
   }
   await page.getByRole("heading", { name: "Properties", level: 1 }).waitFor();
-  await page.locator(".location-map[data-ready=true]").waitFor();
-  await page.locator(".map-marker").first().waitFor();
+  // WI-3 portfolio map: HTML pins + screen-space clusters; data-pins counts every pinned record.
+  await page.locator('.location-map[data-ready=true][data-pins="35"]').waitFor();
+  await page.locator(".portfolio-pin:not([hidden])").first().waitFor();
   if (await page.locator(".map-status").count())
     throw new Error("Live map did not load normally");
+  const clusterLabel = await page.locator(".map-cluster").first().getAttribute("aria-label");
+  if (!/^\d+ properties.*Zoom in$/.test(clusterLabel ?? ""))
+    throw new Error(`Unexpected cluster label: ${clusterLabel}`);
+  await page.locator(".portfolio-pin:not([hidden])").first().hover();
+  await page.locator(".hover-card").getByText("Open analysis").waitFor();
+  await page.mouse.move(5, 5);
   const mapA11y = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
@@ -135,7 +142,7 @@ try {
         })),
       ),
     );
-  if ((await page.locator(".map-marker").count()) !== 35)
+  if ((await page.locator(".portfolio-pin").count()) !== 35)
     throw new Error("Expected 35 real portfolio reference pins");
   if (output)
     await page.screenshot({
@@ -448,7 +455,8 @@ try {
   await page
     .getByText("Basemap tiles unavailable.", { exact: false })
     .waitFor();
-  if ((await page.locator(".map-marker").count()) !== expectedPinned)
+  await page.locator(`.location-map[data-ready=true][data-pins="${expectedPinned}"]`).waitFor();
+  if ((await page.locator(".portfolio-pin").count()) !== expectedPinned)
     throw new Error("Tile failure lost the saved pins");
   await page.unroute("https://tile.openstreetmap.org/**");
   const anonymous = await browser.newContext();

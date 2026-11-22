@@ -1,10 +1,10 @@
-import { lazy, Suspense, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, MapPin, X } from "lucide-react";
 import { api, ApiError } from "./api";
 import type { Location } from "./types";
-const LocationMap = lazy(() => import("./LocationMap"));
+import { PreviewMap } from "./components/map/lazy";
 
 export default function PinEditor({ location }: { location: Location }) {
   const [open, setOpen] = useState(false),
@@ -14,8 +14,7 @@ export default function PinEditor({ location }: { location: Location }) {
     [confirmed, setConfirmed] = useState(false);
   const cache = useQueryClient();
   const mutation = useMutation({
-    mutationFn: (data: unknown) =>
-      api<Location>(`/api/locations/${location.id}/pin/`, "POST", data),
+    mutationFn: (data: unknown) => api<Location>(`/api/locations/${location.id}/pin/`, "POST", data),
     onSuccess: () => {
       cache.invalidateQueries({ queryKey: ["location", location.id] });
       cache.invalidateQueries({ queryKey: ["locations"] });
@@ -35,11 +34,7 @@ export default function PinEditor({ location }: { location: Location }) {
   }
   const lat = latitude.trim() ? Number(latitude) : NaN,
     lon = longitude.trim() ? Number(longitude) : NaN;
-  const valid =
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    Math.abs(lat) <= 90 &&
-    Math.abs(lon) <= 180;
+  const valid = Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
   const preview: Location = {
     ...snapshot,
     current_revision: {
@@ -65,9 +60,7 @@ export default function PinEditor({ location }: { location: Location }) {
       <Dialog.Trigger asChild>
         <button className="button secondary small-button">
           <MapPin size={15} />
-          {location.current_revision.lat === null
-            ? "Place pin"
-            : "Correct / confirm pin"}
+          {location.current_revision.lat === null ? "Place pin" : "Correct / confirm pin"}
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -80,28 +73,26 @@ export default function PinEditor({ location }: { location: Location }) {
             </Dialog.Close>
           </div>
           <Dialog.Description className="muted">
-            Enter coordinates or drag the preview pin onto the building. Changes
-            are saved only when you choose Save pin. Pin verification does not
-            confirm ownership.
+            Enter coordinates or drag the preview pin onto the building. Changes are saved only when you choose Save
+            pin. Pin verification does not confirm ownership.
           </Dialog.Description>
           <div className="preview-label">UNSAVED PIN PREVIEW</div>
           {valid ? (
-            <Suspense fallback={<p>Loading pin preview…</p>}>
-              <LocationMap
-                locations={[preview]}
-                editPin
-                previewOnly
-                onPinChange={(nextLat, nextLon) => {
-                  setLatitude(nextLat.toFixed(6));
-                  setLongitude(nextLon.toFixed(6));
-                  setConfirmed(false);
-                }}
-              />
-            </Suspense>
+            <PreviewMap
+              lat={lat}
+              lon={lon}
+              draggable
+              label="Unsaved pin preview"
+              onMove={(nextLat, nextLon) => {
+                setLatitude(nextLat.toFixed(6));
+                setLongitude(nextLon.toFixed(6));
+                setConfirmed(false);
+              }}
+            />
           ) : (
             <p className="notice">
-              Enter a valid latitude and longitude to preview a pin, or close this and use "Find from address"
-              to look the address up.
+              Enter a valid latitude and longitude to preview a pin, or close this and use "Find from address" to look
+              the address up.
             </p>
           )}
           <form onSubmit={submit}>
@@ -140,38 +131,32 @@ export default function PinEditor({ location }: { location: Location }) {
               </label>
             </div>
             <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-              />
-              I checked that this pin is on the property building.
+              <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />I checked
+              that this pin is on the property building.
             </label>
             <p className="small muted">
-              Saving creates a new manual pin revision and marks existing
-              analysis for recalculation. Previous pin evidence remains in the
-              history.
+              Saving creates a new manual pin revision and marks existing analysis for recalculation. Previous pin
+              evidence remains in the history.
             </p>
             {mutation.error && (
               <p className="notice error" role="alert">
                 {mutation.error.message}
               </p>
             )}
-            {mutation.error instanceof ApiError &&
-              mutation.error.status === 409 && (
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => {
-                    cache.invalidateQueries({
-                      queryKey: ["location", location.id],
-                    });
-                    setOpen(false);
-                  }}
-                >
-                  Reload record
-                </button>
-              )}
+            {mutation.error instanceof ApiError && mutation.error.status === 409 && (
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => {
+                  cache.invalidateQueries({
+                    queryKey: ["location", location.id],
+                  });
+                  setOpen(false);
+                }}
+              >
+                Reload record
+              </button>
+            )}
             <button className="button" disabled={!valid || mutation.isPending}>
               {mutation.isPending ? "Saving…" : "Save pin"}
               <Check size={16} />
