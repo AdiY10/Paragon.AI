@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 
 /**
  * Disclosure-pattern menu: a button with aria-expanded that shows a panel of ordinary links and
@@ -8,8 +8,11 @@ export function MenuButton({
   label,
   buttonContent,
   className = "nav-button",
+  buttonRef,
   children,
 }: {
+  /** Lets callers return focus here after a dialog the menu opened closes. */
+  buttonRef?: RefObject<HTMLButtonElement | null>;
   /** Accessible name of the button, e.g. "Account menu". */
   label: string;
   buttonContent: ReactNode;
@@ -19,7 +22,8 @@ export function MenuButton({
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
+  const ownButton = useRef<HTMLButtonElement>(null);
+  const button = buttonRef ?? ownButton;
   const panelId = useId();
   useEffect(() => {
     if (!open) return;

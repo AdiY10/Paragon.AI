@@ -26,7 +26,7 @@ export function AppShell({
     document.getElementById("main")?.focus({ preventScroll: true });
   }, [path]);
   useEffect(() => {
-    document.title = `${title} · Paragon Radar`;
+    if (title) document.title = `${title} · Paragon Radar`;
   }, [title]);
   const failing = (sources ?? []).some((source) => source.status === "Failing");
   return (

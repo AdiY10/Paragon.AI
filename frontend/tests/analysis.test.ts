@@ -208,7 +208,8 @@ describe("legacy bundle adapter", () => {
     expect(kpis[2].value).toBeNull(); // households missing → null, never 0
     expect(kpis[3].value).toBeNull(); // jobs still pending
     expect(kpis[4]).toMatchObject({ value: 19000, detail: "US 1", change: { value: -0.05, since: "2024" } });
-    expect(kpis[7]).toMatchObject({ display: "Inside FEMA zone AE (base flood elevation 9 ft)", ranked: false });
+    expect(kpis[0].change?.since).toBe("2015–2019");
+    expect(kpis[7]).toMatchObject({ display: "Inside zone AE", detail: "Base flood elevation 9 ft", ranked: false });
   });
   it("turns the flood result into a risk badge and labels", () => {
     expect(bundle.risk_badges).toEqual([{ kind: "flood", label: "Inside FEMA zone AE", source: "SRC-11" }]);

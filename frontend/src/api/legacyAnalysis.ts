@@ -3,7 +3,8 @@
  * assembles the PART C bundle from /demographics/, /area/ and /summary/. Analyses start on their
  * own (B3a), so this only reads; it never POSTs a compute request.
  */
-import type { Area, Flood, Section } from "../lib/format/area";
+import { releaseLabel, type Area, type Flood, type Section } from "../lib/format/area";
+import { dateLabel } from "../lib/format/dates";
 import type { Demographics, Ring } from "../lib/format/demographics";
 import type { Location } from "../types";
 import { deriveState } from "./analysis";
@@ -101,6 +102,12 @@ export function floodLabel(f: Flood | undefined): string | null {
   return `Outside high-risk zones (zone ${f.zone})`;
 }
 
+/** Tile-sized flood status: "Inside zone AE" / "Outside high-risk zones". */
+export function floodShortLabel(f: Flood | undefined): string | null {
+  if (!f || f.reason || !f.zone) return null;
+  return (f.in_sfha ?? f.sfha) ? `Inside zone ${f.zone}` : "Outside high-risk zones";
+}
+
 /** KPI set in the fixed B6b order, built from the section data plus summary percentiles. */
 export function legacyKpis(sections: Sections, summary: LegacySummary | null): Kpi[] {
   const metric = (key: string) => summary?.metrics.find((m) => m.key === key);
@@ -131,7 +138,13 @@ export function legacyKpis(sections: Sections, summary: LegacySummary | null): K
       ...ranking("population"),
       change:
         popTrend && popTrend.value !== null
-          ? { value: popTrend.value, unit: "pct", since: popTrend.period ?? "", significant: popTrend.significant ?? null }
+          ? {
+              value: popTrend.value,
+              unit: "pct",
+              // "2015–2019 → 2020–2024": the change is since the earlier period.
+              since: (popTrend.period ?? demo?.trend_baseline?.acs_year?.toString() ?? "").split("→")[0].trim(),
+              significant: popTrend.significant ?? null,
+            }
           : null,
     },
     {
@@ -193,7 +206,7 @@ export function legacyKpis(sections: Sections, summary: LegacySummary | null): K
       label: "Retail & services within 1 mi",
       value: biz?.retail_and_services_total?.["1mi"] ?? null,
       unit: "count",
-      period: biz ? `Overture ${biz.release}` : null,
+      period: biz ? releaseLabel(biz.release) : null,
       source: "SRC-13",
       ranked: false,
       percentile: null,
@@ -205,7 +218,7 @@ export function legacyKpis(sections: Sections, summary: LegacySummary | null): K
       value: biz?.nearest_supermarket?.distance_mi ?? null,
       display: biz?.nearest_supermarket ? biz.nearest_supermarket.name ?? biz.nearest_supermarket.brand : null,
       unit: "mi",
-      period: biz ? `Overture ${biz.release}` : null,
+      period: biz ? releaseLabel(biz.release) : null,
       source: "SRC-13",
       ranked: false,
       percentile: null,
@@ -215,9 +228,10 @@ export function legacyKpis(sections: Sections, summary: LegacySummary | null): K
       key: "flood",
       label: "Flood status",
       value: null,
-      display: floodLabel(flood),
+      display: floodShortLabel(flood),
+      detail: flood && !flood.reason && flood.bfe_ft != null ? `Base flood elevation ${flood.bfe_ft} ft` : null,
       unit: "text",
-      period: flood?.checked ?? null,
+      period: flood?.checked ? dateLabel(flood.checked) : null,
       source: "SRC-11",
       ranked: false,
       percentile: null,

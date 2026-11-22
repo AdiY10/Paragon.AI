@@ -189,8 +189,17 @@ try {
   if ((await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Properties", exact: true }).getAttribute("aria-current")) !== "page")
     throw new Error("Properties is not current on a property analysis");
   await page.getByRole("heading", { name, exact: true }).waitFor();
-  await page.getByLabel("Key facts").waitFor();
-  await page.getByRole("navigation", { name: "Sections on this page" }).waitFor();
+  // WI-6 analysis page: fixed section menu, takeaways or progress, and no buttons that run an analysis.
+  const sectionNav = page.getByRole("navigation", { name: "Analysis sections" });
+  await sectionNav.waitFor();
+  if ((await sectionNav.getByRole("link").count()) !== 10) throw new Error("Expected 10 analysis sections");
+  await page.getByText(/^(Key takeaways|Analysis progress)$/).first().waitFor();
+  if (await page.getByRole("button", { name: /calculate|check area data|confirm/i }).count())
+    throw new Error("Analysis page still shows a run/confirm button");
+  await sectionNav.getByRole("link", { name: "Risk" }).click();
+  await page.waitForFunction(() => location.hash.includes("section=risk"));
+  if ((await page.evaluate(() => document.activeElement?.id)) !== "risk-title")
+    throw new Error("Section link did not move focus to the section heading");
   // Property pages at phone width: no overflow and no WCAG 2.2 AA violations (R2.23).
   await page.setViewportSize({ width: 375, height: 1000 });
   if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth))
@@ -199,23 +208,31 @@ try {
   if (propertyA11y.violations.length)
     throw new Error(`Property page a11y at 375: ${propertyA11y.violations.map((v) => v.id).join(", ")}`);
   await page.setViewportSize({ width: 1280, height: 1000 });
-  // The record, map pin and history live in the closed "Property record and map pin" section.
-  await page.getByText("Property record and map pin", { exact: true }).click();
-  await page.locator(".location-map[data-ready=true]").waitFor();
-  await page.locator(".map-marker").first().waitFor();
-  await page.locator(".location-map[data-rings='3']").waitFor();
+  // Overview map: subject pin and the three radius rings.
+  await page.locator("#overview .location-map[data-ready=true][data-rings='3']").waitFor();
+  await page.locator("#overview .map-marker").first().waitFor();
+  const propertyActions = async (item) => {
+    await page.getByRole("button", { name: "Property actions", exact: true }).click();
+    await page.getByRole("button", { name: item, exact: true }).click();
+  };
   if (output)
     await page.screenshot({
       path: `${output}/property-map-1280.png`,
       fullPage: true,
     });
-  await page.getByRole("button", { name: "View provenance" }).click();
+  await propertyActions("Record & history");
+  await page.getByRole("dialog", { name: "Record & history" }).waitFor();
   await page
     .getByRole("heading", { name: "Property record evidence" })
     .waitFor();
   await page.getByRole("heading", { name: "Change history" }).waitFor();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Edit record" }).click();
+  await page
+    .waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Property actions", null, { timeout: 2000 })
+    .catch(() => {
+      throw new Error("Closing a Property actions dialog did not return focus to the menu");
+    });
+  await propertyActions("Edit details");
   await page
     .getByLabel("Team notes")
     .fill("Browser verification note — isolated test database only.");
@@ -225,11 +242,7 @@ try {
       exact: true,
     })
     .waitFor();
-  await page
-    .getByRole("button", { name: "Yes, confirm", exact: true })
-    .click();
-  await page.getByText("Record confirmed.", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Correct / confirm pin" }).click();
+  await propertyActions("Correct pin");
   const pinDialog = page.getByRole("dialog", {
     name: "Review the property pin",
   });
@@ -277,12 +290,9 @@ try {
     .getByRole("button", { name: "Save pin", exact: true })
     .click();
   await pinDialog.waitFor({ state: "hidden" });
-  await page
-    .getByText("Pin confirmed by a team member.", { exact: true })
-    .waitFor();
   const savedPin = await page.evaluate(async () => {
     const path =
-      location.hash.slice(1).replace("/p/", "/api/locations/") + "/";
+      location.hash.slice(1).split("?")[0].replace("/p/", "/api/locations/") + "/";
     return (await fetch(path)).json();
   });
   if (
@@ -294,14 +304,14 @@ try {
     throw new Error(
       "Pin save did not preserve revision and analysis semantics",
     );
-  await page.getByRole("button", { name: "Edit record" }).click();
+  await propertyActions("Edit details");
   const editDialog = page.getByRole("dialog", { name: "Edit property record" });
   await editDialog
     .getByLabel("Team notes")
     .fill("Stale form must not overwrite the newer record.");
   await page.evaluate(async () => {
     const path =
-      location.hash.slice(1).replace("/p/", "/api/locations/") + "/";
+      location.hash.slice(1).split("?")[0].replace("/p/", "/api/locations/") + "/";
     const record = await (await fetch(path)).json();
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
     const response = await fetch(path, {
@@ -373,13 +383,8 @@ try {
       await context.request.get(`${base}/api/locations/${record.id}/`)
     ).json();
     await page.goto(`${base}/#/p/${record.id}`);
-    // The pin tools live in the collapsed "Property record and map pin" section.
-    const recordSection = page.locator("details", { hasText: "Property record and map pin" });
-    if (!(await recordSection.evaluate((element) => element.open)))
-      await page.getByText("Property record and map pin", { exact: true }).click();
-    await page
-      .getByRole("button", { name: "Find address pin", exact: true })
-      .click();
+    await page.getByRole("heading", { level: 1 }).waitFor();
+    await propertyActions("Find address pin");
     const dialog = page.getByRole("dialog", {
       name: "Find a Census address pin",
     });
@@ -453,7 +458,6 @@ try {
       .getByRole("button", { name: "Use selected Census pin", exact: true })
       .click();
     await dialog.waitFor({ state: "hidden" });
-    await page.getByText("Census Interpolated", { exact: true }).waitFor();
     const after = await (
       await context.request.get(`${base}/api/locations/${record.id}/`)
     ).json();
@@ -488,7 +492,7 @@ try {
   await anonymous.close();
   if (errors.length) throw new Error(errors.join("\n"));
   console.log(
-    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
+    "UI browser smoke passed: Properties map/table/sort/filters/compare tray, analysis page sections/menu/Property actions, top navigation, account menu, legacy redirects, 375/768/1280 layouts, WCAG AA, private APIs, filters, provenance, real edits, confirmation, sources, POST search, pin dragging/revisions, concurrent-edit conflicts, mobile keyboard focus, and live Census match/ambiguity/no-match review.",
   );
 } finally {
   await browser.close();

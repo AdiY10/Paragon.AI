@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowRight, Check, Plus, Settings2, X } from "lucide-react";
@@ -77,9 +77,28 @@ export function AddLocation() {
     </Dialog.Root>
   );
 }
-export function EditLocation({ location }: { location: Location }) {
-  const [open, setOpen] = useState(false);
+export function EditLocation({
+  location,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  returnFocus,
+}: {
+  location: Location;
+  /** Controlled from the "Property actions" menu (no own trigger button). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Where focus goes when the dialog closes (the menu button). */
+  returnFocus?: () => void;
+}) {
+  const controlled = openProp !== undefined;
+  const [openState, setOpen] = useState(false);
+  const open = controlled ? openProp : openState;
   const [snapshot, setSnapshot] = useState(location);
+  useEffect(() => {
+    if (controlled && openProp) setSnapshot(location);
+    // Initialise once each time the menu opens the dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlled, openProp]);
   const cache = useQueryClient();
   const mutation = useMutation({
     mutationFn: (data: unknown) =>
@@ -88,7 +107,9 @@ export function EditLocation({ location }: { location: Location }) {
       cache.invalidateQueries({ queryKey: ["locations"] });
       cache.invalidateQueries({ queryKey: ["location", location.id] });
       cache.invalidateQueries({ queryKey: ["history", location.id] });
-      setOpen(false);
+      cache.invalidateQueries({ queryKey: ["analysis", location.id] });
+      if (controlled) onOpenChangeProp?.(false);
+      else setOpen(false);
     },
   });
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -116,17 +137,30 @@ export function EditLocation({ location }: { location: Location }) {
           setSnapshot(location);
           mutation.reset();
         }
-        setOpen(next);
+        if (controlled) onOpenChangeProp?.(next);
+        else setOpen(next);
       }}
     >
-      <Dialog.Trigger asChild>
-        <button className="button secondary">
-          Edit record <Settings2 size={16} />
-        </button>
-      </Dialog.Trigger>
+      {!controlled && (
+        <Dialog.Trigger asChild>
+          <button className="button secondary">
+            Edit record <Settings2 size={16} />
+          </button>
+        </Dialog.Trigger>
+      )}
       <Dialog.Portal>
         <Dialog.Overlay className="overlay" />
-        <Dialog.Content className="modal">
+        <Dialog.Content
+          className="modal"
+          onCloseAutoFocus={
+            returnFocus
+              ? (event) => {
+                  event.preventDefault();
+                  returnFocus();
+                }
+              : undefined
+          }
+        >
           <div className="drawer-head">
             <Dialog.Title>Edit property record</Dialog.Title>
             <Dialog.Close

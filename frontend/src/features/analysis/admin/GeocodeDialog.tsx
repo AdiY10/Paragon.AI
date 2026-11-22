@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Compass, X } from "lucide-react";
-import { api, ApiError, dateLabel } from "./api";
-import type { Location } from "./types";
-import { PreviewMap } from "./components/map/lazy";
+import { api, ApiError } from "../../../api/client";
+import { dateLabel } from "../../../lib/format/dates";
+import type { Location } from "../../../types";
+import { PreviewMap } from "../../../components/map/lazy";
 export interface GeocodePreview {
   id: string;
   expected_version: number;
@@ -34,8 +35,21 @@ export interface GeocodePreview {
   };
   notice: string;
 }
-export default function GeocodeDialog({ location }: { location: Location }) {
-  const [open, setOpen] = useState(false),
+export default function GeocodeDialog({
+  location,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  returnFocus,
+}: {
+  location: Location;
+  /** Controlled from the "Property actions" menu (no own trigger button). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Where focus goes when the dialog closes (the menu button). */
+  returnFocus?: () => void;
+}) {
+  const controlled = openProp !== undefined;
+  const [openState, setOpen] = useState(false),
     [snapshot, setSnapshot] = useState(location),
     [choice, setChoice] = useState<number | null>(null);
   const cache = useQueryClient();
@@ -57,18 +71,27 @@ export default function GeocodeDialog({ location }: { location: Location }) {
       cache.invalidateQueries({ queryKey: ["locations"] });
       cache.invalidateQueries({ queryKey: ["location", location.id] });
       cache.invalidateQueries({ queryKey: ["history", location.id] });
-      setOpen(false);
+      cache.invalidateQueries({ queryKey: ["analysis", location.id] });
+      onOpenChange(false);
     },
   });
-  function onOpenChange(next: boolean) {
-    if (next) {
-      setSnapshot(location);
-      setChoice(null);
-      lookup.reset();
-      accept.reset();
-    }
-    setOpen(next);
+  const open = controlled ? openProp : openState;
+  function init() {
+    setSnapshot(location);
+    setChoice(null);
+    lookup.reset();
+    accept.reset();
   }
+  function onOpenChange(next: boolean) {
+    if (next) init();
+    if (controlled) onOpenChangeProp?.(next);
+    else setOpen(next);
+  }
+  useEffect(() => {
+    if (controlled && openProp) init();
+    // Initialise once each time the menu opens the dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlled, openProp]);
   const data = lookup.data,
     candidate = choice === null ? null : data?.candidates[choice];
   const error = accept.error ?? lookup.error;
@@ -88,15 +111,27 @@ export default function GeocodeDialog({ location }: { location: Location }) {
     : undefined;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Trigger asChild>
-        <button className="button secondary small-button">
-          <Compass size={15} />
-          Find address pin
-        </button>
-      </Dialog.Trigger>
+      {!controlled && (
+        <Dialog.Trigger asChild>
+          <button className="button secondary small-button">
+            <Compass size={15} />
+            Find address pin
+          </button>
+        </Dialog.Trigger>
+      )}
       <Dialog.Portal>
         <Dialog.Overlay className="overlay" />
-        <Dialog.Content className="modal geocode-dialog">
+        <Dialog.Content
+          className="modal geocode-dialog"
+          onCloseAutoFocus={
+            returnFocus
+              ? (event) => {
+                  event.preventDefault();
+                  returnFocus();
+                }
+              : undefined
+          }
+        >
           <div className="drawer-head">
             <Dialog.Title>Find a Census address pin</Dialog.Title>
             <Dialog.Close

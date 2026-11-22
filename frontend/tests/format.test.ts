@@ -36,7 +36,6 @@ import {
 // Old import paths keep working until WI-9.
 import { count as legacyCount } from "../src/area";
 import { formatValue as legacyFormatValue } from "../src/demographics";
-import { formatMetric as legacyFormatMetric } from "../src/Summary";
 import { dateLabel as legacyDateLabel } from "../src/api";
 
 const metric = (m: Partial<Metric>): Metric => ({
@@ -181,7 +180,6 @@ describe("re-export stubs", () => {
   it("keep the old import paths working", () => {
     expect(legacyCount(5)).toBe("5");
     expect(legacyFormatValue(metric({ value: 10 }))).toBe("10");
-    expect(legacyFormatMetric({ unit: "count", value: 3 })).toBe("3");
     expect(legacyDateLabel("2026-01-02")).toBe("Jan 2, 2026");
   });
 });

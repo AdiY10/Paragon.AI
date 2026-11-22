@@ -61,6 +61,15 @@ a {
 a:hover {
   text-decoration: underline;
 }
+/* Links inside running text are underlined, so they never rely on colour alone. */
+p a,
+li > small a,
+.fine-print a,
+.takeaway-meta a,
+.section-sources a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 button,
 input,
 select,

@@ -290,12 +290,14 @@
   color: var(--text);
 }
 .stat-change {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+  display: block;
   font-size: var(--fs-table);
   line-height: var(--lh-table);
   font-weight: 600;
+}
+.stat-change svg {
+  vertical-align: -2px;
+  margin-right: 2px;
 }
 .stat-sub,
 .stat-foot {

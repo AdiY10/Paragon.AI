@@ -9,8 +9,11 @@ export function Drawer({
   trigger,
   open,
   onOpenChange,
+  onCloseAutoFocus,
   children,
 }: {
+  /** Where focus goes on close (defaults to the trigger). */
+  onCloseAutoFocus?: () => void;
   title: string;
   description?: string;
   trigger?: ReactNode;
@@ -23,7 +26,17 @@ export function Drawer({
       {trigger && <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>}
       <Dialog.Portal>
         <Dialog.Overlay className="shell-overlay" />
-        <Dialog.Content className="ui-drawer">
+        <Dialog.Content
+          className="ui-drawer"
+          onCloseAutoFocus={
+            onCloseAutoFocus
+              ? (event) => {
+                  event.preventDefault();
+                  onCloseAutoFocus();
+                }
+              : undefined
+          }
+        >
           <div className="ui-drawer-head">
             <Dialog.Title className="ui-drawer-title">{title}</Dialog.Title>
             <Dialog.Close className="icon-btn" aria-label={`Close ${title}`}>
