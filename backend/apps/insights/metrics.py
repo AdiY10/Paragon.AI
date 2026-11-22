@@ -22,8 +22,11 @@ METRICS = {
     'unemployment_change': ('Unemployment rate change vs a year earlier', 'pts', 'down', 'Economy'),
     'permits_change': ('New homes permitted vs prior 12 months', 'pct', 'up', 'Economy'),
     'aadt': ('Traffic on the main road (vehicles/day)', 'count', 'up', 'Access'),
+    'retail_services_1mi': ('Retail and services within 1 mile', 'count', 'up', 'Retail'),
+    'nearest_supermarket_mi': ('Distance to the nearest supermarket (mi)', 'mi', 'down', 'Retail'),
 }
 MIN_PORTFOLIO = 5
+SNAPSHOT_VERSION = 2  # 2: retail/supermarket metrics and list extras (B6b/B9); older rows are rebuilt
 
 
 def _ring(rings, radius=3):
@@ -36,6 +39,7 @@ def refresh_snapshot(location):
     from .signals import attention
     values = extract(location, fresh=True)
     values['_list'] = list_numbers(location)
+    values['_v'] = SNAPSHOT_VERSION
     row, _ = LocationMetrics.objects.update_or_create(location=location, defaults={
         'analysis_version': location.analysis_version, 'values': values, 'attention': attention(location.pk)})
     return row
@@ -71,7 +75,7 @@ def snapshots(locations):
     out = {}
     for loc in locations:
         row = rows.get(loc.pk)
-        if row is None or row.analysis_version != loc.analysis_version:
+        if row is None or row.analysis_version != loc.analysis_version or row.values.get('_v') != SNAPSHOT_VERSION:
             row = refresh_snapshot(loc)
         out[loc.pk] = row
     return out
@@ -126,6 +130,16 @@ def extract(location, fresh=False):
     if traffic and traffic.status == 'available' and traffic.data.get('roads'):
         road = traffic.data['roads'][0]
         out['aadt'] = {'value': road['aadt'], 'period': f"HPMS {road['year']}", 'source': 'SRC-10', 'detail': road['label']}
+    biz = rows.get('businesses')
+    if biz and biz.status == 'available':
+        period = f"Overture {biz.data.get('release')}"
+        total = (biz.data.get('retail_and_services_total') or {}).get('1mi')
+        if total is not None:
+            out['retail_services_1mi'] = {'value': total, 'period': period, 'source': 'SRC-13'}
+        market = biz.data.get('nearest_supermarket')
+        if market and market.get('distance_mi') is not None:
+            out['nearest_supermarket_mi'] = {'value': market['distance_mi'], 'period': period, 'source': 'SRC-13',
+                'detail': market.get('brand') or market.get('name')}
     hazards = rows.get('hazards')
     out['_hazards'] = hazards.data if hazards and hazards.status == 'available' else None
     return out
@@ -170,6 +184,8 @@ def _fmt(key, value):
         return f'{value * 100:+.1f}%'
     if unit == 'pts':
         return f'{value:+.1f} pts'
+    if unit == 'mi':
+        return f'{value:.1f} mi'
     return f'{value:,.0f}'
 
 

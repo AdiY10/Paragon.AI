@@ -24,7 +24,7 @@ def required_states():
 def ingested_years():
     """{year: set(states)} for table-based vintages."""
     out = {}
-    for release, scope in SourceSnapshot.objects.filter(source_id='SRC-03').values_list('release', 'scope'):
+    for release, scope in SourceSnapshot.objects.filter(source_id='SRC-03', scope__contains=':bg:').values_list('release', 'scope'):
         if release.isdigit() and int(release) >= FIRST_TABLE_BASED_YEAR:
             out.setdefault(int(release), set()).add(scope.rsplit(':', 1)[1])
     return out

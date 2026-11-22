@@ -70,7 +70,10 @@ def kpis(location):
     out = []
     for key, label, unit, direction in KPI_ORDER:
         item = mine.get(key)
-        card = {'key': key, 'label': label, 'value': None if item is None else item['value'], 'unit': unit,
+        value = None if item is None else item['value']
+        if value is not None and unit in ('people', 'households', 'jobs', 'vehicles', 'places'):
+            value = round(value)
+        card = {'key': key, 'label': label, 'value': value, 'unit': unit,
             'direction': direction, 'rank': None, 'of': None, 'percentile': None, 'hypothetical': not owned,
             'change': None, 'note': None, 'period': item and item.get('period'), 'source': item and item.get('source')}
         peer = peer_values.get(key, [])
@@ -107,6 +110,10 @@ def kpis(location):
     return out
 
 
+def _pct(value):
+    return f'{value * 100:+.1f}%'.replace('-', '\u2212')
+
+
 def _fmt(unit, value):
     if unit == 'usd':
         return f'${value:,.0f}'
@@ -138,7 +145,7 @@ def takeaways(location, cards=None, signals=None, limit=5):
         change = pop['change']
         tail = ''
         if change and change['significant']:
-            tail = f", {change['value'] * 100:+.1f}% since {change['since']} (significant)"
+            tail = f", {_pct(change['value'])} since {change['since']} (significant)"
         strength = (abs(pop['percentile'] - 50) if pop['percentile'] is not None else 0) + (25 if tail else 0)
         tone = 'positive' if (pop['percentile'] or 50) >= 75 or (change and change['significant'] and change['value'] > 0) \
             else 'caution' if (pop['percentile'] or 50) <= 25 or (change and change['significant'] and change['value'] < 0) \
@@ -161,7 +168,7 @@ def takeaways(location, cards=None, signals=None, limit=5):
         change = road['change']
         text = f"Main road {road.get('detail') or ''} carries {_fmt('people', road['value'])} vehicles/day ({road['period'].replace('HPMS ', '')})".replace('road  carries', 'road carries')
         if change:
-            text += f", {change['value'] * 100:+.1f}% vs the prior count"
+            text += f", {_pct(change['value'])} vs the prior count"
         add(abs(change['value']) * 300 if change else 10, text,
             'caution' if change and change['value'] <= -0.05 else 'neutral', 'access', road['source'], road['period'])
     market = by_key.get('nearest_supermarket_mi')

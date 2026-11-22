@@ -256,6 +256,42 @@ def plan_batches(counts, limit=30_000):
     return batches
 
 
+REFERENCE_PREFIXES = {'0100000US': 'US', '0400000US': None}  # nation; states (GEO_ID suffix = state FIPS)
+
+
+def extract_reference(year, line_source):
+    """Nation and state rows of every table (redesign B6b: the "100 = US average" index).
+
+    Returns an AcsExtract whose rows are keyed 'US' and two-digit state FIPS codes.
+    """
+    rows = {}
+    for table in TABLES:
+        lines = iter(line_source(table))
+        columns = next(lines).rstrip('\r\n').split('|')
+        wanted = {columns.index(f'{table}_{k}{c}'): (f'{table}_{c}_{k}', k == 'M') for c in TABLES[table] for k in 'EM'
+            if f'{table}_{k}{c}' in columns}
+        for line in lines:
+            if not line.startswith(('0100000US', '0400000US')):
+                continue
+            parts = line.rstrip('\r\n').split('|')
+            key = 'US' if parts[0] == '0100000US' else parts[0][len('0400000US'):]
+            row = rows.setdefault(key, {})
+            for i, (name, is_moe) in wanted.items():
+                row[name] = parse_value(parts[i], moe=is_moe)
+    if 'US' not in rows:
+        raise AcsError('national row missing')
+    return AcsExtract(year, 'reference', rows, (BASE_URL.format(year=year, table='b01003'),), datetime.now(timezone.utc))
+
+
+def publish_reference(extract, store):
+    payload = extract.payload()
+    return publish_snapshot(source_id='SRC-03', scope=f'acs5:{extract.year}:reference', release=str(extract.year),
+        data_period=vintage_period(extract.year), source_url=extract.source_urls[0].rsplit('/', 1)[0] + '/',
+        adapter_version=ADAPTER_VERSION, stream=io.BytesIO(payload), store=store, retrieved_at=extract.retrieved_at,
+        validation=ValidationReport(True, True, {'tables': TABLES}, len(extract.rows)),
+        context={'tables': sorted(TABLES), 'geography': 'nation and states', 'format': 'jsonl.gz'})
+
+
 def scope_for(year, state):
     return f'acs5:{year}:bg:{state}'
 
